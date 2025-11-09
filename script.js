@@ -7,7 +7,7 @@
 
 // Canvas setup
 const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d'); 
+const ctx = canvas.getContext('2d');
 
 // Offscreen canvas setup
 const gameCanvas = document.createElement('canvas');
@@ -52,6 +52,15 @@ const statPointsEl = document.getElementById('stat-points');
 const statOptionsEl = document.getElementById('stat-options');
 
 
+// Runtime & timing helpers
+const TARGET_FPS = 60;
+const FRAME_TIME = 1 / TARGET_FPS;
+const FRAME_MS = 1000 / TARGET_FPS;
+
+let lastFrameTimestamp = null;
+let deltaTime = FRAME_TIME;
+let deltaMultiplier = 1;
+
 // Wallet & Blockchain
 let walletPublicKey = null;
 let hasAstroCatNFT = false;
@@ -92,9 +101,27 @@ let tail = []; let particles = [];
 let chargeStartTime = 0; let isCharging = false;
 const COMBO_WINDOW = 5000; const COMBO_THRESHOLD = 3;
 let killStreak = 0; let lastKillTime = 0;
-let powerupTimeouts = []; 
-let screenShakeDuration = 0; let hitStopDuration = 0; 
-const DAILY_INTERVAL_MS = 24 * 60 * 60 * 1000; 
+let powerupTimeouts = [];
+let screenShakeDuration = 0; let hitStopDuration = 0;
+const DAILY_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+const uiCache = {
+    score: null,
+    credits: null,
+    lives: null,
+    levelText: null,
+    combo: null,
+    shopCredits: null
+};
+
+const STAR_COUNT = 120;
+const starField = Array.from({ length: STAR_COUNT }, () => ({
+    x: Math.random() * gameCanvas.width,
+    y: Math.random() * gameCanvas.height,
+    speed: 40 + Math.random() * 80,
+    size: Math.random() * 2 + 1,
+    twinkle: Math.random() * Math.PI * 2
+}));
 
 // LEVELING CONSTANTS
 const BASE_XP_TO_LEVEL = 100;
@@ -123,7 +150,23 @@ const player = {
 
 let projectiles = []; let enemies = [];
 const keys = {}; let joystickActive = false; let joystickDelta = { x: 0, y: 0 };
+let joystickSmoothed = { x: 0, y: 0 };
+const JOYSTICK_SMOOTHING = 0.15;
 const lastKeyTime = {};
+
+const POWERUP_VISUALS = {
+    speed: { color: '#ff9f1c', letter: 'S' },
+    rapid: { color: '#ffe066', letter: 'R' },
+    shield: { color: '#4dabf7', letter: 'D' },
+    life: { color: '#fa5252', letter: '♥' },
+    spread: { color: '#845ef7', letter: 'W' },
+    homing: { color: '#3bc9db', letter: 'H' },
+    pierce: { color: '#e64980', letter: 'P' },
+    ultra_dash: { color: '#ffd43b', letter: 'U' },
+    default: { color: '#ffffff', letter: '?' }
+};
+
+const framesToMs = (frames) => frames * FRAME_MS;
 
 // ====================================================================
 // SECTION A: CORE UTILITY AND UI UPDATE FUNCTIONS (DEFINED FIRST)
@@ -145,10 +188,14 @@ function emitParticles(x, y, count = 3, isDash = false, isCharge = false) {
         if (particles.length < 200) {
             const angle = Math.random() * Math.PI * 2;
             const speed = (Math.random() - 0.5) * (isDash ? 4 : isCharge ? 3 : 2);
+            const baseLife = framesToMs(isCharge ? 50 : 30);
             particles.push({
-                x: x + player.width / 2, y: y + player.height / 2,
-                vx: Math.cos(angle) * speed - player.dx * 0.5, vy: Math.sin(angle) * speed - player.dy * 0.5,
-                life: isCharge ? 50 : 30, maxLife: isCharge ? 50 : 30,
+                x: x + player.width / 2,
+                y: y + player.height / 2,
+                vx: Math.cos(angle) * speed - player.dx * 0.5,
+                vy: Math.sin(angle) * speed - player.dy * 0.5,
+                life: baseLife,
+                maxLife: baseLife,
                 size: Math.random() * 4 + 2,
                 color: isDash ? '#ffff00' : isCharge ? '#ff00ff' : `hsl(${Math.random() * 60 + 100}, 100%, 50%)`
             });
@@ -157,18 +204,22 @@ function emitParticles(x, y, count = 3, isDash = false, isCharge = false) {
 }
 
 function updateParticles() {
+    const damping = Math.pow(0.98, deltaMultiplier);
+    const elapsedMs = deltaTime * 1000;
     for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
-        p.x += p.vx; p.y += p.vy;
-        p.life--;
-        p.vx *= 0.98; p.vy *= 0.98;
+        p.x += p.vx * deltaMultiplier;
+        p.y += p.vy * deltaMultiplier;
+        p.life -= elapsedMs;
+        p.vx *= damping;
+        p.vy *= damping;
         if (p.life <= 0) { particles.splice(i, 1); }
     }
 }
 
 function drawParticles() {
     particles.forEach(p => {
-        const alpha = p.life / p.maxLife;
+        const alpha = Math.max(0, p.life / p.maxLife);
         gameCtx.save();
         gameCtx.globalAlpha = alpha;
         gameCtx.fillStyle = p.color;
@@ -179,13 +230,44 @@ function drawParticles() {
     });
 }
 
+function updateStarfield() {
+    starField.forEach(star => {
+        star.x -= star.speed * deltaTime;
+        if (star.x < -star.size) {
+            star.x = gameCanvas.width + star.size;
+            star.y = Math.random() * gameCanvas.height;
+            star.twinkle = Math.random() * Math.PI * 2;
+        }
+        star.twinkle += deltaTime * 2;
+    });
+}
+
 function updateUI() {
-    if (scoreEl) scoreEl.textContent = `Score: ${score}`; 
-    if (creditsEl) creditsEl.textContent = `Credits: ${credits}`;
-    if (livesEl) livesEl.textContent = `Lives: ${lives}`; 
-    if (levelEl) levelEl.textContent = `Level: ${playerData.level} (XP: ${playerData.currentXP}/${getXPForNextLevel(playerData.level)})`;
-    if (comboEl) comboEl.textContent = `Combo: ${killStreak}`; 
-    if (shopCreditsEl) shopCreditsEl.textContent = credits;
+    if (scoreEl && uiCache.score !== score) {
+        uiCache.score = score;
+        scoreEl.textContent = `Score: ${score}`;
+    }
+    if (creditsEl && uiCache.credits !== credits) {
+        uiCache.credits = credits;
+        creditsEl.textContent = `Credits: ${credits}`;
+    }
+    if (livesEl && uiCache.lives !== lives) {
+        uiCache.lives = lives;
+        livesEl.textContent = `Lives: ${lives}`;
+    }
+    const levelText = `Level: ${playerData.level} (XP: ${playerData.currentXP}/${getXPForNextLevel(playerData.level)})`;
+    if (levelEl && uiCache.levelText !== levelText) {
+        uiCache.levelText = levelText;
+        levelEl.textContent = levelText;
+    }
+    if (comboEl && uiCache.combo !== killStreak) {
+        uiCache.combo = killStreak;
+        comboEl.textContent = `Combo: ${killStreak}`;
+    }
+    if (shopCreditsEl && uiCache.shopCredits !== credits) {
+        uiCache.shopCredits = credits;
+        shopCreditsEl.textContent = credits;
+    }
     if (shopRollBtn) shopRollBtn.disabled = credits < 50;
 }
 
@@ -303,7 +385,8 @@ function drawTail() {
     });
 }
 
-function drawPowerup(x, y, w, h, type, letter, color) {
+function drawPowerup(x, y, w, h, visuals) {
+    const { color, letter } = visuals;
     gameCtx.fillStyle = color; gameCtx.fillRect(x, y, w, h);
     gameCtx.fillStyle = '#000000'; gameCtx.font = 'bold 12px "MS PGothic", monospace';
     gameCtx.textAlign = 'center'; gameCtx.textBaseline = 'middle';
@@ -331,7 +414,10 @@ function applyPowerup(type) {
             const shieldDuration = 5000 + (player.defenseRating * 1000); 
             shieldActive = true; timeoutId = setTimeout(() => { shieldActive = false; }, shieldDuration); powerupTimeouts.push(timeoutId); break;
         case 'life':
-            lives++; if (livesEl) livesEl.textContent = `Lives: ${lives}`; break;
+            lives++;
+            uiCache.lives = null;
+            if (livesEl) livesEl.textContent = `Lives: ${lives}`;
+            break;
         case 'spread':
             spreadActive = true; timeoutId = setTimeout(() => { spreadActive = false; }, 8000); powerupTimeouts.push(timeoutId); break;
         case 'homing':
@@ -695,13 +781,20 @@ function loadPlayerData() {
 function updateEnemies() {
     if (hitStopDuration > 0) return;
     const now = Date.now();
-    if (bossActive && boss) { updateBossAI(now); }
+    if (bossActive && boss) { updateBossAI(now, deltaMultiplier); }
 
     for (let i = enemies.length - 1; i >= 0; i--) {
         const enemy = enemies[i];
-        if (bossActive && enemy !== boss && enemy.variant !== 'mecha') continue; 
+        if (bossActive && enemy !== boss && enemy.variant !== 'mecha') continue;
 
-        enemy.x -= enemy.speed; enemy.y += enemy.dy;
+        const horizontalSpeed = enemy.speed || 0;
+        const verticalSpeed = enemy.dy || 0;
+        enemy.x -= horizontalSpeed * deltaMultiplier;
+        enemy.y += verticalSpeed * deltaMultiplier;
+        if (enemy.diveStrength) {
+            enemy.divePhase = (enemy.divePhase || 0) + deltaTime * 3;
+            enemy.y += Math.sin(enemy.divePhase) * enemy.diveStrength * deltaTime;
+        }
         enemy.y = Math.max(0, Math.min(gameCanvas.height - enemy.height, enemy.y));
         if (enemy.x < -enemy.width) { enemies.splice(i, 1); continue; }
 
@@ -711,18 +804,36 @@ function updateEnemies() {
             if (rectOverlap(enemy, seg)) { tailHit = true; break; }
         }
         if (tailHit) {
-            lives--; if (livesEl) livesEl.textContent = `Lives: ${lives}`; enemies.splice(i, 1);
-            if (lives <= 0) { gameRunning = false; playerData.losses++; savePlayerData(); setTimeout(() => alert(`Game Over! Level: ${level} Score: ${score}\nReload to play again.`), 100); }
+            lives--;
+            uiCache.lives = null;
+            if (livesEl) livesEl.textContent = `Lives: ${lives}`;
+            enemies.splice(i, 1);
+            if (lives <= 0) {
+                gameRunning = false;
+                playerData.losses++;
+                savePlayerData();
+                setTimeout(() => alert(`Game Over! Level: ${level} Score: ${score}\nReload to play again.`), 100);
+            }
             continue;
         }
 
         if (rectOverlap(player, enemy)) {
             if (shieldActive) {
-                score += 10 * (enemy.hp || 1); if (scoreEl) scoreEl.textContent = `Score: ${score}`; updateTailLength();
-                enemies.splice(i, 1); shieldActive = false;
+                score += 10 * (enemy.hp || 1);
+                uiCache.score = null;
+                updateTailLength();
+                enemies.splice(i, 1);
+                shieldActive = false;
             } else {
-                lives--; if (livesEl) livesEl.textContent = `Lives: ${lives}`; enemies.splice(i, 1);
-                if (lives <= 0) { gameRunning = false; playerData.losses++; savePlayerData(); setTimeout(() => alert(`Game Over! Level: ${level} Score: ${score}\nReload to play again.`), 100); }
+                lives--;
+                uiCache.lives = null;
+                enemies.splice(i, 1);
+                if (lives <= 0) {
+                    gameRunning = false;
+                    playerData.losses++;
+                    savePlayerData();
+                    setTimeout(() => alert(`Game Over! Level: ${level} Score: ${score}\nReload to play again.`), 100);
+                }
             }
             continue;
         }
@@ -743,8 +854,8 @@ function updateEnemies() {
                 }
                 
                 if (enemy === boss) {
-                    hitStopDuration = 5; 
-                    screenShakeDuration = 20; 
+                    hitStopDuration = framesToMs(5);
+                    screenShakeDuration = framesToMs(20);
                 }
                 
                 emitParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, isCrit ? 6 : 3);
@@ -753,6 +864,7 @@ function updateEnemies() {
                 if (enemy.hp <= 0) {
                     const streakBonus = killStreak >= COMBO_THRESHOLD ? 20 : 10;
                     score += streakBonus + (enemy.variant === 'mecha' ? 10 : 0) + (enemy.variant === 'boss' ? 100 : 0);
+                    uiCache.score = null;
                     
                     // XP GAIN
                     const xpReward = 5 + level * 2 + (enemy.variant === 'boss' ? 50 : 0);
@@ -761,6 +873,7 @@ function updateEnemies() {
                     const killTime = Date.now();
                     if (killTime - lastKillTime < COMBO_WINDOW) { killStreak++; } else { killStreak = 1; }
                     lastKillTime = killTime;
+                    uiCache.combo = null;
                     
                     // --- DAILY QUEST: ACHIEVE COMBO 5 TRACKING ---
                     const comboQuest = playerData.daily.quests.find(q => q.id === 'achieveCombo');
@@ -773,10 +886,25 @@ function updateEnemies() {
                     if (killStreak >= COMBO_THRESHOLD) { player.speed *= 1.2; setTimeout(() => { player.speed /= 1.2; }, 3000); }
     
                     if (enemy === boss) {
-                        enemies.splice(e, 1); bossActive = false;
+                        enemies.splice(e, 1);
+                        bossActive = false;
                         if (boss.split) {
-                            for (let j = 0; j < 3; j++) { enemies.push({ x: boss.x, y: boss.y + j * 40 - 40, width: 30, height: 30, speed: 4, dy: (Math.random() - 0.5) * 2, variant: 'mecha', hp: 1 }); }
-                        } showAnnounce(waveAnnounceEl, 'Boss Defeated!');
+                            for (let j = 0; j < 3; j++) {
+                                enemies.push({
+                                    x: boss.x,
+                                    y: boss.y + j * 40 - 40,
+                                    width: 30,
+                                    height: 30,
+                                    speed: 4,
+                                    dy: (Math.random() - 0.5) * 2,
+                                    variant: 'mecha',
+                                    hp: 1,
+                                    diveStrength: 0,
+                                    divePhase: 0
+                                });
+                            }
+                        }
+                        showAnnounce(waveAnnounceEl, 'Boss Defeated!');
                         
                         // --- DAILY QUEST: DEFEAT BOSS TRACKING ---
                         const defeatBossQuest = playerData.daily.quests.find(q => q.id === 'defeatBoss');
@@ -794,34 +922,63 @@ function updateEnemies() {
                         } enemies.splice(e, 1);
                     }
                 }
-                hitsThisFrame++; updateUI(); updateTailLength();
+                hitsThisFrame++;
+                updateTailLength();
             }
         }
         if (hitsThisFrame > 0) { proj.hits -= hitsThisFrame; if (proj.hits <= 0) { projectiles.splice(p, 1); } }
     }
-    if (Date.now() - lastKillTime > COMBO_WINDOW) { killStreak = 0; }
+    if (Date.now() - lastKillTime > COMBO_WINDOW) {
+        if (killStreak !== 0) {
+            killStreak = 0;
+            uiCache.combo = null;
+        }
+    }
 }
 
 function updatePlayer() {
     if (gamePaused || hitStopDuration > 0) return;
-    
-    player.dx = 0; player.dy = 0;
-    if (keys['ArrowLeft'] || keys['KeyA']) player.dx = -player.speed;
-    if (keys['ArrowRight'] || keys['KeyD']) player.dx = player.speed;
-    if (keys['ArrowUp'] || keys['KeyW']) player.dy = -player.speed;
-    if (keys['ArrowDown'] || keys['KeyS']) player.dy = player.speed;
 
-    if (joystickActive) { player.dx += joystickDelta.x * player.speed; player.dy += joystickDelta.y * player.speed; }
+    let inputX = 0;
+    let inputY = 0;
 
-    const isMoving = player.dx !== 0 || player.dy !== 0;
+    if (keys['ArrowLeft'] || keys['KeyA']) inputX -= 1;
+    if (keys['ArrowRight'] || keys['KeyD']) inputX += 1;
+    if (keys['ArrowUp'] || keys['KeyW']) inputY -= 1;
+    if (keys['ArrowDown'] || keys['KeyS']) inputY += 1;
+
+    if (joystickActive) {
+        const smoothingFactor = Math.min(1, deltaMultiplier * JOYSTICK_SMOOTHING * TARGET_FPS);
+        joystickSmoothed.x += (joystickDelta.x - joystickSmoothed.x) * smoothingFactor;
+        joystickSmoothed.y += (joystickDelta.y - joystickSmoothed.y) * smoothingFactor;
+        inputX += joystickSmoothed.x;
+        inputY += joystickSmoothed.y;
+    } else {
+        joystickSmoothed.x += (0 - joystickSmoothed.x) * 0.2;
+        joystickSmoothed.y += (0 - joystickSmoothed.y) * 0.2;
+    }
+
+    const magnitude = Math.hypot(inputX, inputY);
+    if (magnitude > 1) {
+        inputX /= magnitude;
+        inputY /= magnitude;
+    }
+
     const dashMultiplier = dashActive ? 3 : 1;
-    player.x += player.dx * dashMultiplier; player.y += player.dy * dashMultiplier;
+    player.dx = inputX * player.speed * dashMultiplier;
+    player.dy = inputY * player.speed * dashMultiplier;
+
+    player.x += player.dx * deltaMultiplier;
+    player.y += player.dy * deltaMultiplier;
     player.x = Math.max(0, Math.min(gameCanvas.width - player.width, player.x));
     player.y = Math.max(0, Math.min(gameCanvas.height - player.height, player.y));
 
-    if (isMoving && gameRunning) { emitParticles(player.x, player.y, 2, dashActive); }
+    if ((Math.abs(player.dx) > 0.01 || Math.abs(player.dy) > 0.01) && gameRunning) {
+        emitParticles(player.x, player.y, 2, dashActive);
+    }
 
-    const newHead = { x: player.x, y: player.y }; tail.unshift(newHead);
+    const newHead = { x: player.x, y: player.y };
+    tail.unshift(newHead);
     updateTailLength();
 }
 
@@ -834,11 +991,17 @@ function updateProjectiles() {
             const dist = Math.hypot(dx, dy);
             if (dist > 0) {
                 const angle = Math.atan2(dy, dx);
-                proj.x += Math.cos(angle) * proj.speed * 0.1; 
-                proj.y += Math.sin(angle) * proj.speed * 0.1;
+                const adjustStep = (proj.speed || 0) * deltaMultiplier * 0.1;
+                proj.x += Math.cos(angle) * adjustStep;
+                proj.y += Math.sin(angle) * adjustStep;
             }
-            proj.x += proj.speed; 
-        } else { proj.x += proj.speed; }
+            proj.x += (proj.speed || 0) * deltaMultiplier;
+        } else {
+            proj.x += (proj.speed || 0) * deltaMultiplier;
+        }
+        if (proj.dy) {
+            proj.y += proj.dy * deltaMultiplier;
+        }
         if (proj.x > gameCanvas.width || proj.hits <= 0) { projectiles.splice(i, 1); }
     }
 }
@@ -846,7 +1009,7 @@ function updateProjectiles() {
 function updatePowerups() {
     if (hitStopDuration > 0) return;
     for (let i = powerups.length - 1; i >= 0; i--) {
-        const pu = powerups[i]; pu.x -= 1.5;
+        const pu = powerups[i]; pu.x -= 1.5 * deltaMultiplier;
         if (pu.x < -pu.width) { powerups.splice(i, 1); continue; }
         if (rectOverlap(player, pu)) { applyPowerup(pu.type); powerups.splice(i, 1); }
     }
@@ -854,25 +1017,33 @@ function updatePowerups() {
 
 function spawnEnemy() {
     if (bossActive || gamePaused || hitStopDuration > 0) return;
-    enemySpawnTimer++;
-    const spawnInterval = Math.max(20, 60 - score / 10);
+    enemySpawnTimer += deltaTime;
+    const spawnInterval = Math.max(20, 60 - score / 10) * FRAME_TIME;
     if (enemySpawnTimer > spawnInterval) {
         enemySpawnTimer = 0;
         if (enemyWave.length > 0) {
             const y = enemyWave.shift();
+            const diveStrength = currentWaveConfig.dive ? 35 : 0;
             const enemy = {
-                x: gameCanvas.width, y: y, width: 50, height: 50,
-                speed: currentWaveConfig.speed + (currentWaveConfig.dive ? Math.sin(Date.now() * 0.01 + y) * 2 : 0),
-                dy: currentWaveConfig.dive ? (Math.random() - 0.5) * 4 : (Math.random() - 0.5) * 2,
-                variant: currentWaveConfig.type, hp: currentWaveConfig.type === 'mecha' ? 2 : 1
+                x: gameCanvas.width,
+                y,
+                width: 50,
+                height: 50,
+                speed: currentWaveConfig.speed,
+                dy: (Math.random() - 0.5) * (currentWaveConfig.dive ? 4 : 2),
+                variant: currentWaveConfig.type,
+                hp: currentWaveConfig.type === 'mecha' ? 2 : 1,
+                diveStrength,
+                divePhase: Math.random() * Math.PI * 2
             }; enemies.push(enemy);
         } else if (enemies.length === 0) {
-            credits += Math.floor(score / 10) + (level * 10); 
+            credits += Math.floor(score / 10) + (level * 10);
+            uiCache.credits = null;
             playerData.credits = credits;
             if (score > playerData.bestScore) { playerData.bestScore = score; }
             if (lives > 0) { playerData.wins++; } else { playerData.losses++; }
             savePlayerData();
-            gameRunning = false; showHub(); 
+            gameRunning = false; showHub();
         }
     }
 }
@@ -889,19 +1060,24 @@ function setupNextWave() {
     }
 }
 
-function updateBossAI(now) {
+function updateBossAI(now, deltaStep) {
     if (!boss || !boss.mirrorDash) return;
-    if (now - boss.lastDash > 2000 && Math.random() < 0.01) {
+    if (!boss.lastDash) { boss.lastDash = now; }
+    const dashChance = 0.01 * (deltaStep || 1);
+    if (now - boss.lastDash > 2000 && Math.random() < dashChance) {
         const dx = player.x - boss.x; const dy = player.y - boss.y;
         const dist = Math.hypot(dx, dy);
         if (dist > 0) {
-            boss.dx = (dx / dist) * boss.speed * 2; 
+            boss.dx = (dx / dist) * boss.speed * 2;
             boss.dy = (dy / dist) * boss.speed * 2;
             setTimeout(() => { boss.dx = 0; boss.dy = 0; }, 500);
             boss.lastDash = now;
         }
     }
-    boss.x += boss.dx || -boss.speed; boss.y += boss.dy || 0;
+    const moveX = typeof boss.dx === 'number' && boss.dx !== 0 ? boss.dx : -boss.speed;
+    const moveY = typeof boss.dy === 'number' ? boss.dy : 0;
+    boss.x += moveX * (deltaStep || 1);
+    boss.y += moveY * (deltaStep || 1);
     boss.y = Math.max(0, Math.min(gameCanvas.height - boss.height, boss.y));
 }
 
@@ -910,15 +1086,20 @@ function updateBossAI(now) {
 function renderGameScene() {
     gameCtx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
 
-    gameCtx.fillStyle = '#ffffff';
-    const time = Date.now() * 0.01;
-    for (let i = 0; i < 100; i++) {
-        const x = (i * 37 + time) % gameCanvas.width; const y = (i * 23 + time * 0.5) % gameCanvas.height;
-        const size = (i % 3) + 1; gameCtx.fillRect(x, y, size, size);
-    }
+    gameCtx.save();
+    starField.forEach(star => {
+        const brightness = (Math.sin(star.twinkle) + 1) * 0.25 + 0.5;
+        gameCtx.globalAlpha = brightness;
+        gameCtx.fillStyle = '#ffffff';
+        gameCtx.fillRect(star.x, star.y, star.size, star.size);
+    });
+    gameCtx.restore();
 
     drawParticles(); drawTail();
-    powerups.forEach(pu => drawPowerup(pu.x, pu.y, pu.type, pu.width, pu.height));
+    powerups.forEach(pu => {
+        const visuals = POWERUP_VISUALS[pu.type] || POWERUP_VISUALS.default;
+        drawPowerup(pu.x, pu.y, pu.width, pu.height, visuals);
+    });
 
     projectiles.forEach(proj => {
         gameCtx.fillStyle = proj.isBeam ? '#ff00ff' : '#ffff00';
@@ -1003,29 +1184,57 @@ function renderWithShader() {
 }
 
 // --- MAIN GAME LOOP ---
-function render() { 
-    if (hitStopDuration === 0) {
+function render() {
+    if (hitStopDuration <= 0) {
         if (screenShakeDuration > 0) {
-            if (canvas) canvas.style.transform = `translate(${Math.random() * 5 - 2.5}px, ${Math.random() * 5 - 2.5}px)`;
+            const intensity = Math.min(1, screenShakeDuration / framesToMs(20));
+            const offsetX = (Math.random() * 5 - 2.5) * intensity;
+            const offsetY = (Math.random() * 5 - 2.5) * intensity;
+            if (canvas) canvas.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
         } else {
             if (canvas) canvas.style.transform = 'translate(0, 0)';
         }
     }
 
-    renderGameScene(); renderWithShader(); 
+    renderGameScene();
+    renderWithShader();
 }
 
-function gameLoop() {
-    if (hitStopDuration > 0) {
-        hitStopDuration--;
-    } else if (gameRunning && !gamePaused) {
-        if (screenShakeDuration > 0) { screenShakeDuration--; }
-
-        updatePlayer(); updateParticles(); updateProjectiles();
-        if (!bossActive) spawnEnemy();
-        updateEnemies(); updatePowerups(); updateDashCooldown();
+function gameLoop(timestamp = (typeof performance !== 'undefined' ? performance.now() : Date.now())) {
+    if (lastFrameTimestamp === null) {
+        lastFrameTimestamp = timestamp;
     }
+
+    const rawDelta = (timestamp - lastFrameTimestamp) / 1000;
+    lastFrameTimestamp = timestamp;
+    deltaTime = Math.min(rawDelta > 0 ? rawDelta : FRAME_TIME, 0.1);
+    deltaMultiplier = Math.max(0.25, Math.min(deltaTime / FRAME_TIME, 3));
+
+    const elapsedMs = deltaTime * 1000;
+    if (hitStopDuration > 0) {
+        hitStopDuration = Math.max(0, hitStopDuration - elapsedMs);
+    }
+    if (screenShakeDuration > 0) {
+        screenShakeDuration = Math.max(0, screenShakeDuration - elapsedMs);
+    }
+
+    updateStarfield();
+
+    if (hitStopDuration === 0) {
+        updateParticles();
+        if (gameRunning && !gamePaused) {
+            updatePlayer();
+            updateProjectiles();
+            if (!bossActive) spawnEnemy();
+            updateEnemies();
+            updatePowerups();
+        }
+    }
+
+    updateDashCooldown();
+
     render();
+    updateUI();
     requestAnimationFrame(gameLoop);
 }
 
