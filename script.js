@@ -42,6 +42,8 @@ const lossesEl = document.getElementById('losses');
 const bestScoreEl = document.getElementById('best-score');
 const hubCreditsEl = document.getElementById('hub-credits');
 const itemsEl = document.getElementById('items');
+const activeSpriteEl = document.getElementById('active-sprite');
+const ownedSpritesEl = document.getElementById('owned-sprites');
 const leaderboardEl = document.getElementById('leaderboard');
 const waveAnnounceEl = document.getElementById('wave-announce');
 const bossAnnounceEl = document.getElementById('boss-announce');
@@ -74,18 +76,34 @@ function createDefaultQuests() {
     ];
 }
 
-let playerData = {
-    gamesPlayed: 0, wins: 0, losses: 0, bestScore: 0, credits: 0, items: [],
-    level: 1, currentXP: 0, levelPoints: 0,
-    stats: {
-        attack: 0, defense: 0, agility: 0, luck: 0
-    },
-    daily: { 
-        lastLogin: 0,
-        claimedLogin: false,
-        quests: createDefaultQuests()
-    }
-};
+function createBasePlayerData() {
+    return {
+        gamesPlayed: 0,
+        wins: 0,
+        losses: 0,
+        bestScore: 0,
+        credits: 0,
+        items: [],
+        ownedSprites: [DEFAULT_SPRITE_ID],
+        activeSpriteId: DEFAULT_SPRITE_ID,
+        level: 1,
+        currentXP: 0,
+        levelPoints: 0,
+        stats: {
+            attack: 0,
+            defense: 0,
+            agility: 0,
+            luck: 0
+        },
+        daily: {
+            lastLogin: 0,
+            claimedLogin: false,
+            quests: createDefaultQuests()
+        }
+    };
+}
+
+let playerData = createBasePlayerData();
 const ASTRO_CAT_COLLECTION_MINT = 'AstroCatMintAddress'; 
 let gl;
 let program;
@@ -164,6 +182,176 @@ const UPGRADE_DETAILS = {
     pierce: { name: 'Piercing Rounds', description: 'Bullets pass through enemies, damaging multiple targets.' },
     ultra_dash: { name: 'Ultra Dash', description: 'Reduce dash cooldown dramatically for rapid repositioning.' }
 };
+
+const SPRITE_DIRECTORY = 'assets/sprites/';
+const DEFAULT_SPRITE_ID = 'astro-pioneer';
+
+const SPACECRAFT_CATALOG = [
+    {
+        id: 'astro-pioneer',
+        name: 'Astro Pioneer',
+        description: 'Reliable starter craft that every pilot begins with.',
+        cost: 0,
+        rarity: 'starter',
+        fileName: 'astro-pioneer.png',
+        fallbackColors: { primary: '#6ff0ff', secondary: '#ffffff', accent: '#ff8bff' }
+    },
+    {
+        id: 'nova-striker',
+        name: 'Nova Striker',
+        description: 'Aggressive strike craft with blazing exhaust trails.',
+        cost: 350,
+        rarity: 'rare',
+        fileName: 'nova-striker.png',
+        fallbackColors: { primary: '#ff6b6b', secondary: '#ffd166', accent: '#ffe66d' }
+    },
+    {
+        id: 'lunar-shadow',
+        name: 'Lunar Shadow',
+        description: 'Stealthy interceptor that leaves a prismatic shimmer.',
+        cost: 550,
+        rarity: 'legendary',
+        fileName: 'lunar-shadow.png',
+        fallbackColors: { primary: '#9c6bff', secondary: '#e6e7ff', accent: '#6bf1ff' }
+    }
+];
+
+const SPRITE_RARITY_LABELS = {
+    starter: 'Starter',
+    common: 'Common',
+    rare: 'Rare',
+    epic: 'Epic',
+    legendary: 'Legendary'
+};
+
+const spriteImageCache = {};
+
+function createSpriteFallback(colors = {}) {
+    const { primary = '#6ff0ff', secondary = '#ffffff', accent = '#ff8bff' } = colors;
+    const size = 64;
+    const canvasSprite = document.createElement('canvas');
+    canvasSprite.width = size;
+    canvasSprite.height = size;
+    const ctx2d = canvasSprite.getContext('2d');
+
+    ctx2d.clearRect(0, 0, size, size);
+
+    ctx2d.fillStyle = secondary;
+    ctx2d.beginPath();
+    ctx2d.moveTo(size * 0.5, size * 0.1);
+    ctx2d.lineTo(size * 0.7, size * 0.35);
+    ctx2d.lineTo(size * 0.3, size * 0.35);
+    ctx2d.closePath();
+    ctx2d.fill();
+
+    ctx2d.fillStyle = primary;
+    ctx2d.beginPath();
+    ctx2d.moveTo(size * 0.5, size * 0.12);
+    ctx2d.lineTo(size * 0.88, size * 0.55);
+    ctx2d.lineTo(size * 0.5, size * 0.92);
+    ctx2d.lineTo(size * 0.12, size * 0.55);
+    ctx2d.closePath();
+    ctx2d.fill();
+
+    ctx2d.fillStyle = accent;
+    ctx2d.beginPath();
+    ctx2d.ellipse(size * 0.5, size * 0.48, size * 0.16, size * 0.2, 0, 0, Math.PI * 2);
+    ctx2d.fill();
+
+    ctx2d.fillStyle = '#ffffff';
+    ctx2d.fillRect(size * 0.47, size * 0.25, size * 0.06, size * 0.18);
+
+    ctx2d.fillStyle = '#ffd166';
+    ctx2d.fillRect(size * 0.38, size * 0.82, size * 0.08, size * 0.12);
+    ctx2d.fillRect(size * 0.54, size * 0.82, size * 0.08, size * 0.12);
+
+    return canvasSprite.toDataURL('image/png');
+}
+
+function getSpriteMeta(spriteId) {
+    return SPACECRAFT_CATALOG.find(sprite => sprite.id === spriteId) || SPACECRAFT_CATALOG[0];
+}
+
+function getSpriteDisplayName(spriteId) {
+    const meta = getSpriteMeta(spriteId);
+    return meta ? meta.name : spriteId;
+}
+
+function getSpriteFallback(meta) {
+    if (!meta) return null;
+    if (!meta.fallbackDataUrl) {
+        meta.fallbackDataUrl = createSpriteFallback(meta.fallbackColors || {});
+    }
+    return meta.fallbackDataUrl;
+}
+
+function ensureSpriteProgression() {
+    if (!Array.isArray(playerData.ownedSprites)) {
+        playerData.ownedSprites = [DEFAULT_SPRITE_ID];
+    }
+    if (!playerData.ownedSprites.includes(DEFAULT_SPRITE_ID)) {
+        playerData.ownedSprites.unshift(DEFAULT_SPRITE_ID);
+    }
+    if (!playerData.activeSpriteId || !playerData.ownedSprites.includes(playerData.activeSpriteId)) {
+        playerData.activeSpriteId = DEFAULT_SPRITE_ID;
+    }
+}
+
+function applySpriteImage(meta) {
+    if (!meta) return;
+    const cached = spriteImageCache[meta.id];
+    if (cached && !cached.isFallback) {
+        playerImg = cached;
+        return;
+    }
+    const fallbackSrc = getSpriteFallback(meta);
+    if (fallbackSrc) {
+        const fallbackImage = new Image();
+        fallbackImage.isFallback = true;
+        fallbackImage.src = fallbackSrc;
+        spriteImageCache[meta.id] = fallbackImage;
+        playerImg = fallbackImage;
+    } else {
+        playerImg = null;
+    }
+
+    if (meta.fileName) {
+        const assetImage = new Image();
+        assetImage.src = `${SPRITE_DIRECTORY}${meta.fileName}`;
+        assetImage.onload = () => {
+            assetImage.isFallback = false;
+            spriteImageCache[meta.id] = assetImage;
+            if (playerData.activeSpriteId === meta.id) {
+                playerImg = assetImage;
+            }
+        };
+        assetImage.onerror = () => {
+            spriteImageCache[meta.id] = spriteImageCache[meta.id] || playerImg;
+        };
+    }
+}
+
+function setActiveSprite(spriteId, options = {}) {
+    const { skipSave = false, skipUI = false } = options;
+    ensureSpriteProgression();
+    const meta = getSpriteMeta(spriteId);
+    playerData.activeSpriteId = meta.id;
+    if (!playerData.ownedSprites.includes(meta.id)) {
+        playerData.ownedSprites.push(meta.id);
+    }
+    applySpriteImage(meta);
+    if (!skipUI) {
+        updateHubUI();
+    }
+    if (!skipSave) {
+        savePlayerData();
+    }
+}
+
+function initializeSpriteSystem() {
+    ensureSpriteProgression();
+    setActiveSprite(playerData.activeSpriteId, { skipSave: true });
+}
 
 let currentShopOptions = [];
 
@@ -564,7 +752,13 @@ function updateHubUI() {
     if (statLevelHubEl) statLevelHubEl.textContent = playerData.level;
     if (statLevelOverlayEl) statLevelOverlayEl.textContent = playerData.level;
     if (statPointsEl) statPointsEl.textContent = playerData.levelPoints;
-    if (itemsEl) itemsEl.textContent = playerData.items.join(', ') || 'None';
+    if (itemsEl) itemsEl.textContent = playerData.items.length ? playerData.items.join(', ') : 'None';
+    ensureSpriteProgression();
+    if (activeSpriteEl) activeSpriteEl.textContent = getSpriteDisplayName(playerData.activeSpriteId);
+    if (ownedSpritesEl) {
+        const names = playerData.ownedSprites.map(getSpriteDisplayName);
+        ownedSpritesEl.textContent = names.length ? names.join(', ') : 'None';
+    }
     credits = playerData.credits;
     updateUI();
     updateQuestsUI();
@@ -784,6 +978,32 @@ function purchaseUpgrade(optionId) {
     currentShopOptions.splice(optionIndex, 1);
     playerData.items.push(option.type);
     applyPowerup(option.type);
+
+    renderShopOptions();
+    updateUI();
+    updateHubUI();
+    savePlayerData();
+    loadAndDisplayLeaderboard();
+}
+
+function purchaseSprite(spriteId) {
+    const meta = getSpriteMeta(spriteId);
+    if (!meta) return;
+
+    ensureSpriteProgression();
+    const owned = playerData.ownedSprites.includes(meta.id);
+
+    if (!owned) {
+        if (credits < meta.cost) return;
+
+        credits -= meta.cost;
+        playerData.credits = credits;
+        uiCache.credits = null;
+        uiCache.shopCredits = null;
+        playerData.ownedSprites.push(meta.id);
+    }
+
+    setActiveSprite(meta.id, { skipSave: true, skipUI: true });
 
     renderShopOptions();
     updateUI();
@@ -1041,17 +1261,23 @@ function savePlayerData() {
 function loadPlayerData() {
     if (walletPublicKey && hasAstroCatNFT) {
         const saved = localStorage.getItem(`astro_invaders_${walletPublicKey}`);
-        if (saved) { 
+        if (saved) {
             const loadedData = JSON.parse(saved);
-            playerData = { ...playerData, ...loadedData };
-            playerData.stats = playerData.stats || { attack: 0, defense: 0, agility: 0, luck: 0 };
-            
+            const base = createBasePlayerData();
+            playerData = { ...base, ...loadedData };
+            playerData.stats = { ...base.stats, ...(loadedData.stats || {}) };
+
             // Ensure daily object exists and merge quest structure
-            playerData.daily = playerData.daily || { lastLogin: 0, claimedLogin: false, quests: [] };
+            const dailyFallback = base.daily;
+            playerData.daily = { ...dailyFallback, ...(loadedData.daily || {}) };
             if (!Array.isArray(playerData.daily.quests) || playerData.daily.quests.length !== 3) {
                 playerData.daily.quests = createDefaultQuests();
             }
+        } else {
+            playerData = createBasePlayerData();
         }
+        ensureSpriteProgression();
+        setActiveSprite(playerData.activeSpriteId, { skipSave: true, skipUI: true });
         updateHubUI();
     }
 }
@@ -1106,6 +1332,7 @@ function renderShopOptions() {
     if (!shopOptionsEl) return;
 
     shopOptionsEl.innerHTML = '';
+    ensureSpriteProgression();
 
     const rollContainer = document.createElement('div');
     rollContainer.className = 'shop-roll-container';
@@ -1129,39 +1356,119 @@ function renderShopOptions() {
         hint.className = 'shop-hint';
         hint.textContent = 'Roll to reveal upgrades and claim a power boost for the next battle.';
         shopOptionsEl.appendChild(hint);
-        return;
     }
 
-    const list = document.createElement('div');
-    list.className = 'shop-option-list';
+    if (currentShopOptions.length > 0) {
+        const list = document.createElement('div');
+        list.className = 'shop-option-list';
 
-    currentShopOptions.forEach(option => {
-        const optionEl = document.createElement('div');
-        optionEl.className = `shop-option ${option.rarity}`;
+        currentShopOptions.forEach(option => {
+            const optionEl = document.createElement('div');
+            optionEl.className = `shop-option ${option.rarity}`;
+
+            const title = document.createElement('h4');
+            title.textContent = `${option.label} [${option.rarity.toUpperCase()}]`;
+            optionEl.appendChild(title);
+
+            const description = document.createElement('p');
+            description.textContent = option.description;
+            optionEl.appendChild(description);
+
+            const costLabel = document.createElement('p');
+            costLabel.className = 'shop-cost';
+            costLabel.textContent = `Cost: ${option.cost} Credits`;
+            optionEl.appendChild(costLabel);
+
+            const purchaseBtn = document.createElement('button');
+            purchaseBtn.textContent = 'Purchase';
+            purchaseBtn.disabled = credits < option.cost;
+            purchaseBtn.onclick = () => purchaseUpgrade(option.id);
+            optionEl.appendChild(purchaseBtn);
+
+            list.appendChild(optionEl);
+        });
+
+        shopOptionsEl.appendChild(list);
+    }
+
+    const spriteSection = document.createElement('div');
+    spriteSection.className = 'shop-section sprite-section';
+
+    const spriteHeader = document.createElement('h3');
+    spriteHeader.textContent = 'Spacecraft Hangar';
+    spriteSection.appendChild(spriteHeader);
+
+    const spriteHint = document.createElement('p');
+    spriteHint.className = 'shop-hint';
+    spriteHint.textContent = 'Equip your current ship or purchase new sprites using PNGs from assets/sprites/.';
+    spriteSection.appendChild(spriteHint);
+
+    const spriteList = document.createElement('div');
+    spriteList.className = 'shop-sprite-grid';
+
+    SPACECRAFT_CATALOG.forEach(sprite => {
+        const owned = playerData.ownedSprites.includes(sprite.id);
+        const active = playerData.activeSpriteId === sprite.id;
+
+        const card = document.createElement('div');
+        card.className = `shop-sprite-card ${sprite.rarity}`;
+
+        const preview = document.createElement('img');
+        preview.className = 'shop-sprite-preview';
+        preview.alt = `${sprite.name} preview`;
+        const fallback = getSpriteFallback(sprite);
+        preview.src = `${SPRITE_DIRECTORY}${sprite.fileName}`;
+        preview.onerror = () => {
+            preview.onerror = null;
+            if (fallback) preview.src = fallback;
+        };
+        preview.loading = 'lazy';
+        card.appendChild(preview);
+
+        const info = document.createElement('div');
+        info.className = 'shop-sprite-info';
 
         const title = document.createElement('h4');
-        title.textContent = `${option.label} [${option.rarity.toUpperCase()}]`;
-        optionEl.appendChild(title);
+        const rarityLabel = SPRITE_RARITY_LABELS[sprite.rarity] || 'Cosmetic';
+        title.textContent = `${sprite.name} [${rarityLabel.toUpperCase()}]`;
+        info.appendChild(title);
 
         const description = document.createElement('p');
-        description.textContent = option.description;
-        optionEl.appendChild(description);
+        description.textContent = sprite.description;
+        info.appendChild(description);
 
         const costLabel = document.createElement('p');
         costLabel.className = 'shop-cost';
-        costLabel.textContent = `Cost: ${option.cost} Credits`;
-        optionEl.appendChild(costLabel);
+        costLabel.textContent = sprite.cost > 0 ? `Cost: ${sprite.cost} Credits` : 'Starter Craft (Free)';
+        info.appendChild(costLabel);
 
-        const purchaseBtn = document.createElement('button');
-        purchaseBtn.textContent = 'Purchase';
-        purchaseBtn.disabled = credits < option.cost;
-        purchaseBtn.onclick = () => purchaseUpgrade(option.id);
-        optionEl.appendChild(purchaseBtn);
+        card.appendChild(info);
 
-        list.appendChild(optionEl);
+        const actions = document.createElement('div');
+        actions.className = 'shop-sprite-actions';
+
+        const status = document.createElement('span');
+        status.className = 'shop-sprite-status';
+        status.textContent = owned ? (active ? 'Equipped' : 'Owned') : (SPRITE_RARITY_LABELS[sprite.rarity] || 'Cosmetic');
+        actions.appendChild(status);
+
+        const actionBtn = document.createElement('button');
+        if (owned) {
+            actionBtn.textContent = active ? 'Equipped' : 'Equip';
+            actionBtn.disabled = active;
+        } else {
+            actionBtn.textContent = 'Purchase';
+            actionBtn.disabled = credits < sprite.cost;
+        }
+        actionBtn.onclick = () => purchaseSprite(sprite.id);
+        actions.appendChild(actionBtn);
+
+        card.appendChild(actions);
+        spriteList.appendChild(card);
     });
 
-    shopOptionsEl.appendChild(list);
+    spriteSection.appendChild(spriteList);
+    shopOptionsEl.appendChild(spriteSection);
 }
 
 function pickRarity(weights) {
@@ -1320,13 +1627,14 @@ async function connectWallet() {
 function disconnectWallet() {
     if (hasAstroCatNFT) { savePlayerData(); }
     walletPublicKey = null; hasAstroCatNFT = false;
-    if (walletStatusEl) walletStatusEl.textContent = 'Not Connected'; 
+    if (walletStatusEl) walletStatusEl.textContent = 'Not Connected';
     if (nftStatusEl) nftStatusEl.textContent = 'Not Detected';
-    if (connectBtn) connectBtn.textContent = 'Connect Phantom Wallet'; 
+    if (connectBtn) connectBtn.textContent = 'Connect Phantom Wallet';
     if (connectBtn) connectBtn.onclick = connectWallet;
-    
-    playerData = { gamesPlayed: 0, wins: 0, losses: 0, bestScore: 0, credits: 0, items: [], level: 1, currentXP: 0, levelPoints: 0, stats: { attack: 0, defense: 0, agility: 0, luck: 0 }, daily: { lastLogin: 0, claimedLogin: false, quests: createDefaultQuests() } };
-    
+
+    playerData = createBasePlayerData();
+    initializeSpriteSystem();
+
     showStartMenu();
 }
 
@@ -1343,7 +1651,8 @@ async function checkNFT(publicKey) {
         if (playBtn) playBtn.disabled = false; 
         
         if (hasAstroCatNFT && !playerData.gamesPlayed) {
-            playerData = { gamesPlayed: 0, wins: 0, losses: 0, bestScore: 0, credits: 0, items: [], level: 1, currentXP: 0, levelPoints: 0, stats: { attack: 0, defense: 0, agility: 0, luck: 0 }, daily: { lastLogin: 0, claimedLogin: false, quests: createDefaultQuests() } };
+            playerData = createBasePlayerData();
+            initializeSpriteSystem();
             savePlayerData();
         }
     } catch (err) {
@@ -1846,8 +2155,9 @@ window.disconnectWallet = disconnectWallet;
 window.showStartMenu = showStartMenu;
 window.openShop = openShop;
 window.rollUpgrade = rollUpgrade;
-window.skipShop = skipShop; 
+window.skipShop = skipShop;
 window.purchaseUpgrade = purchaseUpgrade;
+window.purchaseSprite = purchaseSprite;
 window.allocateStat = allocateStat;
 window.claimQuestReward = claimQuestReward;
 
@@ -1858,6 +2168,7 @@ window.addEventListener('blur', resetKeyState);
 
 window.onload = function() {
     initWebGL();
+    initializeSpriteSystem();
     showStartMenu();
 
     if (dragDrop) {
