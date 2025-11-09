@@ -45,6 +45,7 @@ const itemsEl = document.getElementById('items');
 const leaderboardEl = document.getElementById('leaderboard');
 const waveAnnounceEl = document.getElementById('wave-announce');
 const bossAnnounceEl = document.getElementById('boss-announce');
+const taskbarClockEl = document.getElementById('taskbar-clock');
 // STAT UI ELEMENTS
 const statAllocationEl = document.getElementById('stat-allocation');
 const statLevelHubEl = document.getElementById('stat-level-hub');
@@ -166,6 +167,7 @@ const UPGRADE_DETAILS = {
 };
 
 let currentShopOptions = [];
+let shouldResumeAfterOverlay = false;
 
 const DASH_WINDOW = 300; const DASH_DURATION = 500;
 
@@ -583,7 +585,18 @@ function hideAllOverlays() {
     });
 }
 
+function resumeGame() {
+    hideAllOverlays();
+    if (shouldResumeAfterOverlay) {
+        gameRunning = true;
+        gamePaused = false;
+    }
+    shouldResumeAfterOverlay = false;
+    updateUI();
+}
+
 function showStartMenu() {
+    shouldResumeAfterOverlay = gameRunning && !gamePaused;
     gameRunning = false;
     gamePaused = true;
     hideAllOverlays();
@@ -593,6 +606,7 @@ function showStartMenu() {
 }
 
 function showHub() {
+    shouldResumeAfterOverlay = gameRunning && !gamePaused;
     gameRunning = false;
     gamePaused = true;
     hideAllOverlays();
@@ -607,6 +621,7 @@ function startGame(isNewSession = true) {
 
     gameRunning = true;
     gamePaused = false;
+    shouldResumeAfterOverlay = false;
     bossActive = false;
     boss = null;
     dashActive = false;
@@ -661,6 +676,7 @@ function startNewRound(initialLoad = false) {
     gameRunning = true;
     gamePaused = false;
     hideAllOverlays();
+    shouldResumeAfterOverlay = false;
 
     bossActive = false;
     boss = null;
@@ -720,6 +736,7 @@ function startNewRound(initialLoad = false) {
 }
 
 function openShop() {
+    shouldResumeAfterOverlay = gameRunning && !gamePaused;
     gameRunning = false;
     gamePaused = true;
     hideAllOverlays();
@@ -915,9 +932,20 @@ function applyPowerup(type) {
 }
 
 function showAnnounce(el, text) {
-    if (el) el.textContent = text; 
+    if (el) el.textContent = text;
     if (el) el.style.display = 'block';
     if (el) setTimeout(() => { el.style.display = 'none'; }, 2000);
+}
+
+function updateTaskbarClock() {
+    if (!taskbarClockEl) return;
+    const now = new Date();
+    let hours = now.getHours();
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const suffix = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    if (hours === 0) hours = 12;
+    taskbarClockEl.textContent = `${hours}:${minutes} ${suffix}`;
 }
 
 // Drag-drop handlers
@@ -1183,6 +1211,7 @@ function showStatAllocation() {
     if (playerData.levelPoints === 0 && playerData.level > 1) {
         showHub(); return;
     }
+    shouldResumeAfterOverlay = gameRunning && !gamePaused;
     gamePaused = true;
     hideAllOverlays();
     if (statAllocationEl) statAllocationEl.style.display = 'flex';
@@ -1840,16 +1869,19 @@ function gameLoop(timestamp = (typeof performance !== 'undefined' ? performance.
 }
 
 // Expose functions globally for HTML
-window.startGame = startGame; 
+window.startGame = startGame;
 window.connectWallet = connectWallet;
 window.disconnectWallet = disconnectWallet;
 window.showStartMenu = showStartMenu;
+window.showHub = showHub;
 window.openShop = openShop;
 window.rollUpgrade = rollUpgrade;
-window.skipShop = skipShop; 
+window.skipShop = skipShop;
 window.purchaseUpgrade = purchaseUpgrade;
 window.allocateStat = allocateStat;
 window.claimQuestReward = claimQuestReward;
+window.resumeGame = resumeGame;
+window.hideAllOverlays = hideAllOverlays;
 
 // --- CRITICAL FIX: Ensure Initialization Runs After DOM Load ---
 window.addEventListener('keydown', handleKeyDown);
@@ -1859,6 +1891,11 @@ window.addEventListener('blur', resetKeyState);
 window.onload = function() {
     initWebGL();
     showStartMenu();
+
+    if (taskbarClockEl) {
+        updateTaskbarClock();
+        setInterval(updateTaskbarClock, 1000);
+    }
 
     if (dragDrop) {
         const dragDropButton = dragDrop.querySelector('button');

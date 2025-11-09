@@ -9,121 +9,168 @@
     <script src="https://unpkg.com/@metaplex-foundation/js@0.20.1/dist/js/index.js"></script>
 </head>
 <body>
-    <div id="crt-frame">
-        <div id="bezel-top">
-            <div class="gacha-sticker">🌸</div>
-            <h1 class="anime-title">ネオ・ギャラクシーインベーダー</h1>
-            <div class="gacha-sticker">⭐</div>
+    <div class="xp-desktop">
+        <div id="crt-frame" class="xp-window">
+            <div id="bezel-top" class="xp-titlebar" role="banner">
+                <div class="title-group">
+                    <span class="title-icon" aria-hidden="true">🪐</span>
+                    <div class="title-text">
+                        <span class="window-title">Retro XP Anime Invaders</span>
+                        <span class="window-subtitle">ネオ・ギャラクシーインベーダー</span>
+                    </div>
+                </div>
+                <div class="window-controls" aria-hidden="true">
+                    <span class="window-control minimize">—</span>
+                    <span class="window-control maximize">▢</span>
+                    <span class="window-control close">✕</span>
+                </div>
+            </div>
+            <div id="game-container">
+                <canvas id="canvas" width="800" height="600"></canvas>
+                <div id="score">Score: 0</div>
+                <div id="credits">Credits: 0</div>
+                <div id="dash-cooldown">
+                    <div id="dash-bar"></div>
+                </div>
+                <div id="lives">Lives: 3</div>
+                <div id="level">Level: 1</div>
+                <div id="combo">Combo: 0</div>
+                <div id="drag-drop">
+                    <h3>Drag & Drop Assets</h3>
+                    <p>Drop player.png and enemy.png here to load custom sprites!</p>
+                    <button type="button" onclick="showStartMenu()">Start Menu</button>
+                </div>
+                <div id="controls">
+                    <div>Use ← → ↑ ↓ (or WASD) to Move | Double-Tap to Dash (2s CD)</div>
+                    <div>SPACE to Shoot (Hold for Charge)</div>
+                </div>
+                <div class="joystick" id="joystick">
+                    <div class="joystick-knob" id="knob"></div>
+                </div>
+
+                <div id="start-menu" class="overlay" role="dialog" aria-modal="true" aria-labelledby="start-menu-title">
+                    <div class="menu-panel xp-window" tabindex="-1">
+                        <div class="xp-titlebar">
+                            <span id="start-menu-title" class="window-title">Start Menu</span>
+                            <button type="button" class="xp-close-button" onclick="resumeGame()" aria-label="Close start menu">✕</button>
+                        </div>
+                        <div class="xp-body">
+                            <button type="button" id="connect-wallet" onclick="connectWallet()">Connect Phantom Wallet</button>
+                            <p id="wallet-status">Not Connected</p>
+                            <p id="nft-status">NFT Status: Not Detected</p>
+                            <button type="button" id="play-btn" onclick="startGame(true)">Play Game</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="hub" class="overlay" role="dialog" aria-modal="true" aria-labelledby="hub-title">
+                    <div class="hub-panel xp-window" tabindex="-1">
+                        <div class="xp-titlebar">
+                            <span id="hub-title" class="window-title">Player Hub</span>
+                            <button type="button" class="xp-close-button" onclick="resumeGame()" aria-label="Close player hub">✕</button>
+                        </div>
+                        <div class="xp-body">
+                            <p class="hub-wallet">Wallet: <span id="wallet-address">-</span></p>
+                            <div class="hub-section-wrapper">
+                                <div class="hub-section">
+                                    <div id="daily-quests">
+                                        <h4>Daily Missions</h4>
+                                        <p>Loading missions...</p>
+                                    </div>
+                                </div>
+
+                                <div class="hub-section">
+                                    <h4 class="resource-title">Resources &amp; Progression</h4>
+                                    <div class="resource-grid">
+                                        <p>Credits: <span id="hub-credits">0</span></p>
+                                        <p>Level: <span id="stat-level-hub">1</span></p>
+                                        <p>Best Score: <span id="best-score">0</span></p>
+                                        <p>Items: <span id="items">-</span></p>
+                                    </div>
+                                </div>
+
+                                <div class="hub-section">
+                                    <h4>Lifetime Stats</h4>
+                                    <div class="stat-grid">
+                                        <p>Games Played: <span id="games-played">0</span></p>
+                                        <p>Wins: <span id="wins">0</span></p>
+                                        <p>Losses: <span id="losses">0</span></p>
+                                        <p>&nbsp;</p>
+                                    </div>
+                                </div>
+
+                                <div class="hub-section">
+                                    <h4>Leaderboard</h4>
+                                    <div id="leaderboard">
+                                        <p>No leaderboard data yet.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="hub-controls">
+                                <button type="button" onclick="openShop()">Gacha Shop</button>
+                                <button type="button" onclick="startGame(false)">Play Next Round</button>
+                                <button type="button" onclick="showStartMenu()">Back to Menu</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="shop" class="overlay" role="dialog" aria-modal="true" aria-labelledby="shop-title">
+                    <div class="shop-panel xp-window" tabindex="-1">
+                        <div class="xp-titlebar">
+                            <span id="shop-title" class="window-title">Gacha Shop</span>
+                            <button type="button" class="xp-close-button" onclick="resumeGame()" aria-label="Close gacha shop">✕</button>
+                        </div>
+                        <div class="xp-body">
+                            <p class="shop-balance">Credits: <span id="shop-credits">0</span></p>
+                            <div id="shop-options">
+                                <button type="button" onclick="rollUpgrade('basic')">Basic Roll (50 Credits)</button>
+                                <button type="button" onclick="rollUpgrade('premium')">Premium Roll (200 Credits)</button>
+                            </div>
+                            <button type="button" id="shop-skip" onclick="skipShop()">Skip</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="stat-allocation" class="overlay" role="dialog" aria-modal="true" aria-labelledby="stat-allocation-title">
+                    <div class="menu-panel xp-window" tabindex="-1">
+                        <div class="xp-titlebar">
+                            <span id="stat-allocation-title" class="window-title">Level Up! Allocate Points</span>
+                            <button type="button" class="xp-close-button" onclick="resumeGame()" aria-label="Close stat allocation">✕</button>
+                        </div>
+                        <div class="xp-body">
+                            <p>Level: <span id="stat-level-overlay">1</span> | Points Available: <span id="stat-points">0</span></p>
+                            <div id="stat-options"></div>
+                            <button type="button" onclick="showHub()">Return to HUB</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="wave-announce" class="announce">Wave Starting...</div>
+                <div id="boss-announce" class="announce">Boss Incoming!</div>
+            </div>
         </div>
-        <div id="game-container">
-            <canvas id="canvas" width="800" height="600"></canvas>
-            <div id="score">Score: 0</div>
-            <div id="credits">Credits: 0</div>
-            <div id="dash-cooldown">
-                <div id="dash-bar"></div>
+        <div id="bezel-bottom" role="contentinfo">
+            <p class="status-text">Powered by xAI - Gacha Edition</p>
+            <div class="status-icons">
+                <span aria-hidden="true">💖</span>
+                <span aria-hidden="true">🎮</span>
             </div>
-            <div id="lives">Lives: 3</div>
-            <div id="level">Level: 1</div>
-            <div id="combo">Combo: 0</div>
-            <div id="drag-drop">
-                <h3>Drag & Drop Assets</h3>
-                <p>Drop player.png and enemy.png here to load custom sprites!</p>
-                <button onclick="showStartMenu()">Start Menu</button>
-            </div>
-            <div id="controls">
-                <div>Use ← → ↑ ↓ (or WASD) to Move | Double-Tap to Dash (2s CD)</div>
-                <div>SPACE to Shoot (Hold for Charge)</div>
-            </div>
-            <div class="joystick" id="joystick">
-                <div class="joystick-knob" id="knob"></div>
-            </div>
-            <div id="start-menu" class="overlay">
-                <div class="menu-panel">
-                    <h2>Start Menu</h2>
-                    <button id="connect-wallet" onclick="connectWallet()">Connect Phantom Wallet</button>
-                    <p id="wallet-status">Not Connected</p>
-                    <p id="nft-status">NFT Status: Not Detected</p>
-                    <button id="play-btn" onclick="startGame(true)">Play Game</button>
-                </div>
-            </div>
-            
-            <div id="hub" class="overlay">
-                <div class="hub-panel">
-                    <h2>PLAYER HUB (Wallet: <span id="wallet-address">-</span>)</h2>
-                    
-                    <div class="hub-section-wrapper">
-                        
-                        <div class="hub-section">
-                            <div id="daily-quests">
-                                <h4>Daily Missions</h4>
-                                <p>Loading missions...</p>
-                            </div>
-                        </div>
-
-                        <div class="hub-section">
-                            <h4 class="resource-title">Resources & Progression</h4>
-                            <div class="resource-grid">
-                                <p>Credits: <span id="hub-credits">0</span></p>
-                                <p>Level: <span id="stat-level-hub">1</span></p>
-                                <p>Best Score: <span id="best-score">0</span></p>
-                                <p>Items: <span id="items">-</span></p>
-                            </div>
-                        </div>
-
-                        <div class="hub-section">
-                            <h4>Lifetime Stats</h4>
-                            <div class="stat-grid">
-                                <p>Games Played: <span id="games-played">0</span></p>
-                                <p>Wins: <span id="wins">0</span></p>
-                                <p>Losses: <span id="losses">0</span></p>
-                                <p>&nbsp;</p>
-                            </div>
-                        </div>
-
-                        <div class="hub-section">
-                            <h4>Leaderboard</h4>
-                            <div id="leaderboard">
-                                <p>No leaderboard data yet.</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="hub-controls">
-                        <button onclick="openShop()">Gacha Shop</button>
-                        <button onclick="startGame(false)">Play Next Round</button>
-                        <button onclick="showStartMenu()">Back to Menu</button>
-                    </div>
-                </div>
-            </div>
-            <div id="shop" class="shop-overlay">
-                <div class="shop-panel">
-                    <h2>Gacha Shop</h2>
-                    <p>Credits: <span id="shop-credits">0</span></p>
-                    <div id="shop-options">
-                         <button onclick="rollUpgrade('basic')">Basic Roll (50 Credits)</button>
-                         <button onclick="rollUpgrade('premium')">Premium Roll (200 Credits)</button>
-                    </div>
-                    <button id="shop-skip" onclick="skipShop()">Skip</button>
-                </div>
-            </div>
-             <div id="stat-allocation" class="overlay">
-                <div class="menu-panel">
-                    <h2>Level Up! Allocate Points</h2>
-                    <p>Level: <span id="stat-level-overlay">1</span> | Points Available: <span id="stat-points">0</span></p>
-                    <div id="stat-options">
-                        </div>
-                    <button onclick="showHub()">Return to HUB</button>
-                </div>
-            </div>
-            <div id="wave-announce" class="announce">Wave Starting...</div>
-            <div id="boss-announce" class="announce">Boss Incoming!</div>
-        </div>
-        <div id="bezel-bottom">
-            <div class="gacha-sticker">💖</div>
-            <p class="crt-label">Powered by xAI - Gacha Edition</p>
-            <div class="gacha-sticker">🎮</div>
         </div>
     </div>
-    <script src="script.js"></script>
+    <div class="xp-taskbar" role="navigation" aria-label="System taskbar">
+        <button type="button" class="start-button" onclick="showStartMenu()">Start</button>
+        <div class="taskbar-shortcuts" role="group" aria-label="Quick launch">
+            <button type="button" class="taskbar-button" onclick="showHub()">Hub</button>
+            <button type="button" class="taskbar-button" onclick="openShop()">Shop</button>
+            <button type="button" class="taskbar-button" onclick="resumeGame()">Resume</button>
+        </div>
+        <div class="taskbar-system">
+            <span id="taskbar-clock" aria-live="polite">--:--</span>
+        </div>
+    </div>
+</div>
+<script src="script.js"></script>
 </body>
 </html>
