@@ -170,6 +170,35 @@ const player = {
 };
 
 let projectiles = []; let enemies = [];
+
+function prepareProjectile(proj) {
+    if (!proj || typeof proj !== 'object') return;
+
+    if (proj.baseDamage === undefined) {
+        const numericDamage = typeof proj.damage === 'number' && !Number.isNaN(proj.damage)
+            ? proj.damage
+            : 1;
+        proj.baseDamage = numericDamage;
+    }
+
+    if (proj.baseWidth === undefined) {
+        const numericWidth = typeof proj.width === 'number' && proj.width > 0 ? proj.width : 8;
+        proj.baseWidth = numericWidth;
+    }
+
+    if (proj.baseHeight === undefined) {
+        const numericHeight = typeof proj.height === 'number' && proj.height > 0 ? proj.height : 4;
+        proj.baseHeight = numericHeight;
+    }
+
+    if (!proj.isBeam && !proj.scaledForAttack) {
+        const attackStat = playerData?.stats?.attack ?? 0;
+        const widthScale = 1 + attackStat * 0.1;
+        proj.width = proj.baseWidth * widthScale;
+        proj.height = proj.baseHeight;
+        proj.scaledForAttack = true;
+    }
+}
 const keys = {}; let joystickActive = false; let joystickDelta = { x: 0, y: 0 };
 let joystickSmoothed = { x: 0, y: 0 };
 const JOYSTICK_SMOOTHING = 0.15;
@@ -1082,25 +1111,32 @@ function updateEnemies() {
 
     for (let p = projectiles.length - 1; p >= 0; p--) {
         const proj = projectiles[p]; let hitsThisFrame = 0;
+        prepareProjectile(proj);
         for (let e = enemies.length - 1; e >= 0 && hitsThisFrame < proj.hits; e--) {
             const enemy = enemies[e];
             if (rectOverlap(proj, enemy)) {
-                
-                let damage = proj.damage || 1;
+                let damage = proj.baseDamage ?? proj.damage ?? 1;
                 let isCrit = false;
 
                 if (Math.random() < player.critChance) {
                     damage *= player.critMultiplier;
                     isCrit = true;
                 }
-                
+
+                let finalDamage = damage * (player.damageMultiplier || 1);
+                if (proj.isBeam) {
+                    finalDamage = Math.max(0.05, Math.round(finalDamage * 100) / 100);
+                } else {
+                    finalDamage = Math.max(0, finalDamage);
+                }
+
                 if (enemy === boss) {
                     hitStopDuration = framesToMs(5);
                     screenShakeDuration = framesToMs(20);
                 }
-                
+
                 emitParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, isCrit ? 6 : 3);
-                enemy.hp = (enemy.hp || 1) - damage; 
+                enemy.hp = (enemy.hp || 1) - finalDamage;
 
                 if (enemy.hp <= 0) {
                     const streakBonus = killStreak >= COMBO_THRESHOLD ? 20 : 10;
@@ -1227,6 +1263,7 @@ function updateProjectiles() {
     if (hitStopDuration > 0) return;
     for (let i = projectiles.length - 1; i >= 0; i--) {
         const proj = projectiles[i];
+        prepareProjectile(proj);
         if (homingActive && proj.targetX !== null && !proj.isBeam) {
             const dx = proj.targetX - proj.x; const dy = proj.targetY - proj.y;
             const dist = Math.hypot(dx, dy);
