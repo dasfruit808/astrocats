@@ -43,6 +43,7 @@ const lossesEl = document.getElementById('losses');
 const bestScoreEl = document.getElementById('best-score');
 const hubCreditsEl = document.getElementById('hub-credits');
 const itemsEl = document.getElementById('items');
+const leaderboardEl = document.getElementById('leaderboard');
 const waveAnnounceEl = document.getElementById('wave-announce');
 const bossAnnounceEl = document.getElementById('boss-announce');
 // STAT UI ELEMENTS
@@ -336,9 +337,10 @@ function updateHubUI() {
     if (bestScoreEl) bestScoreEl.textContent = playerData.bestScore; 
     if (hubCreditsEl) hubCreditsEl.textContent = playerData.credits;
     if (itemsEl) itemsEl.textContent = playerData.items.join(', ') || 'None';
-    credits = playerData.credits; 
+    credits = playerData.credits;
     updateUI();
     updateQuestsUI();
+    loadAndDisplayLeaderboard();
 }
 
 // ====================================================================
@@ -521,15 +523,68 @@ function saveLocalLeaderboard(currentData) {
 }
 
 function loadAndDisplayLeaderboard() {
-    // Placeholder function, actual display logic would go here
-    const leaderboard = JSON.parse(localStorage.getItem('astro_invaders_leaderboard') || '[]');
-    console.log("Local Leaderboard Data:", leaderboard);
+    if (!leaderboardEl) return;
+
+    const stored = JSON.parse(localStorage.getItem('astro_invaders_leaderboard') || '[]');
+    const leaderboard = Array.isArray(stored) ? [...stored] : [];
+
+    leaderboardEl.innerHTML = '';
+
+    if (!leaderboard.length) {
+        const emptyMessage = document.createElement('p');
+        emptyMessage.textContent = 'No leaderboard data yet.';
+        leaderboardEl.appendChild(emptyMessage);
+        return;
+    }
+
+    leaderboard.sort((a, b) => {
+        if (b.level !== a.level) { return b.level - a.level; }
+        return (b.bestScore || 0) - (a.bestScore || 0);
+    });
+
+    const headerEl = document.createElement('div');
+    headerEl.className = 'leaderboard-header';
+    headerEl.innerHTML = `
+        <span class="leaderboard-rank">Rank</span>
+        <span class="leaderboard-wallet">Wallet</span>
+        <span class="leaderboard-level">Level</span>
+        <span class="leaderboard-score">Best Score</span>
+    `;
+    leaderboardEl.appendChild(headerEl);
+
+    const listEl = document.createElement('ol');
+    listEl.className = 'leaderboard-list';
+
+    leaderboard.slice(0, 10).forEach((entry, index) => {
+        const rowEl = document.createElement('li');
+        rowEl.className = 'leaderboard-row';
+
+        const publicKey = entry.publicKey || 'Unknown Player';
+        const snippet = publicKey.length > 8
+            ? `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`
+            : publicKey;
+
+        const levelText = typeof entry.level === 'number' ? entry.level : 0;
+        const scoreText = typeof entry.bestScore === 'number' ? entry.bestScore : 0;
+
+        rowEl.innerHTML = `
+            <span class="leaderboard-rank">#${index + 1}</span>
+            <span class="leaderboard-wallet">${snippet}</span>
+            <span class="leaderboard-level">Lv.${levelText}</span>
+            <span class="leaderboard-score">${scoreText}</span>
+        `;
+
+        listEl.appendChild(rowEl);
+    });
+
+    leaderboardEl.appendChild(listEl);
 }
 
 function savePlayerData() {
     if (walletPublicKey && hasAstroCatNFT) {
         localStorage.setItem(`astro_invaders_${walletPublicKey}`, JSON.stringify(playerData));
         saveLocalLeaderboard(playerData);
+        loadAndDisplayLeaderboard();
     }
 }
 
