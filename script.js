@@ -141,6 +141,26 @@ const upgradePools = {
     epic: ['pierce', 'shield'], legendary: ['ultra_dash']
 };
 
+const SHOP_ROLL_CONFIG = {
+    basic: { cost: 50, rolls: 3, rarityWeights: { common: 0.7, rare: 0.3 } },
+    premium: { cost: 200, rolls: 3, rarityWeights: { rare: 0.5, epic: 0.35, legendary: 0.15 } }
+};
+
+const SHOP_RARITY_COSTS = { common: 75, rare: 125, epic: 200, legendary: 350 };
+
+const UPGRADE_DETAILS = {
+    speed: { name: 'Speed Boost', description: 'Increase ship movement speed for a short duration.' },
+    rapid: { name: 'Rapid Fire', description: 'Temporarily enhances fire rate for blazing barrages.' },
+    shield: { name: 'Shield Matrix', description: 'Gain a protective barrier that blocks the next hit.' },
+    life: { name: 'Extra Life', description: 'Earn an additional life to stay in the fight longer.' },
+    spread: { name: 'Spread Shot', description: 'Fire multiple shots in a cone to cover more space.' },
+    homing: { name: 'Homing Lasers', description: 'Shots curve toward enemies for guaranteed hits.' },
+    pierce: { name: 'Piercing Rounds', description: 'Bullets pass through enemies, damaging multiple targets.' },
+    ultra_dash: { name: 'Ultra Dash', description: 'Reduce dash cooldown dramatically for rapid repositioning.' }
+};
+
+let currentShopOptions = [];
+
 const DASH_WINDOW = 300; const DASH_DURATION = 500;
 
 const player = {
@@ -466,7 +486,7 @@ if (dragDrop) {
                         else if (file.name.toLowerCase().includes('enemy')) { enemyImg = img; }
                         assetsLoaded = true;
                         if (dragDrop) dragDrop.style.display = 'none';
-                        startNewRound(true); 
+                        startGame(true);
                     };
                     img.src = event.target.result;
                 };
@@ -560,9 +580,9 @@ function applyStatEffects() {
 
 function gainXP(amount) {
     if (playerData.level >= MAX_PLAYER_LEVEL) return;
-    
+
     playerData.currentXP += amount;
-    
+
     let requiredXP = getXPForNextLevel(playerData.level);
 
     while (playerData.currentXP >= requiredXP) {
@@ -581,6 +601,172 @@ function gainXP(amount) {
         }
     }
     updateUI();
+    savePlayerData();
+}
+
+function hideAllOverlays() {
+    [startMenuEl, hubEl, shopEl, statAllocationEl].forEach(el => {
+        if (el) { el.style.display = 'none'; }
+    });
+}
+
+function showStartMenu() {
+    gamePaused = true;
+    hideAllOverlays();
+    if (startMenuEl) startMenuEl.style.display = 'flex';
+    updateUI();
+}
+
+function showHub() {
+    hideAllOverlays();
+    if (hubEl) hubEl.style.display = 'flex';
+    updateUI();
+    updateHubUI();
+}
+
+function renderShopOptions() {
+    if (!shopOptionsEl) return;
+
+    shopOptionsEl.innerHTML = '';
+
+    const rollContainer = document.createElement('div');
+    rollContainer.className = 'shop-roll-container';
+
+    const basicRoll = document.createElement('button');
+    basicRoll.textContent = 'Basic Roll (50 Credits)';
+    basicRoll.disabled = credits < SHOP_ROLL_CONFIG.basic.cost;
+    basicRoll.onclick = () => rollUpgrade('basic');
+    rollContainer.appendChild(basicRoll);
+
+    const premiumRoll = document.createElement('button');
+    premiumRoll.textContent = 'Premium Roll (200 Credits)';
+    premiumRoll.disabled = credits < SHOP_ROLL_CONFIG.premium.cost;
+    premiumRoll.onclick = () => rollUpgrade('premium');
+    rollContainer.appendChild(premiumRoll);
+
+    shopOptionsEl.appendChild(rollContainer);
+
+    if (currentShopOptions.length === 0) {
+        const hint = document.createElement('p');
+        hint.className = 'shop-hint';
+        hint.textContent = 'Roll to reveal upgrades and claim a power boost for the next battle.';
+        shopOptionsEl.appendChild(hint);
+        return;
+    }
+
+    const list = document.createElement('div');
+    list.className = 'shop-option-list';
+
+    currentShopOptions.forEach(option => {
+        const optionEl = document.createElement('div');
+        optionEl.className = `shop-option ${option.rarity}`;
+
+        const title = document.createElement('h4');
+        title.textContent = `${option.label} [${option.rarity.toUpperCase()}]`;
+        optionEl.appendChild(title);
+
+        const description = document.createElement('p');
+        description.textContent = option.description;
+        optionEl.appendChild(description);
+
+        const costLabel = document.createElement('p');
+        costLabel.className = 'shop-cost';
+        costLabel.textContent = `Cost: ${option.cost} Credits`;
+        optionEl.appendChild(costLabel);
+
+        const purchaseBtn = document.createElement('button');
+        purchaseBtn.textContent = 'Purchase';
+        purchaseBtn.disabled = credits < option.cost;
+        purchaseBtn.onclick = () => purchaseUpgrade(option.id);
+        optionEl.appendChild(purchaseBtn);
+
+        list.appendChild(optionEl);
+    });
+
+    shopOptionsEl.appendChild(list);
+}
+
+function pickRarity(weights) {
+    const entries = Object.entries(weights);
+    const totalWeight = entries.reduce((sum, [, weight]) => sum + weight, 0);
+    let roll = Math.random() * totalWeight;
+
+    for (const [rarity, weight] of entries) {
+        roll -= weight;
+        if (roll <= 0) {
+            return rarity;
+        }
+    }
+
+    return entries[entries.length - 1][0];
+}
+
+function openShop() {
+    hideAllOverlays();
+    if (shopEl) shopEl.style.display = 'flex';
+    renderShopOptions();
+    updateUI();
+    updateHubUI();
+}
+
+function rollUpgrade(tier) {
+    const config = SHOP_ROLL_CONFIG[tier];
+    if (!config) return;
+    if (credits < config.cost) { return; }
+
+    credits -= config.cost;
+    playerData.credits = credits;
+    uiCache.credits = null;
+    uiCache.shopCredits = null;
+
+    currentShopOptions = [];
+    for (let i = 0; i < config.rolls; i++) {
+        const rarity = pickRarity(config.rarityWeights);
+        const pool = upgradePools[rarity] || [];
+        if (pool.length === 0) continue;
+        const type = pool[Math.floor(Math.random() * pool.length)];
+        const detail = UPGRADE_DETAILS[type] || { name: type, description: 'Temporary boost.' };
+        currentShopOptions.push({
+            id: `${type}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            type,
+            rarity,
+            cost: SHOP_RARITY_COSTS[rarity] || SHOP_RARITY_COSTS.common,
+            label: detail.name,
+            description: detail.description
+        });
+    }
+
+    renderShopOptions();
+    updateUI();
+    updateHubUI();
+    savePlayerData();
+}
+
+function skipShop() {
+    currentShopOptions = [];
+    renderShopOptions();
+    showHub();
+}
+
+function purchaseUpgrade(optionId) {
+    const optionIndex = currentShopOptions.findIndex(option => option.id === optionId);
+    if (optionIndex === -1) return;
+
+    const option = currentShopOptions[optionIndex];
+    if (credits < option.cost) return;
+
+    credits -= option.cost;
+    playerData.credits = credits;
+    uiCache.credits = null;
+    uiCache.shopCredits = null;
+
+    currentShopOptions.splice(optionIndex, 1);
+    playerData.items.push(option.type);
+    applyPowerup(option.type);
+
+    renderShopOptions();
+    updateUI();
+    updateHubUI();
     savePlayerData();
 }
 
@@ -1013,6 +1199,114 @@ function updatePowerups() {
         if (pu.x < -pu.width) { powerups.splice(i, 1); continue; }
         if (rectOverlap(player, pu)) { applyPowerup(pu.type); powerups.splice(i, 1); }
     }
+}
+
+function startNewRound(initialLoad = false) {
+    gamePaused = false;
+    gameRunning = true;
+    bossActive = false;
+    boss = null;
+    dashActive = false;
+    enemySpawnTimer = 0;
+    enemyWave = [];
+
+    projectiles = [];
+    enemies = [];
+    powerups = [];
+    tail = [];
+    particles = [];
+
+    killStreak = 0;
+    lastKillTime = 0;
+    uiCache.combo = null;
+
+    powerupTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+    powerupTimeouts = [];
+
+    rapidFire = false;
+    shieldActive = false;
+    spreadActive = false;
+    homingActive = false;
+    pierceActive = false;
+    ultraDashActive = false;
+
+    player.x = 50;
+    player.y = gameCanvas.height / 2;
+    chargeStartTime = 0;
+    isCharging = false;
+    dashCooldown = 0;
+
+    currentShopOptions = [];
+    renderShopOptions();
+
+    setupNextWave();
+
+    if (!initialLoad) {
+        const playQuest = playerData.daily?.quests?.find(q => q.id === 'playRounds');
+        if (playQuest && !playQuest.completed) {
+            playQuest.progress = Math.min(playQuest.target, playQuest.progress + 1);
+        }
+    }
+
+    const spawnInterval = Math.max(20, 60 - score / 10) * FRAME_TIME;
+    enemySpawnTimer = spawnInterval;
+    spawnEnemy();
+    enemySpawnTimer = 0;
+
+    updateQuestsUI();
+    updateUI();
+    savePlayerData();
+}
+
+function startGame(isNewSession = true) {
+    hideAllOverlays();
+
+    gameRunning = false;
+    gamePaused = false;
+    bossActive = false;
+    boss = null;
+    dashActive = false;
+
+    lives = 3;
+    score = 0;
+    level = 1;
+    enemies = [];
+    projectiles = [];
+    powerups = [];
+    enemyWave = [];
+    tail = [];
+    particles = [];
+
+    rapidFire = false;
+    shieldActive = false;
+    spreadActive = false;
+    homingActive = false;
+    pierceActive = false;
+    ultraDashActive = false;
+
+    killStreak = 0;
+    lastKillTime = 0;
+    uiCache.score = null;
+    uiCache.lives = null;
+    uiCache.combo = null;
+
+    powerupTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+    powerupTimeouts = [];
+
+    if (typeof playerData.credits === 'number') {
+        credits = playerData.credits;
+        uiCache.credits = null;
+        uiCache.shopCredits = null;
+    }
+
+    if (isNewSession) {
+        playerData.gamesPlayed = (playerData.gamesPlayed || 0) + 1;
+    }
+
+    startNewRound(isNewSession);
+    updateUI();
+    updateHubUI();
+    savePlayerData();
 }
 
 function spawnEnemy() {
