@@ -53,6 +53,7 @@ const statLevelHubEl = document.getElementById('stat-level-hub');
 const statLevelOverlayEl = document.getElementById('stat-level-overlay');
 const statPointsEl = document.getElementById('stat-points');
 const statOptionsEl = document.getElementById('stat-options');
+const statusClockEl = document.getElementById('status-clock');
 
 
 // Runtime & timing helpers
@@ -128,6 +129,7 @@ let killStreak = 0; let lastKillTime = 0;
 let powerupTimeouts = [];
 let screenShakeDuration = 0; let hitStopDuration = 0;
 const DAILY_INTERVAL_MS = 24 * 60 * 60 * 1000;
+let lastClockUpdate = 0;
 
 const uiCache = {
     score: null,
@@ -702,6 +704,14 @@ function updateUI() {
     if (shopCreditsEl && uiCache.shopCredits !== credits) {
         uiCache.shopCredits = credits;
         shopCreditsEl.textContent = credits;
+    }
+    if (statusClockEl) {
+        const now = Date.now();
+        if (now - lastClockUpdate >= 1000) {
+            lastClockUpdate = now;
+            const formatted = new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            statusClockEl.textContent = formatted;
+        }
     }
 }
 
@@ -2149,10 +2159,11 @@ function gameLoop(timestamp = (typeof performance !== 'undefined' ? performance.
 }
 
 // Expose functions globally for HTML
-window.startGame = startGame; 
+window.startGame = startGame;
 window.connectWallet = connectWallet;
 window.disconnectWallet = disconnectWallet;
 window.showStartMenu = showStartMenu;
+window.showHub = showHub;
 window.openShop = openShop;
 window.rollUpgrade = rollUpgrade;
 window.skipShop = skipShop;
@@ -2160,6 +2171,7 @@ window.purchaseUpgrade = purchaseUpgrade;
 window.purchaseSprite = purchaseSprite;
 window.allocateStat = allocateStat;
 window.claimQuestReward = claimQuestReward;
+window.hideAllOverlays = hideAllOverlays;
 
 // --- CRITICAL FIX: Ensure Initialization Runs After DOM Load ---
 window.addEventListener('keydown', handleKeyDown);

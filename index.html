@@ -9,13 +9,23 @@
     <script src="https://unpkg.com/@metaplex-foundation/js@0.20.1/dist/js/index.js"></script>
 </head>
 <body>
-    <div id="crt-frame">
-        <div id="bezel-top">
-            <div class="gacha-sticker">🌸</div>
-            <h1 class="anime-title">ネオ・ギャラクシーインベーダー</h1>
-            <div class="gacha-sticker">⭐</div>
-        </div>
-        <div id="game-container">
+    <div class="xp-desktop">
+        <div id="crt-frame" class="xp-window xp-primary-window">
+            <div id="bezel-top" class="xp-titlebar">
+                <div class="xp-title-group">
+                    <span class="xp-title-icon">🐱‍🚀</span>
+                    <div class="xp-title-text">
+                        <span class="xp-app-name">Retro XP Anime Invaders</span>
+                        <span class="xp-app-caption">Astrocats Arcade Cabinet</span>
+                    </div>
+                </div>
+                <div class="xp-window-controls">
+                    <button type="button" class="xp-control xp-min" title="Show Desktop" onclick="hideAllOverlays()">&#95;</button>
+                    <button type="button" class="xp-control xp-max" title="Open Player Hub" onclick="showHub()">&#9633;</button>
+                    <button type="button" class="xp-control xp-close" title="Back to Start" onclick="showStartMenu()">&#10005;</button>
+                </div>
+            </div>
+            <div id="game-container">
             <canvas id="canvas" width="800" height="600"></canvas>
             <div id="score">Score: 0</div>
             <div id="credits">Credits: 0</div>
@@ -38,92 +48,149 @@
                 <div class="joystick-knob" id="knob"></div>
             </div>
             <div id="start-menu" class="overlay">
-                <div class="menu-panel">
-                    <h2>Start Menu</h2>
-                    <button id="connect-wallet" onclick="connectWallet()">Connect Phantom Wallet</button>
-                    <p id="wallet-status">Not Connected</p>
-                    <p id="nft-status">NFT Status: Not Detected</p>
-                    <button id="play-btn" onclick="startGame(true)">Play Game</button>
-                </div>
-            </div>
-            
-            <div id="hub" class="overlay">
-                <div class="hub-panel">
-                    <h2>PLAYER HUB (Wallet: <span id="wallet-address">-</span>)</h2>
-                    
-                    <div class="hub-section-wrapper">
-                        
-                        <div class="hub-section">
-                            <div id="daily-quests">
-                                <h4>Daily Missions</h4>
-                                <p>Loading missions...</p>
-                            </div>
+                <div class="menu-panel xp-window xp-modal">
+                    <div class="xp-titlebar">
+                        <div class="xp-title-group">
+                            <span class="xp-title-icon">🚀</span>
+                            <span class="xp-app-name">Start Menu</span>
                         </div>
-
-                        <div class="hub-section">
-                            <h4 class="resource-title">Resources & Progression</h4>
-                            <div class="resource-grid">
-                                <p>Credits: <span id="hub-credits">0</span></p>
-                                <p>Level: <span id="stat-level-hub">1</span></p>
-                                <p>Best Score: <span id="best-score">0</span></p>
-                                <p>Items: <span id="items">-</span></p>
-                                <p>Active Sprite: <span id="active-sprite">Astro Pioneer</span></p>
-                                <p>Spacecraft Owned: <span id="owned-sprites">Astro Pioneer</span></p>
-                            </div>
-                        </div>
-
-                        <div class="hub-section">
-                            <h4>Lifetime Stats</h4>
-                            <div class="stat-grid">
-                                <p>Games Played: <span id="games-played">0</span></p>
-                                <p>Wins: <span id="wins">0</span></p>
-                                <p>Losses: <span id="losses">0</span></p>
-                                <p>&nbsp;</p>
-                            </div>
-                        </div>
-
-                        <div class="hub-section">
-                            <h4>Leaderboard</h4>
-                            <div id="leaderboard">
-                                <p>No leaderboard data yet.</p>
-                            </div>
+                        <div class="xp-window-controls">
+                            <button type="button" class="xp-control xp-close" title="Close" onclick="hideAllOverlays()">&#10005;</button>
                         </div>
                     </div>
+                    <div class="xp-window-content">
+                        <h2>Welcome Pilot</h2>
+                        <p class="xp-intro">Connect your wallet to sync progress or jump straight into the action.</p>
+                        <button id="connect-wallet" onclick="connectWallet()">Connect Phantom Wallet</button>
+                        <p id="wallet-status">Not Connected</p>
+                        <p id="nft-status">NFT Status: Not Detected</p>
+                        <button id="play-btn" onclick="startGame(true)">Play Game</button>
+                    </div>
+                </div>
+            </div>
 
-                    <div class="hub-controls">
-                        <button onclick="openShop()">Gacha Shop</button>
-                        <button onclick="startGame(false)">Play Next Round</button>
-                        <button onclick="showStartMenu()">Back to Menu</button>
+            <div id="hub" class="overlay">
+                <div class="hub-panel xp-window xp-modal">
+                    <div class="xp-titlebar">
+                        <div class="xp-title-group">
+                            <span class="xp-title-icon">🛰️</span>
+                            <span class="xp-app-name">Player Hub</span>
+                        </div>
+                        <div class="xp-window-controls">
+                            <button type="button" class="xp-control xp-close" title="Back to Start" onclick="showStartMenu()">&#10005;</button>
+                        </div>
+                    </div>
+                    <div class="xp-window-content">
+                        <h2>PLAYER HUB <span class="xp-subheading">Wallet: <span id="wallet-address">-</span></span></h2>
+
+                        <div class="hub-section-wrapper">
+
+                            <div class="hub-section">
+                                <div id="daily-quests">
+                                    <h4>Daily Missions</h4>
+                                    <p>Loading missions...</p>
+                                </div>
+                            </div>
+
+                            <div class="hub-section">
+                                <h4 class="resource-title">Resources & Progression</h4>
+                                <div class="resource-grid">
+                                    <p>Credits: <span id="hub-credits">0</span></p>
+                                    <p>Level: <span id="stat-level-hub">1</span></p>
+                                    <p>Best Score: <span id="best-score">0</span></p>
+                                    <p>Items: <span id="items">-</span></p>
+                                    <p>Active Sprite: <span id="active-sprite">Astro Pioneer</span></p>
+                                    <p>Spacecraft Owned: <span id="owned-sprites">Astro Pioneer</span></p>
+                                </div>
+                            </div>
+
+                            <div class="hub-section">
+                                <h4>Lifetime Stats</h4>
+                                <div class="stat-grid">
+                                    <p>Games Played: <span id="games-played">0</span></p>
+                                    <p>Wins: <span id="wins">0</span></p>
+                                    <p>Losses: <span id="losses">0</span></p>
+                                    <p>&nbsp;</p>
+                                </div>
+                            </div>
+
+                            <div class="hub-section">
+                                <h4>Leaderboard</h4>
+                                <div id="leaderboard">
+                                    <p>No leaderboard data yet.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="hub-controls">
+                            <button onclick="openShop()">Gacha Shop</button>
+                            <button onclick="startGame(false)">Play Next Round</button>
+                            <button onclick="showStartMenu()">Back to Menu</button>
+                        </div>
                     </div>
                 </div>
             </div>
             <div id="shop" class="shop-overlay">
-                <div class="shop-panel">
-                    <h2>Gacha Shop</h2>
-                    <p>Credits: <span id="shop-credits">0</span></p>
-                    <div id="shop-options">
-                         <button onclick="rollUpgrade('basic')">Basic Roll (50 Credits)</button>
-                         <button onclick="rollUpgrade('premium')">Premium Roll (200 Credits)</button>
+                <div class="shop-panel xp-window xp-modal">
+                    <div class="xp-titlebar">
+                        <div class="xp-title-group">
+                            <span class="xp-title-icon">🎰</span>
+                            <span class="xp-app-name">Gacha Shop</span>
+                        </div>
+                        <div class="xp-window-controls">
+                            <button type="button" class="xp-control xp-close" title="Close Shop" onclick="skipShop()">&#10005;</button>
+                        </div>
                     </div>
-                    <button id="shop-skip" onclick="skipShop()">Skip</button>
+                    <div class="xp-window-content">
+                        <p class="xp-balance">Credits Available: <span id="shop-credits">0</span></p>
+                        <div id="shop-options">
+                             <button onclick="rollUpgrade('basic')">Basic Roll (50 Credits)</button>
+                             <button onclick="rollUpgrade('premium')">Premium Roll (200 Credits)</button>
+                        </div>
+                        <button id="shop-skip" onclick="skipShop()">Skip</button>
+                    </div>
                 </div>
             </div>
              <div id="stat-allocation" class="overlay">
-                <div class="menu-panel">
-                    <h2>Level Up! Allocate Points</h2>
-                    <p>Level: <span id="stat-level-overlay">1</span> | Points Available: <span id="stat-points">0</span></p>
-                    <div id="stat-options">
+                <div class="menu-panel xp-window xp-modal">
+                    <div class="xp-titlebar">
+                        <div class="xp-title-group">
+                            <span class="xp-title-icon">📊</span>
+                            <span class="xp-app-name">Level Up</span>
                         </div>
-                    <button onclick="showHub()">Return to HUB</button>
+                        <div class="xp-window-controls">
+                            <button type="button" class="xp-control xp-close" title="Return to Hub" onclick="showHub()">&#10005;</button>
+                        </div>
+                    </div>
+                    <div class="xp-window-content">
+                        <p>Level: <span id="stat-level-overlay">1</span> | Points Available: <span id="stat-points">0</span></p>
+                        <div id="stat-options"></div>
+                        <button onclick="showHub()">Return to HUB</button>
+                    </div>
                 </div>
             </div>
             <div id="wave-announce" class="announce">Wave Starting...</div>
             <div id="boss-announce" class="announce">Boss Incoming!</div>
         </div>
-        <div id="bezel-bottom">
-            <div class="gacha-sticker">💖</div>
-            <p class="crt-label">Powered by xAI - Gacha Edition</p>
-            <div class="gacha-sticker">🎮</div>
+        <div id="bezel-bottom" class="xp-statusbar">
+            <div class="xp-status-left">
+                <span class="xp-status-label">System Status:</span>
+                <span class="xp-status-value">Controls ready · Use arrow keys or WASD</span>
+            </div>
+            <div class="xp-status-right">
+                <span class="xp-status-tip">Press SPACE to fire · Double-tap to dash</span>
+            </div>
+        </div>
+        <div id="taskbar" class="xp-taskbar">
+            <button class="xp-start-button" type="button" onclick="showStartMenu()">
+                <span class="xp-start-icon">🌟</span>
+                <span class="xp-start-text">Start</span>
+            </button>
+            <div class="xp-task-buttons">
+                <button type="button" class="xp-task-button" onclick="showHub()">Player Hub</button>
+                <button type="button" class="xp-task-button" onclick="openShop()">Gacha Shop</button>
+            </div>
+            <div class="xp-task-clock" id="status-clock">--:--</div>
         </div>
     </div>
     <script src="script.js"></script>
