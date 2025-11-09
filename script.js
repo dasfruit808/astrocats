@@ -7,7 +7,7 @@
 
 // Canvas setup
 const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
+let ctx = null;
 
 // Offscreen canvas setup
 const gameCanvas = document.createElement('canvas');
@@ -1426,7 +1426,13 @@ function compileShader(type, source) {
 
 function initWebGL() {
     gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-    if (!gl) { console.warn('WebGL not supported, falling back to 2D'); return false; }
+    if (!gl) {
+        console.warn('WebGL not supported, falling back to 2D');
+        if (!ctx) {
+            ctx = canvas.getContext('2d');
+        }
+        return false;
+    }
 
     const vsSource = `attribute vec2 a_position; varying vec2 v_texCoord; void main() { gl_Position = vec4(a_position, 0.0, 1.0); v_texCoord = (a_position + 1.0) / 2.0; }`;
     const fsSource = `
@@ -1468,6 +1474,9 @@ function initWebGL() {
 
 function renderWithShader() {
     if (!gl || !program) {
+        if (!ctx) {
+            ctx = canvas.getContext('2d');
+        }
         ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(gameCanvas, 0, 0, canvas.width, canvas.height); return;
     }
     gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), canvas.width, canvas.height);
