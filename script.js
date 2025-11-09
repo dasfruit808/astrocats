@@ -100,7 +100,7 @@ let powerups = [];
 let rapidFire = false; let shieldActive = false; let spreadActive = false;
 let homingActive = false; let pierceActive = false; let ultraDashActive = false;
 let enemyWave = []; let enemySpawnTimer = 0; let currentWaveConfig = null;
-let bossActive = false; let boss = null; let dashActive = false; 
+let bossActive = false; let boss = null; let dashActive = false; let dashDirection = null;
 const DASH_COOLDOWN_DURATION = 2000; 
 let dashCooldown = 0;
 let tail = []; let particles = [];
@@ -208,6 +208,198 @@ const keys = {}; let joystickActive = false; let joystickDelta = { x: 0, y: 0 };
 let joystickSmoothed = { x: 0, y: 0 };
 const JOYSTICK_SMOOTHING = 0.15;
 const lastKeyTime = {};
+
+// Keyboard shooting helpers
+let lastShotTime = 0;
+const BASE_SHOT_INTERVAL = 250; // in ms
+const RAPID_SHOT_INTERVAL = 120;
+const DASH_VECTORS = {
+    ArrowLeft: { x: -1, y: 0 },
+    ArrowRight: { x: 1, y: 0 },
+    ArrowUp: { x: 0, y: -1 },
+    ArrowDown: { x: 0, y: 1 }
+};
+
+function resetKeyState() {
+    Object.keys(keys).forEach(code => {
+        keys[code] = false;
+    });
+    isCharging = false;
+    chargeStartTime = 0;
+    dashDirection = null;
+}
+
+function findNearestEnemy() {
+    if (!enemies.length) return null;
+    let nearest = null;
+    let nearestDist = Infinity;
+    const playerCenterX = player.x + player.width / 2;
+    const playerCenterY = player.y + player.height / 2;
+    enemies.forEach(enemy => {
+        const enemyCenterX = enemy.x + enemy.width / 2;
+        const enemyCenterY = enemy.y + enemy.height / 2;
+        const dist = Math.hypot(enemyCenterX - playerCenterX, enemyCenterY - playerCenterY);
+        if (dist < nearestDist) {
+            nearestDist = dist;
+            nearest = { enemy, x: enemyCenterX, y: enemyCenterY };
+        }
+    });
+    return nearest;
+}
+
+function spawnProjectile(config = {}) {
+    const projectile = {
+        x: player.x + player.width - 4,
+        y: player.y + player.height / 2 - (config.height || 4) / 2,
+        width: config.width || 10,
+        height: config.height || 4,
+        speed: config.speed || 12,
+        dy: config.dy || 0,
+        damage: config.damage ?? 1,
+        hits: config.hits ?? 1,
+        isBeam: Boolean(config.isBeam),
+        targetX: config.targetX ?? null,
+        targetY: config.targetY ?? null,
+        scaledForAttack: false
+    };
+    projectiles.push(projectile);
+}
+
+function triggerDash(directionKey) {
+    const now = Date.now();
+    const agilityCooldownReduction = playerData.stats.agility * 50;
+    const baseDuration = Math.max(500, DASH_COOLDOWN_DURATION - agilityCooldownReduction);
+    const finalCooldown = ultraDashActive ? baseDuration / 2 : baseDuration;
+    if (dashActive || dashCooldown > now || gamePaused) return;
+
+    dashActive = true;
+    dashCooldown = now + finalCooldown;
+    dashDirection = directionKey;
+    setTimeout(() => {
+        dashActive = false;
+        dashDirection = null;
+    }, Math.max(150, Math.min(DASH_DURATION, finalCooldown / 3)));
+
+    emitParticles(player.x, player.y, 6, true);
+}
+
+function maybeTriggerDash(code) {
+    const now = Date.now();
+    const previous = lastKeyTime[code] || 0;
+    lastKeyTime[code] = now;
+    if (now - previous <= DASH_WINDOW) {
+        triggerDash(code);
+    }
+}
+
+function startCharge() {
+    if (!gameRunning || gamePaused || isCharging) return;
+    isCharging = true;
+    chargeStartTime = Date.now();
+}
+
+function releaseCharge() {
+    if (!isCharging) return;
+    const now = Date.now();
+    const heldFor = now - chargeStartTime;
+    isCharging = false;
+    chargeStartTime = 0;
+    fireShot(Math.min(1, heldFor / 1500));
+}
+
+function fireShot(chargeLevel = 0) {
+    if (!gameRunning || gamePaused) return;
+    const now = Date.now();
+    const agilityBonus = playerData.stats.agility * 15;
+    const baseInterval = rapidFire ? RAPID_SHOT_INTERVAL : BASE_SHOT_INTERVAL;
+    const finalInterval = Math.max(80, baseInterval - agilityBonus);
+
+    if (chargeLevel === 0 && now - lastShotTime < finalInterval) {
+        return;
+    }
+    lastShotTime = now;
+
+    const attackStat = playerData.stats.attack || 0;
+    const baseDamage = 1 + attackStat;
+    const damageMultiplier = 1 + chargeLevel * 2;
+    const projectileDamage = baseDamage * damageMultiplier * (player.damageMultiplier || 1);
+    const projectileSpeed = 12 + chargeLevel * 6;
+    const isBeam = chargeLevel >= 0.95;
+    const pierceHits = pierceActive || isBeam ? 3 + Math.floor(chargeLevel * 2) : 1;
+
+    const nearest = homingActive ? findNearestEnemy() : null;
+
+    const projectilesToSpawn = [];
+
+    if (isBeam) {
+        projectilesToSpawn.push({
+            width: 30,
+            height: player.height,
+            speed: projectileSpeed,
+            damage: projectileDamage * 0.5,
+            hits: pierceHits,
+            isBeam: true,
+            targetX: nearest ? nearest.x : null,
+            targetY: nearest ? nearest.y : null
+        });
+    } else {
+        const baseConfig = {
+            width: 10 + chargeLevel * 4,
+            height: 4 + chargeLevel * 2,
+            speed: projectileSpeed,
+            damage: projectileDamage,
+            hits: pierceHits,
+            targetX: nearest ? nearest.x : null,
+            targetY: nearest ? nearest.y : null
+        };
+
+        projectilesToSpawn.push({ ...baseConfig, dy: 0 });
+
+        if (spreadActive) {
+            projectilesToSpawn.push({ ...baseConfig, dy: -3 - chargeLevel * 2 });
+            projectilesToSpawn.push({ ...baseConfig, dy: 3 + chargeLevel * 2 });
+        }
+    }
+
+    projectilesToSpawn.forEach(spawnProjectile);
+    emitParticles(player.x, player.y, isBeam ? 12 : 4, false, chargeLevel > 0);
+}
+
+function handleKeyDown(event) {
+    const { code } = event;
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(code)) {
+        event.preventDefault();
+    }
+
+    keys[code] = true;
+
+    if (event.repeat) {
+        return;
+    }
+
+    if (!gameRunning || gamePaused) {
+        return;
+    }
+
+    if (code === 'Space') {
+        startCharge();
+    } else if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyA', 'KeyD', 'KeyW', 'KeyS'].includes(code)) {
+        const canonical = code.startsWith('Key')
+            ? ({ KeyA: 'ArrowLeft', KeyD: 'ArrowRight', KeyW: 'ArrowUp', KeyS: 'ArrowDown' }[code] || code)
+            : code;
+        maybeTriggerDash(canonical);
+    }
+}
+
+function handleKeyUp(event) {
+    const { code } = event;
+    keys[code] = false;
+
+    if (code === 'Space') {
+        event.preventDefault();
+        releaseCharge();
+    }
+}
 
 const POWERUP_VISUALS = {
     speed: { color: '#ff9f1c', letter: 'S' },
@@ -445,6 +637,9 @@ function startGame(isNewSession = true) {
     powerupTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
     powerupTimeouts = [];
 
+    resetKeyState();
+    lastShotTime = 0;
+
     if (typeof playerData.credits === 'number') {
         credits = playerData.credits;
         uiCache.credits = null;
@@ -498,6 +693,8 @@ function startNewRound(initialLoad = false) {
     chargeStartTime = 0;
     isCharging = false;
     dashCooldown = 0;
+
+    lastShotTime = 0;
 
     currentShopOptions = [];
     renderShopOptions();
@@ -1352,6 +1549,13 @@ function updatePlayer() {
     }
 
     const dashMultiplier = dashActive ? 3 : 1;
+    if (dashActive && dashDirection && Math.abs(inputX) < 0.01 && Math.abs(inputY) < 0.01) {
+        const vector = DASH_VECTORS[dashDirection];
+        if (vector) {
+            inputX = vector.x;
+            inputY = vector.y;
+        }
+    }
     player.dx = inputX * player.speed * dashMultiplier;
     player.dy = inputY * player.speed * dashMultiplier;
 
@@ -1648,15 +1852,19 @@ window.allocateStat = allocateStat;
 window.claimQuestReward = claimQuestReward;
 
 // --- CRITICAL FIX: Ensure Initialization Runs After DOM Load ---
+window.addEventListener('keydown', handleKeyDown);
+window.addEventListener('keyup', handleKeyUp);
+window.addEventListener('blur', resetKeyState);
+
 window.onload = function() {
     initWebGL();
-    showStartMenu(); 
+    showStartMenu();
 
     if (dragDrop) {
         const dragDropButton = dragDrop.querySelector('button');
         if (dragDropButton) {
             dragDropButton.onclick = () => {
-                startGame(true); 
+                startGame(true);
             };
         }
     }
