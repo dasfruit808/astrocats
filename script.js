@@ -372,6 +372,222 @@ function updateHubUI() {
     loadAndDisplayLeaderboard();
 }
 
+// --------------------------------------------------------------------
+// CORE OVERLAY & GAME FLOW HELPERS
+// --------------------------------------------------------------------
+
+function hideAllOverlays() {
+    [startMenuEl, hubEl, shopEl, statAllocationEl].forEach(el => {
+        if (el) {
+            el.style.display = 'none';
+        }
+    });
+}
+
+function showStartMenu() {
+    gameRunning = false;
+    gamePaused = true;
+    hideAllOverlays();
+    if (startMenuEl) startMenuEl.style.display = 'flex';
+    updateUI();
+    updateHubUI();
+}
+
+function showHub() {
+    gameRunning = false;
+    gamePaused = true;
+    hideAllOverlays();
+    if (hubEl) hubEl.style.display = 'flex';
+    updateUI();
+    updateHubUI();
+    loadAndDisplayLeaderboard();
+}
+
+function startGame(isNewSession = true) {
+    hideAllOverlays();
+
+    gameRunning = true;
+    gamePaused = false;
+    bossActive = false;
+    boss = null;
+    dashActive = false;
+
+    lives = 3;
+    score = 0;
+    level = 1;
+    enemies = [];
+    projectiles = [];
+    powerups = [];
+    enemyWave = [];
+    tail = [];
+    particles = [];
+
+    rapidFire = false;
+    shieldActive = false;
+    spreadActive = false;
+    homingActive = false;
+    pierceActive = false;
+    ultraDashActive = false;
+
+    killStreak = 0;
+    lastKillTime = 0;
+    uiCache.score = null;
+    uiCache.lives = null;
+    uiCache.combo = null;
+
+    powerupTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+    powerupTimeouts = [];
+
+    if (typeof playerData.credits === 'number') {
+        credits = playerData.credits;
+        uiCache.credits = null;
+        uiCache.shopCredits = null;
+    }
+
+    if (isNewSession) {
+        playerData.gamesPlayed = (playerData.gamesPlayed || 0) + 1;
+    }
+
+    startNewRound(isNewSession);
+    updateUI();
+    updateHubUI();
+    savePlayerData();
+    loadAndDisplayLeaderboard();
+}
+
+function startNewRound(initialLoad = false) {
+    gameRunning = true;
+    gamePaused = false;
+    hideAllOverlays();
+
+    bossActive = false;
+    boss = null;
+    dashActive = false;
+    enemySpawnTimer = 0;
+    enemyWave = [];
+
+    projectiles = [];
+    enemies = [];
+    powerups = [];
+    tail = [];
+    particles = [];
+
+    killStreak = 0;
+    lastKillTime = 0;
+    uiCache.combo = null;
+
+    powerupTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+    powerupTimeouts = [];
+
+    rapidFire = false;
+    shieldActive = false;
+    spreadActive = false;
+    homingActive = false;
+    pierceActive = false;
+    ultraDashActive = false;
+
+    player.x = 50;
+    player.y = gameCanvas.height / 2;
+    chargeStartTime = 0;
+    isCharging = false;
+    dashCooldown = 0;
+
+    currentShopOptions = [];
+    renderShopOptions();
+
+    setupNextWave();
+
+    if (!initialLoad) {
+        const playQuest = playerData.daily?.quests?.find(q => q.id === 'playRounds');
+        if (playQuest && !playQuest.completed) {
+            playQuest.progress = Math.min(playQuest.target, playQuest.progress + 1);
+        }
+    }
+
+    const spawnInterval = Math.max(20, 60 - score / 10) * FRAME_TIME;
+    enemySpawnTimer = spawnInterval;
+    spawnEnemy();
+    enemySpawnTimer = 0;
+
+    updateQuestsUI();
+    updateUI();
+    savePlayerData();
+    loadAndDisplayLeaderboard();
+}
+
+function openShop() {
+    gameRunning = false;
+    gamePaused = true;
+    hideAllOverlays();
+    if (shopEl) shopEl.style.display = 'flex';
+    renderShopOptions();
+    updateUI();
+    updateHubUI();
+}
+
+function rollUpgrade(tier) {
+    const config = SHOP_ROLL_CONFIG[tier];
+    if (!config) return;
+    if (credits < config.cost) { return; }
+
+    credits -= config.cost;
+    playerData.credits = credits;
+    uiCache.credits = null;
+    uiCache.shopCredits = null;
+
+    currentShopOptions = [];
+    for (let i = 0; i < config.rolls; i++) {
+        const rarity = pickRarity(config.rarityWeights);
+        const pool = upgradePools[rarity] || [];
+        if (pool.length === 0) continue;
+        const type = pool[Math.floor(Math.random() * pool.length)];
+        const detail = UPGRADE_DETAILS[type] || { name: type, description: 'Temporary boost.' };
+        currentShopOptions.push({
+            id: `${type}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            type,
+            rarity,
+            cost: SHOP_RARITY_COSTS[rarity] || SHOP_RARITY_COSTS.common,
+            label: detail.name,
+            description: detail.description
+        });
+    }
+
+    renderShopOptions();
+    updateUI();
+    updateHubUI();
+    savePlayerData();
+    loadAndDisplayLeaderboard();
+}
+
+function skipShop() {
+    currentShopOptions = [];
+    renderShopOptions();
+    showHub();
+}
+
+function purchaseUpgrade(optionId) {
+    const optionIndex = currentShopOptions.findIndex(option => option.id === optionId);
+    if (optionIndex === -1) return;
+
+    const option = currentShopOptions[optionIndex];
+    if (credits < option.cost) return;
+
+    credits -= option.cost;
+    playerData.credits = credits;
+    uiCache.credits = null;
+    uiCache.shopCredits = null;
+
+    currentShopOptions.splice(optionIndex, 1);
+    playerData.items.push(option.type);
+    applyPowerup(option.type);
+
+    renderShopOptions();
+    updateUI();
+    updateHubUI();
+    savePlayerData();
+    loadAndDisplayLeaderboard();
+}
+
 // ====================================================================
 // SECTION B: GAMEPLAY CORE LOGIC (Functions defined here call functions from Section A)
 // ====================================================================
@@ -688,26 +904,6 @@ function gainXP(amount) {
     savePlayerData();
 }
 
-function hideAllOverlays() {
-    [startMenuEl, hubEl, shopEl, statAllocationEl].forEach(el => {
-        if (el) { el.style.display = 'none'; }
-    });
-}
-
-function showStartMenu() {
-    gamePaused = true;
-    hideAllOverlays();
-    if (startMenuEl) startMenuEl.style.display = 'flex';
-    updateUI();
-}
-
-function showHub() {
-    hideAllOverlays();
-    if (hubEl) hubEl.style.display = 'flex';
-    updateUI();
-    updateHubUI();
-}
-
 function renderShopOptions() {
     if (!shopOptionsEl) return;
 
@@ -783,75 +979,6 @@ function pickRarity(weights) {
     }
 
     return entries[entries.length - 1][0];
-}
-
-function openShop() {
-    hideAllOverlays();
-    if (shopEl) shopEl.style.display = 'flex';
-    renderShopOptions();
-    updateUI();
-    updateHubUI();
-}
-
-function rollUpgrade(tier) {
-    const config = SHOP_ROLL_CONFIG[tier];
-    if (!config) return;
-    if (credits < config.cost) { return; }
-
-    credits -= config.cost;
-    playerData.credits = credits;
-    uiCache.credits = null;
-    uiCache.shopCredits = null;
-
-    currentShopOptions = [];
-    for (let i = 0; i < config.rolls; i++) {
-        const rarity = pickRarity(config.rarityWeights);
-        const pool = upgradePools[rarity] || [];
-        if (pool.length === 0) continue;
-        const type = pool[Math.floor(Math.random() * pool.length)];
-        const detail = UPGRADE_DETAILS[type] || { name: type, description: 'Temporary boost.' };
-        currentShopOptions.push({
-            id: `${type}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-            type,
-            rarity,
-            cost: SHOP_RARITY_COSTS[rarity] || SHOP_RARITY_COSTS.common,
-            label: detail.name,
-            description: detail.description
-        });
-    }
-
-    renderShopOptions();
-    updateUI();
-    updateHubUI();
-    savePlayerData();
-}
-
-function skipShop() {
-    currentShopOptions = [];
-    renderShopOptions();
-    showHub();
-}
-
-function purchaseUpgrade(optionId) {
-    const optionIndex = currentShopOptions.findIndex(option => option.id === optionId);
-    if (optionIndex === -1) return;
-
-    const option = currentShopOptions[optionIndex];
-    if (credits < option.cost) return;
-
-    credits -= option.cost;
-    playerData.credits = credits;
-    uiCache.credits = null;
-    uiCache.shopCredits = null;
-
-    currentShopOptions.splice(optionIndex, 1);
-    playerData.items.push(option.type);
-    applyPowerup(option.type);
-
-    renderShopOptions();
-    updateUI();
-    updateHubUI();
-    savePlayerData();
 }
 
 function showStatAllocation() {
@@ -1291,114 +1418,6 @@ function updatePowerups() {
         if (pu.x < -pu.width) { powerups.splice(i, 1); continue; }
         if (rectOverlap(player, pu)) { applyPowerup(pu.type); powerups.splice(i, 1); }
     }
-}
-
-function startNewRound(initialLoad = false) {
-    gamePaused = false;
-    gameRunning = true;
-    bossActive = false;
-    boss = null;
-    dashActive = false;
-    enemySpawnTimer = 0;
-    enemyWave = [];
-
-    projectiles = [];
-    enemies = [];
-    powerups = [];
-    tail = [];
-    particles = [];
-
-    killStreak = 0;
-    lastKillTime = 0;
-    uiCache.combo = null;
-
-    powerupTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
-    powerupTimeouts = [];
-
-    rapidFire = false;
-    shieldActive = false;
-    spreadActive = false;
-    homingActive = false;
-    pierceActive = false;
-    ultraDashActive = false;
-
-    player.x = 50;
-    player.y = gameCanvas.height / 2;
-    chargeStartTime = 0;
-    isCharging = false;
-    dashCooldown = 0;
-
-    currentShopOptions = [];
-    renderShopOptions();
-
-    setupNextWave();
-
-    if (!initialLoad) {
-        const playQuest = playerData.daily?.quests?.find(q => q.id === 'playRounds');
-        if (playQuest && !playQuest.completed) {
-            playQuest.progress = Math.min(playQuest.target, playQuest.progress + 1);
-        }
-    }
-
-    const spawnInterval = Math.max(20, 60 - score / 10) * FRAME_TIME;
-    enemySpawnTimer = spawnInterval;
-    spawnEnemy();
-    enemySpawnTimer = 0;
-
-    updateQuestsUI();
-    updateUI();
-    savePlayerData();
-}
-
-function startGame(isNewSession = true) {
-    hideAllOverlays();
-
-    gameRunning = false;
-    gamePaused = false;
-    bossActive = false;
-    boss = null;
-    dashActive = false;
-
-    lives = 3;
-    score = 0;
-    level = 1;
-    enemies = [];
-    projectiles = [];
-    powerups = [];
-    enemyWave = [];
-    tail = [];
-    particles = [];
-
-    rapidFire = false;
-    shieldActive = false;
-    spreadActive = false;
-    homingActive = false;
-    pierceActive = false;
-    ultraDashActive = false;
-
-    killStreak = 0;
-    lastKillTime = 0;
-    uiCache.score = null;
-    uiCache.lives = null;
-    uiCache.combo = null;
-
-    powerupTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
-    powerupTimeouts = [];
-
-    if (typeof playerData.credits === 'number') {
-        credits = playerData.credits;
-        uiCache.credits = null;
-        uiCache.shopCredits = null;
-    }
-
-    if (isNewSession) {
-        playerData.gamesPlayed = (playerData.gamesPlayed || 0) + 1;
-    }
-
-    startNewRound(isNewSession);
-    updateUI();
-    updateHubUI();
-    savePlayerData();
 }
 
 function spawnEnemy() {
