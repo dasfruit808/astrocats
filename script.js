@@ -31,7 +31,6 @@ const hubEl = document.getElementById('hub');
 const shopEl = document.getElementById('shop');
 const shopCreditsEl = document.getElementById('shop-credits');
 const shopOptionsEl = document.getElementById('shop-options');
-const shopRollBtn = document.getElementById('shop-roll');
 const walletStatusEl = document.getElementById('wallet-status');
 const nftStatusEl = document.getElementById('nft-status');
 const playBtn = document.getElementById('play-btn');
@@ -48,7 +47,8 @@ const waveAnnounceEl = document.getElementById('wave-announce');
 const bossAnnounceEl = document.getElementById('boss-announce');
 // STAT UI ELEMENTS
 const statAllocationEl = document.getElementById('stat-allocation');
-const statLevelEl = document.getElementById('stat-level');
+const statLevelHubEl = document.getElementById('stat-level-hub');
+const statLevelOverlayEl = document.getElementById('stat-level-overlay');
 const statPointsEl = document.getElementById('stat-points');
 const statOptionsEl = document.getElementById('stat-options');
 
@@ -65,6 +65,15 @@ let deltaMultiplier = 1;
 // Wallet & Blockchain
 let walletPublicKey = null;
 let hasAstroCatNFT = false;
+
+function createDefaultQuests() {
+    return [
+        { id: 'playRounds', desc: 'Play 3 Rounds', target: 3, progress: 0, reward: { type: 'credits', amount: 50 }, completed: false },
+        { id: 'defeatBoss', desc: 'Defeat 1 Boss', target: 1, progress: 0, reward: { type: 'xpBonus', amount: 100 }, completed: false },
+        { id: 'achieveCombo', desc: 'Achieve Combo 5', target: 5, progress: 0, reward: { type: 'levelPoint', amount: 1 }, completed: false },
+    ];
+}
+
 let playerData = {
     gamesPlayed: 0, wins: 0, losses: 0, bestScore: 0, credits: 0, items: [],
     level: 1, currentXP: 0, levelPoints: 0,
@@ -74,11 +83,7 @@ let playerData = {
     daily: { 
         lastLogin: 0,
         claimedLogin: false,
-        quests: [
-            { id: 'playRounds', desc: 'Play 3 Rounds', target: 3, progress: 0, reward: { type: 'credits', amount: 50 }, completed: false },
-            { id: 'defeatBoss', desc: 'Defeat 1 Boss', target: 1, progress: 0, reward: { type: 'xpBonus', amount: 100 }, completed: false },
-            { id: 'achieveCombo', desc: 'Achieve Combo 5', target: 5, progress: 0, reward: { type: 'levelPoint', amount: 1 }, completed: false },
-        ]
+        quests: createDefaultQuests()
     }
 };
 const ASTRO_CAT_COLLECTION_MINT = 'AstroCatMintAddress'; 
@@ -318,7 +323,6 @@ function updateUI() {
         uiCache.shopCredits = credits;
         shopCreditsEl.textContent = credits;
     }
-    if (shopRollBtn) shopRollBtn.disabled = credits < 50;
 }
 
 function updateQuestsUI() {
@@ -363,8 +367,11 @@ function updateHubUI() {
     if (gamesPlayedEl) gamesPlayedEl.textContent = playerData.gamesPlayed;
     if (winsEl) winsEl.textContent = playerData.wins; 
     if (lossesEl) lossesEl.textContent = playerData.losses;
-    if (bestScoreEl) bestScoreEl.textContent = playerData.bestScore; 
+    if (bestScoreEl) bestScoreEl.textContent = playerData.bestScore;
     if (hubCreditsEl) hubCreditsEl.textContent = playerData.credits;
+    if (statLevelHubEl) statLevelHubEl.textContent = playerData.level;
+    if (statLevelOverlayEl) statLevelOverlayEl.textContent = playerData.level;
+    if (statPointsEl) statPointsEl.textContent = playerData.levelPoints;
     if (itemsEl) itemsEl.textContent = playerData.items.join(', ') || 'None';
     credits = playerData.credits;
     updateUI();
@@ -844,12 +851,8 @@ function loadPlayerData() {
             
             // Ensure daily object exists and merge quest structure
             playerData.daily = playerData.daily || { lastLogin: 0, claimedLogin: false, quests: [] };
-            if (playerData.daily.quests.length !== 3) {
-                playerData.daily.quests = [
-                    { id: 'playRounds', desc: 'Play 3 Rounds', target: 3, progress: 0, reward: { type: 'credits', amount: 50 }, completed: false },
-                    { id: 'defeatBoss', desc: 'Defeat 1 Boss', target: 1, progress: 0, reward: { type: 'xpBonus', amount: 100 }, completed: false },
-                    { id: 'achieveCombo', desc: 'Achieve Combo 5', target: 5, progress: 0, reward: { type: 'levelPoint', amount: 1 }, completed: false },
-                ];
+            if (!Array.isArray(playerData.daily.quests) || playerData.daily.quests.length !== 3) {
+                playerData.daily.quests = createDefaultQuests();
             }
         }
         updateHubUI();
@@ -873,9 +876,7 @@ function applyStatEffects() {
     player.luckRating = stats.luck;
     player.critChance = stats.luck * 0.01; 
 
-    level = playerData.level; 
-    currentXP = playerData.currentXP; 
-    levelPoints = playerData.levelPoints;
+    level = playerData.level;
 }
 
 function gainXP(amount) {
@@ -989,7 +990,7 @@ function showStatAllocation() {
     hideAllOverlays();
     if (statAllocationEl) statAllocationEl.style.display = 'flex';
 
-    if (statLevelEl) statLevelEl.textContent = playerData.level;
+    if (statLevelOverlayEl) statLevelOverlayEl.textContent = playerData.level;
     if (statPointsEl) statPointsEl.textContent = playerData.levelPoints;
     if (statOptionsEl) statOptionsEl.innerHTML = '';
 
@@ -1036,12 +1037,16 @@ function allocateStat(statKey) {
 
 function checkDailyLogin() {
     const now = Date.now();
-    
+
+    if (!Array.isArray(playerData.daily.quests) || playerData.daily.quests.length === 0) {
+        playerData.daily.quests = createDefaultQuests();
+    }
+
     if (now - playerData.daily.lastLogin >= DAILY_INTERVAL_MS) {
         // Reset daily state
-        playerData.daily.claimedLogin = false; 
+        playerData.daily.claimedLogin = false;
         playerData.daily.quests.forEach(q => {
-            q.progress = 0; 
+            q.progress = 0;
             q.completed = false;
         });
         
@@ -1123,7 +1128,7 @@ function disconnectWallet() {
     if (connectBtn) connectBtn.textContent = 'Connect Phantom Wallet'; 
     if (connectBtn) connectBtn.onclick = connectWallet;
     
-    playerData = { gamesPlayed: 0, wins: 0, losses: 0, bestScore: 0, credits: 0, items: [], level: 1, currentXP: 0, levelPoints: 0, stats: { attack: 0, defense: 0, agility: 0, luck: 0 }, daily: { lastLogin: 0, claimedLogin: false, quests: playerData.daily.quests } };
+    playerData = { gamesPlayed: 0, wins: 0, losses: 0, bestScore: 0, credits: 0, items: [], level: 1, currentXP: 0, levelPoints: 0, stats: { attack: 0, defense: 0, agility: 0, luck: 0 }, daily: { lastLogin: 0, claimedLogin: false, quests: createDefaultQuests() } };
     
     showStartMenu();
 }
@@ -1141,35 +1146,13 @@ async function checkNFT(publicKey) {
         if (playBtn) playBtn.disabled = false; 
         
         if (hasAstroCatNFT && !playerData.gamesPlayed) {
-            playerData = { gamesPlayed: 0, wins: 0, losses: 0, bestScore: 0, credits: 0, items: [], level: 1, currentXP: 0, levelPoints: 0, stats: { attack: 0, defense: 0, agility: 0, luck: 0 }, daily: { lastLogin: 0, claimedLogin: false, quests: playerData.daily.quests } };
+            playerData = { gamesPlayed: 0, wins: 0, losses: 0, bestScore: 0, credits: 0, items: [], level: 1, currentXP: 0, levelPoints: 0, stats: { attack: 0, defense: 0, agility: 0, luck: 0 }, daily: { lastLogin: 0, claimedLogin: false, quests: createDefaultQuests() } };
             savePlayerData();
         }
     } catch (err) {
         console.error('NFT check error:', err);
         if (nftStatusEl) nftStatusEl.textContent = 'NFT Check Failed'; 
         if (playBtn) playBtn.disabled = false; 
-    }
-}
-
-function loadPlayerData() {
-    if (walletPublicKey && hasAstroCatNFT) {
-        const saved = localStorage.getItem(`astro_invaders_${walletPublicKey}`);
-        if (saved) { 
-            const loadedData = JSON.parse(saved);
-            playerData = { ...playerData, ...loadedData };
-            playerData.stats = playerData.stats || { attack: 0, defense: 0, agility: 0, luck: 0 };
-            
-            // Ensure daily object exists and merge quest structure
-            playerData.daily = playerData.daily || { lastLogin: 0, claimedLogin: false, quests: [] };
-            if (playerData.daily.quests.length !== 3) {
-                playerData.daily.quests = [
-                    { id: 'playRounds', desc: 'Play 3 Rounds', target: 3, progress: 0, reward: { type: 'credits', amount: 50 }, completed: false },
-                    { id: 'defeatBoss', desc: 'Defeat 1 Boss', target: 1, progress: 0, reward: { type: 'xpBonus', amount: 100 }, completed: false },
-                    { id: 'achieveCombo', desc: 'Achieve Combo 5', target: 5, progress: 0, reward: { type: 'levelPoint', amount: 1 }, completed: false },
-                ];
-            }
-        }
-        updateHubUI();
     }
 }
 
