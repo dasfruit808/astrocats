@@ -1,0 +1,1059 @@
+/**
+ * Retro XP Anime Invaders - script.js (DEFINITIVE FINAL VERSION)
+ * FIX: CRITICAL EXECUTION FIX - Implemented placeholder logic for loadAndDisplayLeaderboard
+ * to resolve the startup failure and ensured all functions are properly ordered.
+ * ----------------------------------------------------------------------------------
+ */
+
+// Canvas setup
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d'); 
+
+// Offscreen canvas setup
+const gameCanvas = document.createElement('canvas');
+gameCanvas.width = 800;
+gameCanvas.height = 600;
+const gameCtx = gameCanvas.getContext('2d');
+
+// UI elements 
+const scoreEl = document.getElementById('score');
+const creditsEl = document.getElementById('credits');
+const livesEl = document.getElementById('lives');
+const levelEl = document.getElementById('level');
+const comboEl = document.getElementById('combo');
+const dashCooldownEl = document.getElementById('dash-cooldown');
+const dashBarEl = document.getElementById('dash-bar');
+const dragDrop = document.getElementById('drag-drop');
+const joystick = document.getElementById('joystick');
+const knob = document.getElementById('knob');
+const startMenuEl = document.getElementById('start-menu');
+const hubEl = document.getElementById('hub');
+const shopEl = document.getElementById('shop');
+const shopCreditsEl = document.getElementById('shop-credits');
+const shopOptionsEl = document.getElementById('shop-options');
+const shopRollBtn = document.getElementById('shop-roll');
+const walletStatusEl = document.getElementById('wallet-status');
+const nftStatusEl = document.getElementById('nft-status');
+const playBtn = document.getElementById('play-btn');
+const connectBtn = document.getElementById('connect-wallet');
+const walletAddressEl = document.getElementById('wallet-address');
+const gamesPlayedEl = document.getElementById('games-played');
+const winsEl = document.getElementById('wins');
+const lossesEl = document.getElementById('losses');
+const bestScoreEl = document.getElementById('best-score');
+const hubCreditsEl = document.getElementById('hub-credits');
+const itemsEl = document.getElementById('items');
+const waveAnnounceEl = document.getElementById('wave-announce');
+const bossAnnounceEl = document.getElementById('boss-announce');
+// STAT UI ELEMENTS
+const statAllocationEl = document.getElementById('stat-allocation');
+const statLevelEl = document.getElementById('stat-level');
+const statPointsEl = document.getElementById('stat-points');
+const statOptionsEl = document.getElementById('stat-options');
+
+
+// Wallet & Blockchain
+let walletPublicKey = null;
+let hasAstroCatNFT = false;
+let playerData = {
+    gamesPlayed: 0, wins: 0, losses: 0, bestScore: 0, credits: 0, items: [],
+    level: 1, currentXP: 0, levelPoints: 0,
+    stats: {
+        attack: 0, defense: 0, agility: 0, luck: 0
+    },
+    daily: { 
+        lastLogin: 0,
+        claimedLogin: false,
+        quests: [
+            { id: 'playRounds', desc: 'Play 3 Rounds', target: 3, progress: 0, reward: { type: 'credits', amount: 50 }, completed: false },
+            { id: 'defeatBoss', desc: 'Defeat 1 Boss', target: 1, progress: 0, reward: { type: 'xpBonus', amount: 100 }, completed: false },
+            { id: 'achieveCombo', desc: 'Achieve Combo 5', target: 5, progress: 0, reward: { type: 'levelPoint', amount: 1 }, completed: false },
+        ]
+    }
+};
+const ASTRO_CAT_COLLECTION_MINT = 'AstroCatMintAddress'; 
+let gl;
+let program;
+let vertexBuffer;
+let texture;
+
+// Game state & Constants
+let gameRunning = false; let gamePaused = true; 
+let score = 0; let credits = 0; let level = 1; let lives = 3;
+let playerImg = null; let enemyImg = null; let assetsLoaded = false;
+let powerups = [];
+let rapidFire = false; let shieldActive = false; let spreadActive = false;
+let homingActive = false; let pierceActive = false; let ultraDashActive = false;
+let enemyWave = []; let enemySpawnTimer = 0; let currentWaveConfig = null;
+let bossActive = false; let boss = null; let dashActive = false; 
+const DASH_COOLDOWN_DURATION = 2000; 
+let dashCooldown = 0;
+let tail = []; let particles = [];
+let chargeStartTime = 0; let isCharging = false;
+const COMBO_WINDOW = 5000; const COMBO_THRESHOLD = 3;
+let killStreak = 0; let lastKillTime = 0;
+let powerupTimeouts = []; 
+let screenShakeDuration = 0; let hitStopDuration = 0; 
+const DAILY_INTERVAL_MS = 24 * 60 * 60 * 1000; 
+
+// LEVELING CONSTANTS
+const BASE_XP_TO_LEVEL = 100;
+const XP_MULTIPLIER = 1.15;
+const MAX_PLAYER_LEVEL = 50;
+
+const waveConfigs = [
+    { level: 1, type: 'basic', speed: 2, count: 10, theme: 'Scouts' },
+    { level: 2, type: 'basic', speed: 2.5, count: 12, theme: 'Patrol' },
+    { level: 3, type: 'mecha', speed: 3.5, count: 15, theme: 'Mecha Swarm', dive: true },
+    { level: 4, type: 'mecha', speed: 3, count: 18, theme: 'Divers' },
+    { level: 5, type: 'boss', speed: 1, count: 1, theme: 'Kaiju Boss', hp: 50, split: true, mirrorDash: true }
+];
+
+const upgradePools = {
+    common: ['speed', 'rapid'], rare: ['spread', 'homing'],
+    epic: ['pierce', 'shield'], legendary: ['ultra_dash']
+};
+
+const DASH_WINDOW = 300; const DASH_DURATION = 500;
+
+const player = {
+    x: 50, y: gameCanvas.height / 2, width: 50, height: 50, speed: 5, dx: 0, dy: 0,
+    damageMultiplier: 1, defenseRating: 0, luckRating: 0, critChance: 0, critMultiplier: 2.0
+};
+
+let projectiles = []; let enemies = [];
+const keys = {}; let joystickActive = false; let joystickDelta = { x: 0, y: 0 };
+const lastKeyTime = {};
+
+// ====================================================================
+// SECTION A: CORE UTILITY AND UI UPDATE FUNCTIONS (DEFINED FIRST)
+// ====================================================================
+
+function rectOverlap(r1, r2) {
+    return r1.x < r2.x + r2.width && r1.x + r1.width > r2.x &&
+           r1.y < r2.y + r2.height && r1.y + r1.height > r2.y;
+}
+
+function updateTailLength() {
+    const targetLength = Math.min(20, Math.floor(score / 100) + 1);
+    while (tail.length > targetLength) { tail.pop(); }
+}
+
+function emitParticles(x, y, count = 3, isDash = false, isCharge = false) {
+    const emitCount = (isDash ? 5 : count) + (isCharge ? 2 : 0) + (killStreak >= COMBO_THRESHOLD ? 3 : 0);
+    for (let i = 0; i < emitCount; i++) {
+        if (particles.length < 200) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = (Math.random() - 0.5) * (isDash ? 4 : isCharge ? 3 : 2);
+            particles.push({
+                x: x + player.width / 2, y: y + player.height / 2,
+                vx: Math.cos(angle) * speed - player.dx * 0.5, vy: Math.sin(angle) * speed - player.dy * 0.5,
+                life: isCharge ? 50 : 30, maxLife: isCharge ? 50 : 30,
+                size: Math.random() * 4 + 2,
+                color: isDash ? '#ffff00' : isCharge ? '#ff00ff' : `hsl(${Math.random() * 60 + 100}, 100%, 50%)`
+            });
+        }
+    }
+}
+
+function updateParticles() {
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx; p.y += p.vy;
+        p.life--;
+        p.vx *= 0.98; p.vy *= 0.98;
+        if (p.life <= 0) { particles.splice(i, 1); }
+    }
+}
+
+function drawParticles() {
+    particles.forEach(p => {
+        const alpha = p.life / p.maxLife;
+        gameCtx.save();
+        gameCtx.globalAlpha = alpha;
+        gameCtx.fillStyle = p.color;
+        gameCtx.beginPath();
+        gameCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        gameCtx.fill();
+        gameCtx.restore();
+    });
+}
+
+function updateUI() {
+    if (scoreEl) scoreEl.textContent = `Score: ${score}`; 
+    if (creditsEl) creditsEl.textContent = `Credits: ${credits}`;
+    if (livesEl) livesEl.textContent = `Lives: ${lives}`; 
+    if (levelEl) levelEl.textContent = `Level: ${playerData.level} (XP: ${playerData.currentXP}/${getXPForNextLevel(playerData.level)})`;
+    if (comboEl) comboEl.textContent = `Combo: ${killStreak}`; 
+    if (shopCreditsEl) shopCreditsEl.textContent = credits;
+    if (shopRollBtn) shopRollBtn.disabled = credits < 50;
+}
+
+function updateQuestsUI() {
+    const questsEl = document.getElementById('daily-quests');
+    if (!questsEl) return;
+    
+    const staticTitle = questsEl.querySelector('h4') || document.createElement('h4');
+    staticTitle.textContent = 'Daily Missions';
+    questsEl.innerHTML = '';
+    questsEl.appendChild(staticTitle);
+    
+    playerData.daily.quests.forEach(quest => {
+        let statusText = '';
+        if (quest.completed) {
+            statusText = '✅ Claimed';
+        } else if (quest.progress >= quest.target) {
+            statusText = `Ready to Claim!`;
+        } else {
+            statusText = `Progress: ${quest.progress}/${quest.target}`;
+        }
+        
+        const rewardText = quest.reward.type === 'credits' ? `+${quest.reward.amount} Cr` :
+                           quest.reward.type === 'xpBonus' ? `+${quest.reward.amount} XP` :
+                           `+${quest.reward.amount} Stat Point`;
+
+        const div = document.createElement('div');
+        div.className = `quest-entry ${quest.completed ? 'completed' : (quest.progress >= quest.target ? 'ready-to-claim' : '')}`;
+        div.innerHTML = `
+            <p>${quest.desc}</p>
+            <p class="reward-text">Reward: ${rewardText}</p>
+            <p class="status-text">${statusText}</p>
+            <button onclick="claimQuestReward('${quest.id}')" ${quest.completed || quest.progress < quest.target ? 'disabled' : ''}>Claim</button>
+        `;
+        questsEl.appendChild(div);
+    });
+}
+
+function updateHubUI() {
+    // This helper MUST be defined early as it's called immediately by loadPlayerData and checkNFT
+    if (!walletPublicKey) return;
+    if (walletAddressEl) walletAddressEl.textContent = walletPublicKey.slice(0, 8) + '...';
+    if (gamesPlayedEl) gamesPlayedEl.textContent = playerData.gamesPlayed;
+    if (winsEl) winsEl.textContent = playerData.wins; 
+    if (lossesEl) lossesEl.textContent = playerData.losses;
+    if (bestScoreEl) bestScoreEl.textContent = playerData.bestScore; 
+    if (hubCreditsEl) hubCreditsEl.textContent = playerData.credits;
+    if (itemsEl) itemsEl.textContent = playerData.items.join(', ') || 'None';
+    credits = playerData.credits; 
+    updateUI();
+    updateQuestsUI();
+}
+
+// ====================================================================
+// SECTION B: GAMEPLAY CORE LOGIC (Functions defined here call functions from Section A)
+// ====================================================================
+
+function updateDashCooldown() {
+    const now = Date.now();
+    const agilityCooldownReduction = playerData.stats.agility * 50; 
+    const currentDashDuration = Math.max(500, DASH_COOLDOWN_DURATION - agilityCooldownReduction); 
+    const finalDashDuration = ultraDashActive ? currentDashDuration / 2 : currentDashDuration;
+
+
+    if (dashCooldown > now) {
+        if (dashCooldownEl) dashCooldownEl.style.display = 'block';
+        const progress = Math.max(0, (now - (dashCooldown - finalDashDuration)) / finalDashDuration); 
+        if (dashBarEl) dashBarEl.style.width = `${progress * 100}%`;
+        if (dashCooldownEl) dashCooldownEl.classList.remove('ready');
+    } else {
+        if (dashCooldownEl) dashCooldownEl.style.display = 'none';
+        if (dashCooldownEl) dashCooldownEl.classList.add('ready');
+    }
+}
+
+function drawPlayer(x, y, w, h, chargeLevel = 0) {
+    gameCtx.save();
+    if (chargeLevel > 0) {
+        gameCtx.shadowColor = '#ff00ff'; gameCtx.shadowBlur = 10 + chargeLevel * 20;
+    }
+    gameCtx.fillStyle = '#00ff00';
+    gameCtx.fillRect(x + w/4, y + h/4, w/2, h/2);
+    gameCtx.fillStyle = '#ffff00';
+    gameCtx.fillRect(x, y + h/4, w/4, h/4);
+    gameCtx.fillRect(x + 3*w/4, y + h/4, w/4, h/4);
+    gameCtx.fillStyle = '#ff0000';
+    gameCtx.fillRect(x + w/2 - 5, y + h/4 - 5, 10, 10);
+    gameCtx.restore();
+}
+
+function drawEnemy(x, y, w, h, variant = 'basic', hp = 1) {
+    gameCtx.save();
+    if (hp > 1) { gameCtx.shadowColor = '#ff0000'; gameCtx.shadowBlur = 10 * hp; }
+    if (variant === 'mecha') {
+        gameCtx.fillStyle = '#888888'; gameCtx.fillRect(x, y, w, h);
+        gameCtx.fillStyle = '#ffff00'; gameCtx.fillRect(x + 10, y + 10, 20, 10); 
+    } else {
+        gameCtx.fillStyle = '#ff00ff'; gameCtx.fillRect(x, y, w, h);
+        gameCtx.fillStyle = '#00ffff'; gameCtx.fillRect(x + 5, y + 5, 10, 10);
+        gameCtx.fillRect(x + w - 15, y + 5, 10, 10);
+        gameCtx.fillStyle = '#ff0000'; gameCtx.fillRect(x + w - 10, y + h / 2, 10, 5);
+    }
+    gameCtx.restore();
+}
+
+function drawTail() {
+    tail.forEach((segment, index) => {
+        const alpha = (index / tail.length) * 0.8 + 0.2;
+        gameCtx.save();
+        gameCtx.globalAlpha = alpha;
+        gameCtx.fillStyle = '#00ff00';
+        const size = player.width * (1 - index / tail.length * 0.5);
+        gameCtx.fillRect(segment.x, segment.y, size, size);
+        gameCtx.restore();
+    });
+}
+
+function drawPowerup(x, y, w, h, type, letter, color) {
+    gameCtx.fillStyle = color; gameCtx.fillRect(x, y, w, h);
+    gameCtx.fillStyle = '#000000'; gameCtx.font = 'bold 12px "MS PGothic", monospace';
+    gameCtx.textAlign = 'center'; gameCtx.textBaseline = 'middle';
+    gameCtx.fillText(letter, x + w / 2, y + h / 2);
+    gameCtx.textAlign = 'start'; gameCtx.textBaseline = 'alphabetic';
+}
+
+function drawImageOrProcedural(img, x, y, w, h, isPlayer = false, extra = {}) {
+    if (img) { gameCtx.drawImage(img, x, y, w, h); } 
+    else {
+        if (isPlayer) drawPlayer(x, y, w, h, extra.chargeLevel || 0);
+        else drawEnemy(x, y, w, h, extra.variant || 'basic', extra.hp || 1);
+    }
+}
+
+function applyPowerup(type) {
+    let timeoutId;
+
+    switch (type) {
+        case 'speed':
+            player.speed *= 1.5; timeoutId = setTimeout(() => { player.speed /= 1.5; }, 5000); powerupTimeouts.push(timeoutId); break;
+        case 'rapid':
+            rapidFire = true; timeoutId = setTimeout(() => { rapidFire = false; }, 10000); powerupTimeouts.push(timeoutId); break;
+        case 'shield':
+            const shieldDuration = 5000 + (player.defenseRating * 1000); 
+            shieldActive = true; timeoutId = setTimeout(() => { shieldActive = false; }, shieldDuration); powerupTimeouts.push(timeoutId); break;
+        case 'life':
+            lives++; if (livesEl) livesEl.textContent = `Lives: ${lives}`; break;
+        case 'spread':
+            spreadActive = true; timeoutId = setTimeout(() => { spreadActive = false; }, 8000); powerupTimeouts.push(timeoutId); break;
+        case 'homing':
+            homingActive = true; timeoutId = setTimeout(() => { homingActive = false; }, 6000); powerupTimeouts.push(timeoutId); break;
+        case 'pierce':
+            pierceActive = true; timeoutId = setTimeout(() => { pierceActive = false; }, 10000); powerupTimeouts.push(timeoutId); break;
+        case 'ultra_dash':
+            ultraDashActive = true; timeoutId = setTimeout(() => { ultraDashActive = false; }, 30000); powerupTimeouts.push(timeoutId); break;
+    }
+
+    if (Math.random() < 0.5) {
+        const heart = document.createElement('div');
+        heart.className = 'gacha-heart'; heart.innerHTML = '💖';
+        heart.style.position = 'absolute';
+        if (canvas && document.getElementById('game-container')) {
+             heart.style.left = (player.x + canvas.offsetLeft + player.width / 2) + 'px';
+             heart.style.top = (player.y + canvas.offsetTop + player.height / 2) + 'px';
+             heart.style.zIndex = '15';
+             document.getElementById('game-container').appendChild(heart);
+             setTimeout(() => heart.remove(), 3000);
+        }
+    }
+    if (type === 'ultra_dash') playerData.items.push(type);
+}
+
+function showAnnounce(el, text) {
+    if (el) el.textContent = text; 
+    if (el) el.style.display = 'block';
+    if (el) setTimeout(() => { el.style.display = 'none'; }, 2000);
+}
+
+// Drag-drop handlers
+if (dragDrop) {
+    dragDrop.addEventListener('dragover', (e) => { e.preventDefault(); dragDrop.classList.add('dragover'); });
+    dragDrop.addEventListener('dragleave', () => { dragDrop.classList.remove('dragover'); });
+    dragDrop.addEventListener('drop', (e) => {
+        e.preventDefault(); dragDrop.classList.remove('dragover');
+        const files = Array.from(e.dataTransfer.files);
+        files.forEach(file => {
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        if (file.name.toLowerCase().includes('player')) { playerImg = img; } 
+                        else if (file.name.toLowerCase().includes('enemy')) { enemyImg = img; }
+                        assetsLoaded = true;
+                        if (dragDrop) dragDrop.style.display = 'none';
+                        startNewRound(true); 
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    });
+}
+
+// --- LEADERBOARD & STORAGE ---
+
+function saveLocalLeaderboard(currentData) {
+    let leaderboard = JSON.parse(localStorage.getItem('astro_invaders_leaderboard') || '[]');
+
+    leaderboard = leaderboard.filter(entry => entry.publicKey !== walletPublicKey);
+
+    const newEntry = {
+        publicKey: walletPublicKey,
+        level: currentData.level,
+        bestScore: currentData.bestScore,
+        stats: currentData.stats 
+    };
+
+    leaderboard.push(newEntry);
+    leaderboard.sort((a, b) => {
+        if (b.level !== a.level) { return b.level - a.level; }
+        return b.bestScore - a.bestScore;
+    });
+
+    leaderboard = leaderboard.slice(0, 10);
+    localStorage.setItem('astro_invaders_leaderboard', JSON.stringify(leaderboard));
+}
+
+function loadAndDisplayLeaderboard() {
+    // Placeholder function, actual display logic would go here
+    const leaderboard = JSON.parse(localStorage.getItem('astro_invaders_leaderboard') || '[]');
+    console.log("Local Leaderboard Data:", leaderboard);
+}
+
+function savePlayerData() {
+    if (walletPublicKey && hasAstroCatNFT) {
+        localStorage.setItem(`astro_invaders_${walletPublicKey}`, JSON.stringify(playerData));
+        saveLocalLeaderboard(playerData);
+    }
+}
+
+
+function loadPlayerData() {
+    if (walletPublicKey && hasAstroCatNFT) {
+        const saved = localStorage.getItem(`astro_invaders_${walletPublicKey}`);
+        if (saved) { 
+            const loadedData = JSON.parse(saved);
+            playerData = { ...playerData, ...loadedData };
+            playerData.stats = playerData.stats || { attack: 0, defense: 0, agility: 0, luck: 0 };
+            
+            // Ensure daily object exists and merge quest structure
+            playerData.daily = playerData.daily || { lastLogin: 0, claimedLogin: false, quests: [] };
+            if (playerData.daily.quests.length !== 3) {
+                playerData.daily.quests = [
+                    { id: 'playRounds', desc: 'Play 3 Rounds', target: 3, progress: 0, reward: { type: 'credits', amount: 50 }, completed: false },
+                    { id: 'defeatBoss', desc: 'Defeat 1 Boss', target: 1, progress: 0, reward: { type: 'xpBonus', amount: 100 }, completed: false },
+                    { id: 'achieveCombo', desc: 'Achieve Combo 5', target: 5, progress: 0, reward: { type: 'levelPoint', amount: 1 }, completed: false },
+                ];
+            }
+        }
+        updateHubUI();
+    }
+}
+
+
+// --- STATS AND XP LOGIC ---
+
+function getXPForNextLevel(currentLevel) {
+    if (currentLevel >= MAX_PLAYER_LEVEL) return Infinity;
+    return Math.floor(BASE_XP_TO_LEVEL * Math.pow(XP_MULTIPLIER, currentLevel - 1));
+}
+
+function applyStatEffects() {
+    const stats = playerData.stats;
+    
+    player.speed = 5 + (stats.agility * 0.5); 
+    player.damageMultiplier = 1 + (stats.attack * 0.2); 
+    player.defenseRating = stats.defense; 
+    player.luckRating = stats.luck;
+    player.critChance = stats.luck * 0.01; 
+
+    level = playerData.level; 
+    currentXP = playerData.currentXP; 
+    levelPoints = playerData.levelPoints;
+}
+
+function gainXP(amount) {
+    if (playerData.level >= MAX_PLAYER_LEVEL) return;
+    
+    playerData.currentXP += amount;
+    
+    let requiredXP = getXPForNextLevel(playerData.level);
+
+    while (playerData.currentXP >= requiredXP) {
+        playerData.level++;
+        playerData.levelPoints += 3;
+        playerData.currentXP -= requiredXP;
+        
+        showAnnounce(waveAnnounceEl, `LEVEL UP! Lv.${playerData.level}! (+3 Points)`);
+        
+        requiredXP = getXPForNextLevel(playerData.level);
+        
+        if (playerData.level >= MAX_PLAYER_LEVEL) {
+            playerData.level = MAX_PLAYER_LEVEL;
+            playerData.currentXP = 0;
+            break;
+        }
+    }
+    updateUI();
+    savePlayerData();
+}
+
+function showStatAllocation() {
+    if (playerData.levelPoints === 0 && playerData.level > 1) {
+        showHub(); return;
+    }
+    gamePaused = true;
+    hideAllOverlays();
+    if (statAllocationEl) statAllocationEl.style.display = 'flex';
+
+    if (statLevelEl) statLevelEl.textContent = playerData.level;
+    if (statPointsEl) statPointsEl.textContent = playerData.levelPoints;
+    if (statOptionsEl) statOptionsEl.innerHTML = '';
+
+    const stats = playerData.stats;
+    const statNames = {
+        attack: 'Attack (Damage/Bullet Size)',
+        defense: 'Defense (Shield Time/Durability)',
+        agility: 'Agility (Movement Speed)',
+        luck: 'Luck (Crit Chance/Drops)'
+    };
+
+    for (const key in stats) {
+        const div = document.createElement('div');
+        div.className = 'stat-entry';
+        div.innerHTML = `
+            <p>${statNames[key]}: <span id="stat-${key}">${stats[key]}</span></p>
+            <button onclick="allocateStat('${key}')" ${playerData.levelPoints > 0 ? '' : 'disabled'}>+</button>
+        `;
+        if (statOptionsEl) statOptionsEl.appendChild(div);
+    }
+}
+
+function allocateStat(statKey) {
+    if (playerData.levelPoints > 0) {
+        playerData.stats[statKey]++;
+        playerData.levelPoints--;
+        
+        applyStatEffects();
+        
+        const statEl = document.getElementById(`stat-${statKey}`);
+        if (statEl) statEl.textContent = playerData.stats[statKey];
+        if (statPointsEl) statPointsEl.textContent = playerData.levelPoints;
+        
+        if (playerData.levelPoints === 0 && statOptionsEl) {
+            statOptionsEl.querySelectorAll('button').forEach(btn => btn.disabled = true);
+        }
+        
+        updateUI(); 
+        savePlayerData();
+    }
+}
+
+// --- DAILY LOGIN AND QUEST SYSTEM ---
+
+function checkDailyLogin() {
+    const now = Date.now();
+    
+    if (now - playerData.daily.lastLogin >= DAILY_INTERVAL_MS) {
+        // Reset daily state
+        playerData.daily.claimedLogin = false; 
+        playerData.daily.quests.forEach(q => {
+            q.progress = 0; 
+            q.completed = false;
+        });
+        
+        playerData.daily.lastLogin = now; 
+        savePlayerData();
+    }
+    
+    // Grant Daily Login Reward
+    if (!playerData.daily.claimedLogin) {
+        credits += 25; 
+        playerData.credits = credits;
+        playerData.daily.claimedLogin = true;
+        
+        showAnnounce(document.getElementById('hub-announcement') || document.getElementById('wave-announce'), 'Daily Login Bonus: +25 Credits!');
+        savePlayerData();
+        updateUI();
+    }
+}
+
+function claimQuestReward(questId) {
+    const quest = playerData.daily.quests.find(q => q.id === questId);
+    if (quest && quest.progress >= quest.target && !quest.completed) {
+        let rewardMsg = '';
+        if (quest.reward.type === 'credits') {
+            credits += quest.reward.amount;
+            rewardMsg = `+${quest.reward.amount} Credits`;
+        } else if (quest.reward.type === 'xpBonus') {
+            gainXP(quest.reward.amount);
+            rewardMsg = `+${quest.reward.amount} XP`;
+        } else if (quest.reward.type === 'levelPoint') {
+            playerData.levelPoints += quest.reward.amount;
+            rewardMsg = `+${quest.reward.amount} Stat Point`;
+        }
+        
+        playerData.credits = credits;
+        quest.completed = true;
+        
+        showAnnounce(document.getElementById('hub-announcement') || document.getElementById('wave-announce'), `Quest Complete! ${rewardMsg}`);
+        
+        savePlayerData();
+        updateUI();
+        updateQuestsUI(); 
+        showHub(); 
+    }
+}
+
+// --- WALLET AND WEB3 FUNCTIONS ---
+
+async function connectWallet() {
+    const provider = window.phantom?.solana;
+
+    if (!provider) { alert('Phantom Wallet not found. Please install it.'); return; }
+
+    try {
+        const resp = await provider.connect();
+        walletPublicKey = resp.publicKey.toString();
+        
+        if (walletStatusEl) walletStatusEl.textContent = `Connected: ${walletPublicKey.slice(0, 8)}...`;
+        if (connectBtn) connectBtn.textContent = 'Disconnect'; 
+        if (connectBtn) connectBtn.onclick = disconnectWallet;
+        
+        if (typeof solanaWeb3 === 'undefined' || typeof Metaplex === 'undefined') {
+            console.error('Solana Web3 libraries failed to load.');
+            if (nftStatusEl) nftStatusEl.textContent = 'NFT Status: Check Failed (No Libraries)';
+        } else { await checkNFT(walletPublicKey); }
+
+        loadPlayerData(); showHub();
+    } catch (err) {
+        console.error('Wallet connect error:', err);
+        if (walletStatusEl) walletStatusEl.textContent = 'Connection Rejected/Failed';
+    }
+}
+
+function disconnectWallet() {
+    if (hasAstroCatNFT) { savePlayerData(); }
+    walletPublicKey = null; hasAstroCatNFT = false;
+    if (walletStatusEl) walletStatusEl.textContent = 'Not Connected'; 
+    if (nftStatusEl) nftStatusEl.textContent = 'Not Detected';
+    if (connectBtn) connectBtn.textContent = 'Connect Phantom Wallet'; 
+    if (connectBtn) connectBtn.onclick = connectWallet;
+    
+    playerData = { gamesPlayed: 0, wins: 0, losses: 0, bestScore: 0, credits: 0, items: [], level: 1, currentXP: 0, levelPoints: 0, stats: { attack: 0, defense: 0, agility: 0, luck: 0 }, daily: { lastLogin: 0, claimedLogin: false, quests: playerData.daily.quests } };
+    
+    showStartMenu();
+}
+
+async function checkNFT(publicKey) {
+    try {
+        if (typeof solanaWeb3 === 'undefined' || typeof Metaplex === 'undefined') { if (nftStatusEl) nftStatusEl.textContent = 'NFT Check Failed (Libraries Missing)'; return; }
+
+        const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'));
+        const metaplex = Metaplex.Metaplex(connection);
+        const nfts = await metaplex.nfts().findAllByOwner({ owner: new solanaWeb3.PublicKey(publicKey) }).run();
+        hasAstroCatNFT = nfts.some(nft => nft.collection?.key.toString() === ASTRO_CAT_COLLECTION_MINT);
+        if (nftStatusEl) nftStatusEl.textContent = `NFT Status: ${hasAstroCatNFT ? 'Detected! Persistent Account' : 'Not Detected (Volatile Session)'}`;
+        
+        if (playBtn) playBtn.disabled = false; 
+        
+        if (hasAstroCatNFT && !playerData.gamesPlayed) {
+            playerData = { gamesPlayed: 0, wins: 0, losses: 0, bestScore: 0, credits: 0, items: [], level: 1, currentXP: 0, levelPoints: 0, stats: { attack: 0, defense: 0, agility: 0, luck: 0 }, daily: { lastLogin: 0, claimedLogin: false, quests: playerData.daily.quests } };
+            savePlayerData();
+        }
+    } catch (err) {
+        console.error('NFT check error:', err);
+        if (nftStatusEl) nftStatusEl.textContent = 'NFT Check Failed'; 
+        if (playBtn) playBtn.disabled = false; 
+    }
+}
+
+function loadPlayerData() {
+    if (walletPublicKey && hasAstroCatNFT) {
+        const saved = localStorage.getItem(`astro_invaders_${walletPublicKey}`);
+        if (saved) { 
+            const loadedData = JSON.parse(saved);
+            playerData = { ...playerData, ...loadedData };
+            playerData.stats = playerData.stats || { attack: 0, defense: 0, agility: 0, luck: 0 };
+            
+            // Ensure daily object exists and merge quest structure
+            playerData.daily = playerData.daily || { lastLogin: 0, claimedLogin: false, quests: [] };
+            if (playerData.daily.quests.length !== 3) {
+                playerData.daily.quests = [
+                    { id: 'playRounds', desc: 'Play 3 Rounds', target: 3, progress: 0, reward: { type: 'credits', amount: 50 }, completed: false },
+                    { id: 'defeatBoss', desc: 'Defeat 1 Boss', target: 1, progress: 0, reward: { type: 'xpBonus', amount: 100 }, completed: false },
+                    { id: 'achieveCombo', desc: 'Achieve Combo 5', target: 5, progress: 0, reward: { type: 'levelPoint', amount: 1 }, completed: false },
+                ];
+            }
+        }
+        updateHubUI();
+    }
+}
+
+// --- GAME LOOP FUNCTIONS (These call the logic functions above) ---
+
+function updateEnemies() {
+    if (hitStopDuration > 0) return;
+    const now = Date.now();
+    if (bossActive && boss) { updateBossAI(now); }
+
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        const enemy = enemies[i];
+        if (bossActive && enemy !== boss && enemy.variant !== 'mecha') continue; 
+
+        enemy.x -= enemy.speed; enemy.y += enemy.dy;
+        enemy.y = Math.max(0, Math.min(gameCanvas.height - enemy.height, enemy.y));
+        if (enemy.x < -enemy.width) { enemies.splice(i, 1); continue; }
+
+        let tailHit = false;
+        for (let t = 1; t < tail.length; t++) {
+            const seg = { x: tail[t].x, y: tail[t].y, width: player.width * 0.8, height: player.height * 0.8 };
+            if (rectOverlap(enemy, seg)) { tailHit = true; break; }
+        }
+        if (tailHit) {
+            lives--; if (livesEl) livesEl.textContent = `Lives: ${lives}`; enemies.splice(i, 1);
+            if (lives <= 0) { gameRunning = false; playerData.losses++; savePlayerData(); setTimeout(() => alert(`Game Over! Level: ${level} Score: ${score}\nReload to play again.`), 100); }
+            continue;
+        }
+
+        if (rectOverlap(player, enemy)) {
+            if (shieldActive) {
+                score += 10 * (enemy.hp || 1); if (scoreEl) scoreEl.textContent = `Score: ${score}`; updateTailLength();
+                enemies.splice(i, 1); shieldActive = false;
+            } else {
+                lives--; if (livesEl) livesEl.textContent = `Lives: ${lives}`; enemies.splice(i, 1);
+                if (lives <= 0) { gameRunning = false; playerData.losses++; savePlayerData(); setTimeout(() => alert(`Game Over! Level: ${level} Score: ${score}\nReload to play again.`), 100); }
+            }
+            continue;
+        }
+    }
+
+    for (let p = projectiles.length - 1; p >= 0; p--) {
+        const proj = projectiles[p]; let hitsThisFrame = 0;
+        for (let e = enemies.length - 1; e >= 0 && hitsThisFrame < proj.hits; e--) {
+            const enemy = enemies[e];
+            if (rectOverlap(proj, enemy)) {
+                
+                let damage = proj.damage || 1;
+                let isCrit = false;
+
+                if (Math.random() < player.critChance) {
+                    damage *= player.critMultiplier;
+                    isCrit = true;
+                }
+                
+                if (enemy === boss) {
+                    hitStopDuration = 5; 
+                    screenShakeDuration = 20; 
+                }
+                
+                emitParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, isCrit ? 6 : 3);
+                enemy.hp = (enemy.hp || 1) - damage; 
+
+                if (enemy.hp <= 0) {
+                    const streakBonus = killStreak >= COMBO_THRESHOLD ? 20 : 10;
+                    score += streakBonus + (enemy.variant === 'mecha' ? 10 : 0) + (enemy.variant === 'boss' ? 100 : 0);
+                    
+                    // XP GAIN
+                    const xpReward = 5 + level * 2 + (enemy.variant === 'boss' ? 50 : 0);
+                    gainXP(xpReward);
+                    
+                    const killTime = Date.now();
+                    if (killTime - lastKillTime < COMBO_WINDOW) { killStreak++; } else { killStreak = 1; }
+                    lastKillTime = killTime;
+                    
+                    // --- DAILY QUEST: ACHIEVE COMBO 5 TRACKING ---
+                    const comboQuest = playerData.daily.quests.find(q => q.id === 'achieveCombo');
+                    if (comboQuest && !comboQuest.completed && killStreak >= comboQuest.target && comboQuest.progress < comboQuest.target) {
+                        comboQuest.progress = comboQuest.target; 
+                        savePlayerData();
+                    }
+                    // ---------------------------------------------
+                    
+                    if (killStreak >= COMBO_THRESHOLD) { player.speed *= 1.2; setTimeout(() => { player.speed /= 1.2; }, 3000); }
+    
+                    if (enemy === boss) {
+                        enemies.splice(e, 1); bossActive = false;
+                        if (boss.split) {
+                            for (let j = 0; j < 3; j++) { enemies.push({ x: boss.x, y: boss.y + j * 40 - 40, width: 30, height: 30, speed: 4, dy: (Math.random() - 0.5) * 2, variant: 'mecha', hp: 1 }); }
+                        } showAnnounce(waveAnnounceEl, 'Boss Defeated!');
+                        
+                        // --- DAILY QUEST: DEFEAT BOSS TRACKING ---
+                        const defeatBossQuest = playerData.daily.quests.find(q => q.id === 'defeatBoss');
+                        if (defeatBossQuest && !defeatBossQuest.completed) {
+                            defeatBossQuest.progress = Math.min(defeatBossQuest.target, defeatBossQuest.progress + 1);
+                            savePlayerData();
+                        }
+                        // -----------------------------------------
+                        
+                    } else {
+                        if (Math.random() < 0.2 + (player.luckRating * 0.01)) {
+                            const puTypes = ['speed', 'rapid', 'shield', 'life', 'spread', 'homing', 'pierce'];
+                            const puType = puTypes[Math.floor(Math.random() * puTypes.length)];
+                            powerups.push({ x: enemy.x + enemy.width / 2 - 10, y: enemy.y + enemy.height / 2 - 10, type: puType, width: 20, height: 20 });
+                        } enemies.splice(e, 1);
+                    }
+                }
+                hitsThisFrame++; updateUI(); updateTailLength();
+            }
+        }
+        if (hitsThisFrame > 0) { proj.hits -= hitsThisFrame; if (proj.hits <= 0) { projectiles.splice(p, 1); } }
+    }
+    if (Date.now() - lastKillTime > COMBO_WINDOW) { killStreak = 0; }
+}
+
+function updatePlayer() {
+    if (gamePaused || hitStopDuration > 0) return;
+    
+    player.dx = 0; player.dy = 0;
+    if (keys['ArrowLeft'] || keys['KeyA']) player.dx = -player.speed;
+    if (keys['ArrowRight'] || keys['KeyD']) player.dx = player.speed;
+    if (keys['ArrowUp'] || keys['KeyW']) player.dy = -player.speed;
+    if (keys['ArrowDown'] || keys['KeyS']) player.dy = player.speed;
+
+    if (joystickActive) { player.dx += joystickDelta.x * player.speed; player.dy += joystickDelta.y * player.speed; }
+
+    const isMoving = player.dx !== 0 || player.dy !== 0;
+    const dashMultiplier = dashActive ? 3 : 1;
+    player.x += player.dx * dashMultiplier; player.y += player.dy * dashMultiplier;
+    player.x = Math.max(0, Math.min(gameCanvas.width - player.width, player.x));
+    player.y = Math.max(0, Math.min(gameCanvas.height - player.height, player.y));
+
+    if (isMoving && gameRunning) { emitParticles(player.x, player.y, 2, dashActive); }
+
+    const newHead = { x: player.x, y: player.y }; tail.unshift(newHead);
+    updateTailLength();
+}
+
+function updateProjectiles() {
+    if (hitStopDuration > 0) return;
+    for (let i = projectiles.length - 1; i >= 0; i--) {
+        const proj = projectiles[i];
+        if (homingActive && proj.targetX !== null && !proj.isBeam) {
+            const dx = proj.targetX - proj.x; const dy = proj.targetY - proj.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist > 0) {
+                const angle = Math.atan2(dy, dx);
+                proj.x += Math.cos(angle) * proj.speed * 0.1; 
+                proj.y += Math.sin(angle) * proj.speed * 0.1;
+            }
+            proj.x += proj.speed; 
+        } else { proj.x += proj.speed; }
+        if (proj.x > gameCanvas.width || proj.hits <= 0) { projectiles.splice(i, 1); }
+    }
+}
+
+function updatePowerups() {
+    if (hitStopDuration > 0) return;
+    for (let i = powerups.length - 1; i >= 0; i--) {
+        const pu = powerups[i]; pu.x -= 1.5;
+        if (pu.x < -pu.width) { powerups.splice(i, 1); continue; }
+        if (rectOverlap(player, pu)) { applyPowerup(pu.type); powerups.splice(i, 1); }
+    }
+}
+
+function spawnEnemy() {
+    if (bossActive || gamePaused || hitStopDuration > 0) return;
+    enemySpawnTimer++;
+    const spawnInterval = Math.max(20, 60 - score / 10);
+    if (enemySpawnTimer > spawnInterval) {
+        enemySpawnTimer = 0;
+        if (enemyWave.length > 0) {
+            const y = enemyWave.shift();
+            const enemy = {
+                x: gameCanvas.width, y: y, width: 50, height: 50,
+                speed: currentWaveConfig.speed + (currentWaveConfig.dive ? Math.sin(Date.now() * 0.01 + y) * 2 : 0),
+                dy: currentWaveConfig.dive ? (Math.random() - 0.5) * 4 : (Math.random() - 0.5) * 2,
+                variant: currentWaveConfig.type, hp: currentWaveConfig.type === 'mecha' ? 2 : 1
+            }; enemies.push(enemy);
+        } else if (enemies.length === 0) {
+            credits += Math.floor(score / 10) + (level * 10); 
+            playerData.credits = credits;
+            if (score > playerData.bestScore) { playerData.bestScore = score; }
+            if (lives > 0) { playerData.wins++; } else { playerData.losses++; }
+            savePlayerData();
+            gameRunning = false; showHub(); 
+        }
+    }
+}
+
+function setupNextWave() {
+    currentWaveConfig = waveConfigs.find(config => config.level === level) || waveConfigs[waveConfigs.length - 1];
+    const waveSize = currentWaveConfig.count; enemyWave = [];
+    for (let i = 0; i < waveSize; i++) {
+        enemyWave.push(Math.random() * (gameCanvas.height - 100) + 50);
+    }
+    showAnnounce(waveAnnounceEl, `${currentWaveConfig.theme} Wave ${level}!`);
+    if (currentWaveConfig.type === 'boss') {
+        bossActive = true; showAnnounce(bossAnnounceEl, 'Boss Incoming!'); spawnBoss();
+    }
+}
+
+function updateBossAI(now) {
+    if (!boss || !boss.mirrorDash) return;
+    if (now - boss.lastDash > 2000 && Math.random() < 0.01) {
+        const dx = player.x - boss.x; const dy = player.y - boss.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 0) {
+            boss.dx = (dx / dist) * boss.speed * 2; 
+            boss.dy = (dy / dist) * boss.speed * 2;
+            setTimeout(() => { boss.dx = 0; boss.dy = 0; }, 500);
+            boss.lastDash = now;
+        }
+    }
+    boss.x += boss.dx || -boss.speed; boss.y += boss.dy || 0;
+    boss.y = Math.max(0, Math.min(gameCanvas.height - boss.height, boss.y));
+}
+
+// --- RENDERING & WEBGL FUNCTIONS ---
+
+function renderGameScene() {
+    gameCtx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
+
+    gameCtx.fillStyle = '#ffffff';
+    const time = Date.now() * 0.01;
+    for (let i = 0; i < 100; i++) {
+        const x = (i * 37 + time) % gameCanvas.width; const y = (i * 23 + time * 0.5) % gameCanvas.height;
+        const size = (i % 3) + 1; gameCtx.fillRect(x, y, size, size);
+    }
+
+    drawParticles(); drawTail();
+    powerups.forEach(pu => drawPowerup(pu.x, pu.y, pu.type, pu.width, pu.height));
+
+    projectiles.forEach(proj => {
+        gameCtx.fillStyle = proj.isBeam ? '#ff00ff' : '#ffff00';
+        gameCtx.fillRect(proj.x, proj.y, proj.width, proj.height);
+    });
+
+    enemies.forEach(enemy => {
+        const extra = bossActive && enemy === boss ? { variant: 'boss', hp: boss.hp / boss.maxHp * 5 + 1 } : { variant: enemy.variant };
+        drawImageOrProcedural(enemyImg, enemy.x, enemy.y, enemy.width, enemy.height, false, extra);
+    });
+
+    gameCtx.save();
+    if (shieldActive) { gameCtx.shadowColor = '#00ffff'; gameCtx.shadowBlur = 15; } 
+    else if (dashActive) { gameCtx.shadowColor = '#ffff00'; gameCtx.shadowBlur = 20; } 
+    else if (isCharging) {
+        const chargeLevel = Math.min(1, (Date.now() - chargeStartTime) / 1500);
+        drawImageOrProcedural(playerImg, player.x, player.y, player.width, player.height, true, { chargeLevel });
+    } else { drawImageOrProcedural(playerImg, player.x, player.y, player.width, player.height, true); }
+    gameCtx.restore();
+
+    gameCtx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+    for (let i = 0; i < gameCanvas.height; i += 3) { gameCtx.fillRect(0, i, gameCanvas.width, 1); }
+}
+
+function compileShader(type, source) {
+    const shader = gl.createShader(type); gl.shaderSource(shader, source); gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) { console.error(`Shader ${type} error:`, gl.getProgramInfoLog(program)); gl.deleteShader(shader); return null; }
+    return shader;
+}
+
+function initWebGL() {
+    gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (!gl) { console.warn('WebGL not supported, falling back to 2D'); return false; }
+
+    const vsSource = `attribute vec2 a_position; varying vec2 v_texCoord; void main() { gl_Position = vec4(a_position, 0.0, 1.0); v_texCoord = (a_position + 1.0) / 2.0; }`;
+    const fsSource = `
+        precision mediump float; varying vec2 v_texCoord; uniform sampler2D u_texture; uniform vec2 u_resolution; uniform float u_curvature;
+        void main() {
+            vec2 coord = v_texCoord; vec2 center = vec2(0.5, 0.5); vec2 delta = coord - center;
+            float dist = length(delta); float curvatureFactor = 1.0 + u_curvature * dist * dist;
+            vec2 warpedCoord = center + delta / curvatureFactor; warpedCoord = clamp(warpedCoord, 0.0, 1.0);
+            vec4 color = texture2D(u_texture, warpedCoord);
+            float scanline = sin(warpedCoord.y * u_resolution.y * 0.016) * 0.05; color.rgb *= (1.0 - abs(scanline));
+            float vignette = 1.0 - length(delta) * 1.5; vignette = clamp(vignette, 0.0, 1.0); color.rgb *= vignette;
+            color.rgb += color.rgb * 0.2 * vignette;
+            gl_FragColor = color;
+        }
+    `;
+
+    const vertexShader = compileShader(gl.VERTEX_SHADER, vsSource);
+    const fragmentShader = compileShader(gl.FRAGMENT_SHADER, fsSource);
+    if (!vertexShader || !fragmentShader) return false;
+
+    program = gl.createProgram(); gl.attachShader(program, vertexShader); gl.attachShader(program, fragmentShader); gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) { console.error('Program link error:', gl.getProgramInfoLog(program)); return false; }
+
+    const vertices = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
+    vertexBuffer = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer); gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+    texture = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    gl.useProgram(program);
+    gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), canvas.width, canvas.height);
+    gl.uniform1f(gl.getUniformLocation(program, 'u_curvature'), 0.3);
+
+    const positionLoc = gl.getAttribLocation(program, 'a_position');
+    gl.enableVertexAttribArray(positionLoc); gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
+    return true;
+}
+
+function renderWithShader() {
+    if (!gl || !program) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(gameCanvas, 0, 0, canvas.width, canvas.height); return;
+    }
+    gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), canvas.width, canvas.height);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, gameCanvas);
+    gl.clear(gl.COLOR_BUFFER_BIT); gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+
+// --- MAIN GAME LOOP ---
+function render() { 
+    if (hitStopDuration === 0) {
+        if (screenShakeDuration > 0) {
+            if (canvas) canvas.style.transform = `translate(${Math.random() * 5 - 2.5}px, ${Math.random() * 5 - 2.5}px)`;
+        } else {
+            if (canvas) canvas.style.transform = 'translate(0, 0)';
+        }
+    }
+
+    renderGameScene(); renderWithShader(); 
+}
+
+function gameLoop() {
+    if (hitStopDuration > 0) {
+        hitStopDuration--;
+    } else if (gameRunning && !gamePaused) {
+        if (screenShakeDuration > 0) { screenShakeDuration--; }
+
+        updatePlayer(); updateParticles(); updateProjectiles();
+        if (!bossActive) spawnEnemy();
+        updateEnemies(); updatePowerups(); updateDashCooldown();
+    }
+    render();
+    requestAnimationFrame(gameLoop);
+}
+
+// Expose functions globally for HTML
+window.startGame = startGame; 
+window.connectWallet = connectWallet;
+window.disconnectWallet = disconnectWallet;
+window.showStartMenu = showStartMenu;
+window.openShop = openShop;
+window.rollUpgrade = rollUpgrade;
+window.skipShop = skipShop; 
+window.purchaseUpgrade = purchaseUpgrade;
+window.allocateStat = allocateStat;
+window.claimQuestReward = claimQuestReward;
+
+// --- CRITICAL FIX: Ensure Initialization Runs After DOM Load ---
+window.onload = function() {
+    initWebGL();
+    showStartMenu(); 
+
+    if (dragDrop) {
+        const dragDropButton = dragDrop.querySelector('button');
+        if (dragDropButton) {
+            dragDropButton.onclick = () => {
+                startGame(true); 
+            };
+        }
+    }
+
+    gameLoop();
+};

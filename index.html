@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Retro XP Anime Invaders</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js"></script>
+    <script src="https://unpkg.com/@metaplex-foundation/js@0.20.1/dist/js/index.js"></script>
+</head>
+<body>
+    <div id="crt-frame">
+        <div id="bezel-top">
+            <div class="gacha-sticker">🌸</div>
+            <h1 class="anime-title">ネオ・ギャラクシーインベーダー</h1>
+            <div class="gacha-sticker">⭐</div>
+        </div>
+        <div id="game-container">
+            <canvas id="canvas" width="800" height="600"></canvas>
+            <div id="score">Score: 0</div>
+            <div id="credits">Credits: 0</div>
+            <div id="dash-cooldown">
+                <div id="dash-bar"></div>
+            </div>
+            <div id="lives">Lives: 3</div>
+            <div id="level">Level: 1</div>
+            <div id="combo">Combo: 0</div>
+            <div id="drag-drop">
+                <h3>Drag & Drop Assets</h3>
+                <p>Drop player.png and enemy.png here to load custom sprites!</p>
+                <button onclick="showStartMenu()">Start Menu</button>
+            </div>
+            <div id="controls">
+                <div>Use ← → ↑ ↓ (or WASD) to Move | Double-Tap to Dash (2s CD)</div>
+                <div>SPACE to Shoot (Hold for Charge)</div>
+            </div>
+            <div class="joystick" id="joystick">
+                <div class="joystick-knob" id="knob"></div>
+            </div>
+            <div id="start-menu" class="overlay">
+                <div class="menu-panel">
+                    <h2>Start Menu</h2>
+                    <button id="connect-wallet" onclick="connectWallet()">Connect Phantom Wallet</button>
+                    <p id="wallet-status">Not Connected</p>
+                    <p id="nft-status">NFT Status: Not Detected</p>
+                    <button id="play-btn" onclick="startGame(true)">Play Game</button>
+                </div>
+            </div>
+            
+            <div id="hub" class="overlay">
+                <div class="hub-panel">
+                    <h2>PLAYER HUB (Wallet: <span id="wallet-address">-</span>)</h2>
+                    
+                    <div class="hub-section-wrapper">
+                        
+                        <div class="hub-section">
+                            <div id="daily-quests">
+                                <h4>Daily Missions</h4>
+                                <p>Loading missions...</p>
+                            </div>
+                        </div>
+
+                        <div class="hub-section">
+                            <h4 class="resource-title">Resources & Progression</h4>
+                            <div class="resource-grid">
+                                <p>Credits: <span id="hub-credits">0</span></p>
+                                <p>Level: <span id="stat-level">1</span></p>
+                                <p>Best Score: <span id="best-score">0</span></p>
+                                <p>Items: <span id="items">-</span></p>
+                            </div>
+                        </div>
+
+                        <div class="hub-section">
+                            <h4>Lifetime Stats</h4>
+                            <div class="stat-grid">
+                                <p>Games Played: <span id="games-played">0</span></p>
+                                <p>Wins: <span id="wins">0</span></p>
+                                <p>Losses: <span id="losses">0</span></p>
+                                <p>&nbsp;</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="hub-controls">
+                        <button onclick="openShop()">Gacha Shop</button>
+                        <button onclick="startGame(false)">Play Next Round</button>
+                        <button onclick="showStartMenu()">Back to Menu</button>
+                    </div>
+                </div>
+            </div>
+            <div id="shop" class="shop-overlay">
+                <div class="shop-panel">
+                    <h2>Gacha Shop</h2>
+                    <p>Credits: <span id="shop-credits">0</span></p>
+                    <div id="shop-options">
+                         <button onclick="rollUpgrade('basic')">Basic Roll (50 Credits)</button>
+                         <button onclick="rollUpgrade('premium')">Premium Roll (200 Credits)</button>
+                    </div>
+                    <button id="shop-skip" onclick="skipShop()">Skip</button>
+                </div>
+            </div>
+             <div id="stat-allocation" class="overlay">
+                <div class="menu-panel">
+                    <h2>Level Up! Allocate Points</h2>
+                    <p>Level: <span id="stat-level">1</span> | Points Available: <span id="stat-points">0</span></p>
+                    <div id="stat-options">
+                        </div>
+                    <button onclick="showHub()">Return to HUB</button>
+                </div>
+            </div>
+            <div id="wave-announce" class="announce">Wave Starting...</div>
+            <div id="boss-announce" class="announce">Boss Incoming!</div>
+        </div>
+        <div id="bezel-bottom">
+            <div class="gacha-sticker">💖</div>
+            <p class="crt-label">Powered by xAI - Gacha Edition</p>
+            <div class="gacha-sticker">🎮</div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
