@@ -76,6 +76,8 @@ function createDefaultQuests() {
     ];
 }
 
+const DEFAULT_SPRITE_ID = 'astro-pioneer';
+
 function createBasePlayerData() {
     return {
         gamesPlayed: 0,
@@ -184,7 +186,6 @@ const UPGRADE_DETAILS = {
 };
 
 const SPRITE_DIRECTORY = 'assets/sprites/';
-const DEFAULT_SPRITE_ID = 'astro-pioneer';
 
 const SPACECRAFT_CATALOG = [
     {
