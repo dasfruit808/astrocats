@@ -25,11 +25,12 @@
 
 body {
     margin: 0;
-    min-height: 100vh;
-    padding: 32px 20px 40px;
+    height: 100vh;
+    padding: clamp(12px, 2vh, 24px);
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
     background: linear-gradient(180deg, #61a6ff 0%, #b7d7ff 45%, #6dcf74 46%, #94df97 100%);
     color: var(--xp-text);
 }
@@ -38,9 +39,10 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 12px;
+    gap: clamp(10px, 1.8vh, 16px);
     width: 100%;
     max-width: min(100%, 1280px);
+    height: 100%;
 }
 
 .xp-window {
@@ -56,7 +58,8 @@ body {
     max-width: 1200px;
     display: flex;
     flex-direction: column;
-    min-height: 720px;
+    flex: 1 1 auto;
+    min-height: 0;
 }
 
 .xp-titlebar {
@@ -138,8 +141,8 @@ body {
 
 #game-container {
     position: relative;
-    flex: 1;
-    margin: 14px;
+    flex: 1 1 auto;
+    margin: clamp(10px, 1.6vh, 16px);
     border: 2px solid rgba(12, 39, 96, 0.55);
     border-radius: 8px;
     background: linear-gradient(200deg, #0f1f4d 0%, #030815 100%);
@@ -356,36 +359,127 @@ button:disabled {
     margin: 0;
 }
 
+.hub-panel {
+    max-width: 880px;
+}
+
 .hub-panel .xp-window-content {
+    gap: 18px;
+}
+
+.hub-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.hub-header h2 {
+    margin: 0;
+    font-size: 22px;
+}
+
+.hub-header button {
+    align-self: flex-start;
+}
+
+.hub-overview {
+    display: flex;
+    flex-wrap: wrap;
     gap: 16px;
 }
 
-.hub-section-wrapper {
+.xp-card {
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(12, 39, 96, 0.22);
+    border-radius: 10px;
+    padding: 16px;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+
+.pilot-card {
+    flex: 1 1 220px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    max-height: 360px;
-    overflow-y: auto;
-    padding-right: 6px;
+    gap: 12px;
 }
 
-.hub-section {
-    background: rgba(255, 255, 255, 0.75);
-    border: 1px solid rgba(12, 39, 96, 0.2);
-    border-radius: 8px;
-    padding: 12px 14px;
+.pilot-identity {
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
-.hub-section h4 {
-    margin: 0 0 8px 0;
+.pilot-bio {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.hub-summary {
+    flex: 1 1 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.summary-card h3,
+.hub-content-grid h3 {
+    margin: 0 0 10px 0;
     color: var(--xp-blue-dark);
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.summary-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border: 1px solid rgba(12, 39, 96, 0.15);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.summary-label {
+    font-size: 12px;
+    color: #516077;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.summary-value {
+    font-weight: 700;
+    font-size: 18px;
+    color: var(--xp-blue-dark);
+}
+
+.hub-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: flex-start;
+}
+
+.hub-controls button {
+    flex: 1 1 140px;
+}
+
+.hub-content-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
 }
 
 .resource-grid,
 .stat-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px 14px;
+    gap: 8px 16px;
     font-size: 14px;
 }
 
@@ -395,18 +489,16 @@ button:disabled {
 }
 
 #daily-quests {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
     max-height: 200px;
     overflow-y: auto;
-    border: 1px solid rgba(12, 39, 96, 0.25);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.85);
-    padding: 10px 14px;
+    padding-right: 6px;
 }
 
-#daily-quests h4 {
-    margin: 0 0 10px 0;
-    text-align: center;
-    color: var(--xp-blue-dark);
+.quest-list p {
+    margin: 0;
 }
 
 .quest-entry {
@@ -414,7 +506,7 @@ button:disabled {
     justify-content: space-between;
     align-items: center;
     padding: 6px 0;
-    border-bottom: 1px solid rgba(12, 39, 96, 0.1);
+    border-bottom: 1px solid rgba(12, 39, 96, 0.12);
     font-size: 13px;
 }
 
