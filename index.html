@@ -86,14 +86,47 @@
                             <button id="open-profile-modal" type="button">Create Pilot</button>
                         </div>
 
-                        <div class="pilot-identity">
-                            <img id="pilot-avatar" src="https://placehold.co/80x80?text=Pilot" alt="Pilot avatar" />
-                            <div class="pilot-identity-text">
-                                <span id="pilot-name-display">Rookie Pilot</span>
-                                <span id="pilot-title-display">Cadet</span>
+                        <div class="hub-overview">
+                            <div class="pilot-card xp-card">
+                                <div class="pilot-identity">
+                                    <img id="pilot-avatar" src="https://placehold.co/80x80?text=Pilot" alt="Pilot avatar" />
+                                    <div class="pilot-identity-text">
+                                        <span id="pilot-name-display">Rookie Pilot</span>
+                                        <span id="pilot-title-display">Cadet</span>
+                                    </div>
+                                </div>
+                                <p id="pilot-bio-display" class="pilot-bio">Set your pilot bio to share your legend.</p>
+                            </div>
+
+                            <div class="hub-summary">
+                                <div class="summary-card xp-card">
+                                    <h3>Mission Snapshot</h3>
+                                    <div class="summary-grid">
+                                        <div class="summary-stat">
+                                            <span class="summary-label">Credits</span>
+                                            <span class="summary-value" id="hub-credits">0</span>
+                                        </div>
+                                        <div class="summary-stat">
+                                            <span class="summary-label">Level</span>
+                                            <span class="summary-value" id="stat-level-hub">1</span>
+                                        </div>
+                                        <div class="summary-stat">
+                                            <span class="summary-label">Best Score</span>
+                                            <span class="summary-value" id="best-score">0</span>
+                                        </div>
+                                        <div class="summary-stat">
+                                            <span class="summary-label">Active Sprite</span>
+                                            <span class="summary-value" id="active-sprite">Astro Pioneer</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="hub-controls xp-card">
+                                    <button onclick="openShop()">Gacha Shop</button>
+                                    <button onclick="startGame(false)">Play Next Round</button>
+                                    <button onclick="showStartMenu()">Back to Menu</button>
+                                </div>
                             </div>
                         </div>
-                        <p id="pilot-bio-display" class="pilot-bio">Set your pilot bio to share your legend.</p>
 
                         <div id="profile-modal" class="profile-modal xp-window xp-modal" style="display: none;">
                             <div class="xp-titlebar">
@@ -129,31 +162,26 @@
                             </div>
                         </div>
 
-                        <div class="hub-section-wrapper">
-
-                            <div class="hub-section">
-                                <div id="daily-quests">
-                                    <h4>Daily Missions</h4>
+                        <div class="hub-content-grid">
+                            <section class="xp-card">
+                                <h3>Daily Missions</h3>
+                                <div id="daily-quests" class="quest-list">
                                     <p>Loading missions...</p>
                                 </div>
-                            </div>
+                            </section>
 
-                            <div class="hub-section">
-                                <h4 class="resource-title">Resources & Progression</h4>
+                            <section class="xp-card">
+                                <h3>Resources &amp; Progression</h3>
                                 <div class="resource-grid">
                                     <p>Pilot: <span id="pilot-name-stat">Rookie Pilot</span></p>
                                     <p>Callsign: <span id="pilot-title-stat">Cadet</span></p>
-                                    <p>Credits: <span id="hub-credits">0</span></p>
-                                    <p>Level: <span id="stat-level-hub">1</span></p>
-                                    <p>Best Score: <span id="best-score">0</span></p>
                                     <p>Items: <span id="items">-</span></p>
-                                    <p>Active Sprite: <span id="active-sprite">Astro Pioneer</span></p>
                                     <p>Spacecraft Owned: <span id="owned-sprites">Astro Pioneer</span></p>
                                 </div>
-                            </div>
+                            </section>
 
-                            <div class="hub-section">
-                                <h4>Lifetime Stats</h4>
+                            <section class="xp-card">
+                                <h3>Lifetime Stats</h3>
                                 <div class="stat-grid">
                                     <p>Pilot: <span id="pilot-name-stats-panel">Rookie Pilot</span></p>
                                     <p>Callsign: <span id="pilot-title-stats-panel">Cadet</span></p>
@@ -162,20 +190,14 @@
                                     <p>Losses: <span id="losses">0</span></p>
                                     <p>&nbsp;</p>
                                 </div>
-                            </div>
+                            </section>
 
-                            <div class="hub-section">
-                                <h4>Leaderboard</h4>
+                            <section class="xp-card">
+                                <h3>Leaderboard</h3>
                                 <div id="leaderboard">
                                     <p>No leaderboard data yet.</p>
                                 </div>
-                            </div>
-                        </div>
-
-                        <div class="hub-controls">
-                            <button onclick="openShop()">Gacha Shop</button>
-                            <button onclick="startGame(false)">Play Next Round</button>
-                            <button onclick="showStartMenu()">Back to Menu</button>
+                            </section>
                         </div>
                     </div>
                 </div>
