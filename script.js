@@ -50,7 +50,6 @@ const levelEl = document.getElementById('level');
 const comboEl = document.getElementById('combo');
 const dashCooldownEl = document.getElementById('dash-cooldown');
 const dashBarEl = document.getElementById('dash-bar');
-const dragDrop = document.getElementById('drag-drop');
 const joystick = document.getElementById('joystick');
 const knob = document.getElementById('knob');
 const startMenuEl = document.getElementById('start-menu');
@@ -2033,40 +2032,6 @@ function showAnnounce(el, text) {
     if (el) setTimeout(() => { el.style.display = 'none'; }, 2000);
 }
 
-// Drag-drop handlers
-if (dragDrop) {
-    dragDrop.addEventListener('dragover', (e) => { e.preventDefault(); dragDrop.classList.add('dragover'); });
-    dragDrop.addEventListener('dragleave', () => { dragDrop.classList.remove('dragover'); });
-    dragDrop.addEventListener('drop', (e) => {
-        e.preventDefault(); dragDrop.classList.remove('dragover');
-        const files = Array.from(e.dataTransfer.files);
-        files.forEach(file => {
-            if (file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        if (file.name.toLowerCase().includes('player')) {
-                            playerImg = img;
-                            updatePlayerSpriteMetrics(img);
-                            updateTailLength();
-                        }
-                        else if (file.name.toLowerCase().includes('enemy')) {
-                            enemyImg = img;
-                            updateEnemySpriteMetrics(img, true);
-                        }
-                        assetsLoaded = true;
-                        if (dragDrop) dragDrop.style.display = 'none';
-                        startGame(true);
-                    };
-                    img.src = event.target.result;
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-    });
-}
-
 // --- LEADERBOARD & STORAGE ---
 
 function saveLocalLeaderboard(currentData) {
@@ -3100,15 +3065,6 @@ window.onload = function() {
     initWebGL();
     initializeSpriteSystem();
     showStartMenu();
-
-    if (dragDrop) {
-        const dragDropButton = dragDrop.querySelector('button');
-        if (dragDropButton) {
-            dragDropButton.onclick = () => {
-                startGame(true);
-            };
-        }
-    }
 
     gameLoop();
 };

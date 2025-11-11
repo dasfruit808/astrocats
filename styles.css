@@ -229,33 +229,6 @@ body {
     background: linear-gradient(90deg, #64d664 0%, #bdf08c 100%);
 }
 
-#drag-drop {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(236, 233, 216, 0.96);
-    border: 2px dashed rgba(12, 39, 96, 0.4);
-    padding: 22px 26px;
-    text-align: center;
-    border-radius: 10px;
-    color: var(--xp-text);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
-    display: none;
-    max-width: 360px;
-    z-index: 20;
-}
-
-#drag-drop h3 {
-    margin-top: 0;
-    font-size: 18px;
-}
-
-#drag-drop p {
-    font-size: 13px;
-    margin-bottom: 12px;
-}
-
 button {
     background: linear-gradient(180deg, #fefefe 0%, #d9d9de 100%);
     border: 2px solid #8a8e9c;
