@@ -212,8 +212,8 @@ let hasAstroCatNFT = false;
 
 function createDefaultQuests() {
     return [
-        { id: 'playRounds', desc: 'Play 3 Rounds', target: 3, progress: 0, reward: { type: 'credits', amount: 50 }, completed: false },
-        { id: 'defeatBoss', desc: 'Defeat 1 Boss', target: 1, progress: 0, reward: { type: 'xpBonus', amount: 100 }, completed: false },
+        { id: 'playRounds', desc: 'Launch 3 Flights', target: 3, progress: 0, reward: { type: 'credits', amount: 50 }, completed: false },
+        { id: 'defeatBoss', desc: 'Reach Threat Level 5', target: 1, progress: 0, reward: { type: 'xpBonus', amount: 100 }, completed: false },
         { id: 'achieveCombo', desc: 'Achieve Combo 5', target: 5, progress: 0, reward: { type: 'specializationPoint', amount: 1 }, completed: false },
     ];
 }
@@ -264,8 +264,16 @@ let playerImg = null; let enemyImg = null; let assetsLoaded = false;
 let powerups = [];
 let rapidFire = false; let shieldActive = false; let spreadActive = false;
 let homingActive = false; let pierceActive = false; let ultraDashActive = false;
-let enemyWave = []; let enemySpawnTimer = 0; let currentWaveConfig = null;
+let enemySpawnTimer = 0;
 let bossActive = false; let boss = null; let dashActive = false; let dashDirection = null;
+let flightTimeSeconds = 0;
+let difficultyFactor = 1;
+
+const BASE_SPAWN_INTERVAL = 1.35; // seconds
+const MIN_SPAWN_INTERVAL = 0.25; // seconds
+const DIFFICULTY_TIME_SCALE = 32; // seconds to add roughly +1 difficulty
+const SCORE_DIFFICULTY_SCALE = 600; // score points required for +1 difficulty
+const MAX_DIFFICULTY_FACTOR = 12;
 const DASH_COOLDOWN_DURATION = 2000; 
 let dashCooldown = 0;
 let tail = []; let particles = [];
@@ -306,13 +314,54 @@ if (closeProfileBtn) closeProfileBtn.addEventListener('click', hideProfileModal)
 if (cancelProfileBtn) cancelProfileBtn.addEventListener('click', hideProfileModal);
 if (profileForm) profileForm.addEventListener('submit', handleProfileFormSubmit);
 
-const waveConfigs = [
-    { level: 1, type: 'basic', speed: 2, count: 10, theme: 'Scouts' },
-    { level: 2, type: 'basic', speed: 2.5, count: 12, theme: 'Patrol' },
-    { level: 3, type: 'mecha', speed: 3.5, count: 15, theme: 'Mecha Swarm', dive: true },
-    { level: 4, type: 'mecha', speed: 3, count: 18, theme: 'Divers' },
-    { level: 5, type: 'boss', speed: 1, count: 1, theme: 'Kaiju Boss', hp: 50, split: true, mirrorDash: true }
-];
+function updateDifficultyProgress(elapsedSeconds) {
+    if (!gameRunning || gamePaused) return;
+
+    flightTimeSeconds += elapsedSeconds;
+    const timeComponent = flightTimeSeconds / DIFFICULTY_TIME_SCALE;
+    const scoreComponent = score / SCORE_DIFFICULTY_SCALE;
+    const rawFactor = 1 + timeComponent + scoreComponent;
+    const clampedFactor = Math.max(1, Math.min(MAX_DIFFICULTY_FACTOR, rawFactor));
+
+    difficultyFactor = clampedFactor;
+    const nextLevel = Math.max(1, Math.floor(clampedFactor));
+    if (nextLevel !== level) {
+        level = nextLevel;
+        showAnnounce(waveAnnounceEl, `Threat Level ${level}!`);
+
+        if (playerData && playerData.daily && Array.isArray(playerData.daily.quests)) {
+            const reachThreatQuest = playerData.daily.quests.find(q => q.id === 'defeatBoss');
+            if (reachThreatQuest && !reachThreatQuest.completed && reachThreatQuest.progress < reachThreatQuest.target && nextLevel >= 5) {
+                reachThreatQuest.progress = reachThreatQuest.target;
+                updateQuestsUI();
+            }
+        }
+    }
+}
+
+function getSpawnIntervalSeconds() {
+    const scaled = BASE_SPAWN_INTERVAL / Math.max(1, difficultyFactor);
+    return Math.max(MIN_SPAWN_INTERVAL, scaled);
+}
+
+function buildEnemyTemplate() {
+    const baseSpeed = 2.1 + difficultyFactor * 0.45;
+    const baseHp = 1 + Math.floor(Math.max(0, difficultyFactor - 1) * 0.75);
+    const aggressiveChance = Math.min(0.85, Math.max(0, (difficultyFactor - 1) * 0.12));
+    const useMecha = Math.random() < aggressiveChance;
+
+    const diveStrength = useMecha
+        ? 18 + difficultyFactor * 4
+        : (difficultyFactor > 4 ? 10 + difficultyFactor * 2 : 0);
+
+    return {
+        variant: useMecha ? 'mecha' : 'scout',
+        speed: baseSpeed * (0.88 + Math.random() * 0.3),
+        hp: Math.max(1, baseHp + (useMecha ? 1 : 0)),
+        diveStrength,
+        verticalVariance: useMecha ? 4 + Math.random() * 3 : 2 + Math.random() * 2
+    };
+}
 
 const upgradePools = {
     common: ['speed', 'rapid'], rare: ['spread', 'homing'],
@@ -1563,7 +1612,6 @@ function startGame(isNewSession = true) {
     enemies = [];
     projectiles = [];
     powerups = [];
-    enemyWave = [];
     tail = [];
     particles = [];
 
@@ -1586,6 +1634,16 @@ function startGame(isNewSession = true) {
     resetKeyState();
     lastShotTime = 0;
 
+    flightTimeSeconds = 0;
+    difficultyFactor = 1;
+    enemySpawnTimer = 0;
+    chargeStartTime = 0;
+    isCharging = false;
+    dashCooldown = 0;
+
+    player.x = Math.round(BASE_CANVAS_WIDTH * 0.08);
+    player.y = gameCanvas.height / 2 - player.height / 2;
+
     if (typeof playerData.credits === 'number') {
         credits = playerData.credits;
         uiCache.credits = null;
@@ -1596,71 +1654,22 @@ function startGame(isNewSession = true) {
         playerData.gamesPlayed = (playerData.gamesPlayed || 0) + 1;
     }
 
-    startNewRound(isNewSession);
-    updateUI();
-    updateHubUI();
-    savePlayerData();
-    loadAndDisplayLeaderboard();
-}
-
-function startNewRound(initialLoad = false) {
-    gameRunning = true;
-    gamePaused = false;
-    hideAllOverlays();
-
-    bossActive = false;
-    boss = null;
-    dashActive = false;
-    enemySpawnTimer = 0;
-    enemyWave = [];
-
-    projectiles = [];
-    enemies = [];
-    powerups = [];
-    tail = [];
-    particles = [];
-
-    killStreak = 0;
-    lastKillTime = 0;
-    uiCache.combo = null;
-
-    powerupTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
-    powerupTimeouts = [];
-
-    rapidFire = false;
-    shieldActive = false;
-    spreadActive = false;
-    homingActive = false;
-    pierceActive = false;
-    ultraDashActive = false;
-
-    player.x = Math.round(BASE_CANVAS_WIDTH * 0.08);
-    player.y = gameCanvas.height / 2 - player.height / 2;
-    chargeStartTime = 0;
-    isCharging = false;
-    dashCooldown = 0;
-
-    lastShotTime = 0;
-
     currentShopOptions = [];
     renderShopOptions();
 
-    setupNextWave();
-
-    if (!initialLoad) {
-        const playQuest = playerData.daily?.quests?.find(q => q.id === 'playRounds');
-        if (playQuest && !playQuest.completed) {
-            playQuest.progress = Math.min(playQuest.target, playQuest.progress + 1);
-        }
+    const playQuest = playerData.daily?.quests?.find(q => q.id === 'playRounds');
+    if (playQuest && !playQuest.completed) {
+        playQuest.progress = Math.min(playQuest.target, playQuest.progress + 1);
     }
 
-    const spawnInterval = Math.max(20, 60 - score / 10) * FRAME_TIME;
+    const spawnInterval = getSpawnIntervalSeconds();
     enemySpawnTimer = spawnInterval;
     spawnEnemy();
     enemySpawnTimer = 0;
 
     updateQuestsUI();
     updateUI();
+    updateHubUI();
     savePlayerData();
     loadAndDisplayLeaderboard();
 }
@@ -1712,6 +1721,44 @@ function rollUpgrade(tier) {
 function skipShop() {
     currentShopOptions = [];
     renderShopOptions();
+    showHub();
+}
+
+function handleGameOver() {
+    if (!gameRunning) return;
+
+    gameRunning = false;
+    gamePaused = true;
+    bossActive = false;
+    boss = null;
+    dashActive = false;
+
+    const rewardCredits = Math.max(0, Math.floor(score / 5) + level * 10);
+    if (rewardCredits > 0) {
+        credits += rewardCredits;
+        uiCache.credits = null;
+    }
+
+    playerData.credits = credits;
+    if (score > playerData.bestScore) {
+        playerData.bestScore = score;
+        playerData.wins = (playerData.wins || 0) + 1;
+    } else {
+        playerData.losses = (playerData.losses || 0) + 1;
+    }
+
+    savePlayerData();
+    updateUI();
+    updateHubUI();
+    updateQuestsUI();
+
+    const hubAnnouncementEl = document.getElementById('hub-announcement') || waveAnnounceEl;
+    if (rewardCredits > 0) {
+        showAnnounce(hubAnnouncementEl, `Flight complete! Salvaged +${rewardCredits} Credits.`);
+    } else {
+        showAnnounce(hubAnnouncementEl, 'Flight complete! Ready for the next sortie.');
+    }
+
     showHub();
 }
 
@@ -2471,10 +2518,8 @@ function updateEnemies() {
                 uiCache.lives = null;
                 if (livesEl) livesEl.textContent = `Lives: ${lives}`;
                 if (lives <= 0) {
-                    gameRunning = false;
-                    playerData.losses++;
-                    savePlayerData();
-                    setTimeout(() => alert(`Game Over! Level: ${level} Score: ${score}\nReload to play again.`), 100);
+                    lives = 0;
+                    handleGameOver();
                 }
             }
             enemies.splice(i, 1);
@@ -2495,10 +2540,8 @@ function updateEnemies() {
                     uiCache.lives = null;
                     if (livesEl) livesEl.textContent = `Lives: ${lives}`;
                     if (lives <= 0) {
-                        gameRunning = false;
-                        playerData.losses++;
-                        savePlayerData();
-                        setTimeout(() => alert(`Game Over! Level: ${level} Score: ${score}\nReload to play again.`), 100);
+                        lives = 0;
+                        handleGameOver();
                     }
                 }
                 enemies.splice(i, 1);
@@ -2584,14 +2627,6 @@ function updateEnemies() {
                             }
                         }
                         showAnnounce(waveAnnounceEl, 'Boss Defeated!');
-                        
-                        // --- DAILY QUEST: DEFEAT BOSS TRACKING ---
-                        const defeatBossQuest = playerData.daily.quests.find(q => q.id === 'defeatBoss');
-                        if (defeatBossQuest && !defeatBossQuest.completed) {
-                            defeatBossQuest.progress = Math.min(defeatBossQuest.target, defeatBossQuest.progress + 1);
-                            savePlayerData();
-                        }
-                        // -----------------------------------------
                         
                     } else {
                         const dropChance = Math.min(0.95, 0.2 + (player.luckRating * 0.01) + (player.specialPerks?.dropChanceBonus || 0));
@@ -2721,52 +2756,33 @@ function updatePowerups() {
 }
 
 function spawnEnemy() {
-    if (bossActive || gamePaused || hitStopDuration > 0) return;
-    enemySpawnTimer += deltaTime;
-    const spawnInterval = Math.max(20, 60 - score / 10) * FRAME_TIME;
-    if (enemySpawnTimer > spawnInterval) {
-        enemySpawnTimer = 0;
-        if (enemyWave.length > 0) {
-            const y = enemyWave.shift();
-            const diveStrength = currentWaveConfig.dive ? 35 : 0;
-            const enemy = {
-                x: gameCanvas.width,
-                y,
-                width: enemySpriteDimensions.width,
-                height: enemySpriteDimensions.height,
-                speed: currentWaveConfig.speed,
-                dy: (Math.random() - 0.5) * (currentWaveConfig.dive ? 4 : 2),
-                variant: currentWaveConfig.type,
-                hp: currentWaveConfig.type === 'mecha' ? 2 : 1,
-                diveStrength,
-                divePhase: Math.random() * Math.PI * 2
-            }; enemies.push(enemy);
-        } else if (enemies.length === 0) {
-            credits += Math.floor(score / 10) + (level * 10);
-            uiCache.credits = null;
-            playerData.credits = credits;
-            if (score > playerData.bestScore) { playerData.bestScore = score; }
-            if (lives > 0) { playerData.wins++; } else { playerData.losses++; }
-            savePlayerData();
-            gameRunning = false; showHub();
-        }
-    }
-}
+    if (!gameRunning || bossActive || gamePaused || hitStopDuration > 0) return;
 
-function setupNextWave() {
-    currentWaveConfig = waveConfigs.find(config => config.level === level) || waveConfigs[waveConfigs.length - 1];
-    const waveSize = currentWaveConfig.count; enemyWave = [];
-    const verticalPadding = Math.max(40, enemySpriteDimensions.height * 0.5);
-    const minY = Math.max(0, verticalPadding);
-    const maxY = Math.max(minY, gameCanvas.height - enemySpriteDimensions.height - verticalPadding);
-    const spawnRange = Math.max(0, maxY - minY);
-    for (let i = 0; i < waveSize; i++) {
-        const offset = spawnRange > 0 ? Math.random() * spawnRange : 0;
-        enemyWave.push(minY + offset);
-    }
-    showAnnounce(waveAnnounceEl, `${currentWaveConfig.theme} Wave ${level}!`);
-    if (currentWaveConfig.type === 'boss') {
-        bossActive = true; showAnnounce(bossAnnounceEl, 'Boss Incoming!'); spawnBoss();
+    enemySpawnTimer += deltaTime;
+    const spawnInterval = getSpawnIntervalSeconds();
+
+    if (enemySpawnTimer >= spawnInterval) {
+        enemySpawnTimer = 0;
+        const template = buildEnemyTemplate();
+
+        const verticalPadding = Math.max(40, enemySpriteDimensions.height * 0.5);
+        const minY = Math.max(0, verticalPadding * 0.5);
+        const maxY = Math.max(minY, gameCanvas.height - enemySpriteDimensions.height - verticalPadding * 0.5);
+        const spawnRange = Math.max(0, maxY - minY);
+        const spawnY = minY + (spawnRange > 0 ? Math.random() * spawnRange : 0);
+
+        enemies.push({
+            x: gameCanvas.width,
+            y: spawnY,
+            width: enemySpriteDimensions.width,
+            height: enemySpriteDimensions.height,
+            speed: template.speed,
+            dy: (Math.random() - 0.5) * template.verticalVariance,
+            variant: template.variant,
+            hp: template.hp,
+            diveStrength: template.diveStrength,
+            divePhase: Math.random() * Math.PI * 2
+        });
     }
 }
 
@@ -2948,6 +2964,7 @@ function gameLoop(timestamp = (typeof performance !== 'undefined' ? performance.
         screenShakeDuration = Math.max(0, screenShakeDuration - elapsedMs);
     }
 
+    updateDifficultyProgress(deltaTime);
     updateStarfield();
 
     if (hitStopDuration === 0) {
