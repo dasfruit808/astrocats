@@ -81,7 +81,53 @@
                         </div>
                     </div>
                     <div class="xp-window-content">
-                        <h2>PLAYER HUB <span class="xp-subheading">Wallet: <span id="wallet-address">-</span></span></h2>
+                        <div class="hub-header">
+                            <h2>PLAYER HUB <span class="xp-subheading">Wallet: <span id="wallet-address">-</span></span></h2>
+                            <button id="open-profile-modal" type="button">Create Pilot</button>
+                        </div>
+
+                        <div class="pilot-identity">
+                            <img id="pilot-avatar" src="https://placehold.co/80x80?text=Pilot" alt="Pilot avatar" />
+                            <div class="pilot-identity-text">
+                                <span id="pilot-name-display">Rookie Pilot</span>
+                                <span id="pilot-title-display">Cadet</span>
+                            </div>
+                        </div>
+                        <p id="pilot-bio-display" class="pilot-bio">Set your pilot bio to share your legend.</p>
+
+                        <div id="profile-modal" class="profile-modal xp-window xp-modal" style="display: none;">
+                            <div class="xp-titlebar">
+                                <div class="xp-title-group">
+                                    <span class="xp-title-icon">🧑‍🚀</span>
+                                    <span class="xp-app-name">Pilot Profile</span>
+                                </div>
+                                <div class="xp-window-controls">
+                                    <button type="button" class="xp-control xp-close" id="close-profile-modal" title="Close">&#10005;</button>
+                                </div>
+                            </div>
+                            <div class="xp-window-content">
+                                <form id="profile-form">
+                                    <label for="profile-name">Pilot Name</label>
+                                    <input id="profile-name" type="text" maxlength="40" placeholder="e.g., Nova" />
+
+                                    <label for="profile-title">Title / Callsign</label>
+                                    <input id="profile-title" type="text" maxlength="60" placeholder="e.g., Star Commander" />
+
+                                    <label for="profile-avatar">Avatar Image URL</label>
+                                    <input id="profile-avatar" type="text" placeholder="https://example.com/avatar.png" />
+
+                                    <label for="profile-bio">Pilot Bio</label>
+                                    <textarea id="profile-bio" rows="3" maxlength="280" placeholder="Share your origin story..."></textarea>
+
+                                    <p id="profile-error" class="form-error" role="alert"></p>
+
+                                    <div class="profile-actions">
+                                        <button type="submit">Save Pilot</button>
+                                        <button type="button" id="cancel-profile">Cancel</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
 
                         <div class="hub-section-wrapper">
 
@@ -95,6 +141,8 @@
                             <div class="hub-section">
                                 <h4 class="resource-title">Resources & Progression</h4>
                                 <div class="resource-grid">
+                                    <p>Pilot: <span id="pilot-name-stat">Rookie Pilot</span></p>
+                                    <p>Callsign: <span id="pilot-title-stat">Cadet</span></p>
                                     <p>Credits: <span id="hub-credits">0</span></p>
                                     <p>Level: <span id="stat-level-hub">1</span></p>
                                     <p>Best Score: <span id="best-score">0</span></p>
@@ -107,6 +155,8 @@
                             <div class="hub-section">
                                 <h4>Lifetime Stats</h4>
                                 <div class="stat-grid">
+                                    <p>Pilot: <span id="pilot-name-stats-panel">Rookie Pilot</span></p>
+                                    <p>Callsign: <span id="pilot-title-stats-panel">Cadet</span></p>
                                     <p>Games Played: <span id="games-played">0</span></p>
                                     <p>Wins: <span id="wins">0</span></p>
                                     <p>Losses: <span id="losses">0</span></p>
