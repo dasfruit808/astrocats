@@ -1961,10 +1961,34 @@ function drawPowerup(x, y, w, h, visuals) {
 }
 
 function drawImageOrProcedural(img, x, y, w, h, isPlayer = false, extra = {}) {
-    if (img) { gameCtx.drawImage(img, x, y, w, h); } 
-    else {
-        if (isPlayer) drawPlayer(x, y, w, h, extra.chargeLevel || 0);
-        else drawEnemy(x, y, w, h, extra.variant || 'basic', extra.hp || 1);
+    const {
+        glowColor,
+        glowBlur,
+        chargeLevel = 0,
+        variant = 'basic',
+        hp = 1
+    } = extra;
+
+    let glowApplied = false;
+    if (glowColor) {
+        gameCtx.save();
+        gameCtx.shadowColor = glowColor;
+        if (typeof glowBlur === 'number') {
+            gameCtx.shadowBlur = glowBlur;
+        }
+        glowApplied = true;
+    }
+
+    if (img) {
+        gameCtx.drawImage(img, x, y, w, h);
+    } else if (isPlayer) {
+        drawPlayer(x, y, w, h, chargeLevel);
+    } else {
+        drawEnemy(x, y, w, h, variant, hp);
+    }
+
+    if (glowApplied) {
+        gameCtx.restore();
     }
 }
 
@@ -2894,14 +2918,40 @@ function renderGameScene() {
         drawImageOrProcedural(enemyImg, enemy.x, enemy.y, enemy.width, enemy.height, false, extra);
     });
 
-    gameCtx.save();
-    if (shieldActive) { gameCtx.shadowColor = '#00ffff'; gameCtx.shadowBlur = 15; } 
-    else if (dashActive) { gameCtx.shadowColor = '#ffff00'; gameCtx.shadowBlur = 20; } 
-    else if (isCharging) {
+    if (shieldActive) {
+        drawImageOrProcedural(
+            playerImg,
+            player.x,
+            player.y,
+            player.width,
+            player.height,
+            true,
+            { glowColor: '#00ffff', glowBlur: 15 }
+        );
+    } else if (dashActive) {
+        drawImageOrProcedural(
+            playerImg,
+            player.x,
+            player.y,
+            player.width,
+            player.height,
+            true,
+            { glowColor: '#ffff00', glowBlur: 20 }
+        );
+    } else if (isCharging) {
         const chargeLevel = Math.min(1, (Date.now() - chargeStartTime) / 1500);
-        drawImageOrProcedural(playerImg, player.x, player.y, player.width, player.height, true, { chargeLevel });
-    } else { drawImageOrProcedural(playerImg, player.x, player.y, player.width, player.height, true); }
-    gameCtx.restore();
+        drawImageOrProcedural(
+            playerImg,
+            player.x,
+            player.y,
+            player.width,
+            player.height,
+            true,
+            { chargeLevel }
+        );
+    } else {
+        drawImageOrProcedural(playerImg, player.x, player.y, player.width, player.height, true);
+    }
 
     gameCtx.fillStyle = 'rgba(0, 0, 0, 0.05)';
     for (let i = 0; i < gameCanvas.height; i += 3) { gameCtx.fillRect(0, i, gameCanvas.width, 1); }
