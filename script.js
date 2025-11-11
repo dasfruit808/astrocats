@@ -8,12 +8,39 @@
 // Canvas setup
 const canvas = document.getElementById('canvas');
 let ctx = null;
+let gl;
+let program;
+let vertexBuffer;
+let texture;
+
+const BASE_CANVAS_WIDTH = 1280;
+const BASE_CANVAS_HEIGHT = 720;
+const MAX_DEVICE_PIXEL_RATIO = 2.5;
 
 // Offscreen canvas setup
 const gameCanvas = document.createElement('canvas');
-gameCanvas.width = 800;
-gameCanvas.height = 600;
+gameCanvas.width = BASE_CANVAS_WIDTH;
+gameCanvas.height = BASE_CANVAS_HEIGHT;
 const gameCtx = gameCanvas.getContext('2d');
+
+function configureCanvasResolution() {
+    if (!canvas) return;
+    const dpr = Math.min(MAX_DEVICE_PIXEL_RATIO, window.devicePixelRatio || 1);
+    const desiredWidth = Math.round(BASE_CANVAS_WIDTH * dpr);
+    const desiredHeight = Math.round(BASE_CANVAS_HEIGHT * dpr);
+
+    if (canvas.width !== desiredWidth || canvas.height !== desiredHeight) {
+        canvas.width = desiredWidth;
+        canvas.height = desiredHeight;
+        if (gl) {
+            gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+    }
+}
+
+configureCanvasResolution();
+window.addEventListener('resize', configureCanvasResolution);
+window.addEventListener('orientationchange', configureCanvasResolution);
 
 // UI elements 
 const scoreEl = document.getElementById('score');
@@ -72,6 +99,102 @@ const pilotNameStatEl = document.getElementById('pilot-name-stat');
 const pilotTitleStatEl = document.getElementById('pilot-title-stat');
 const pilotNameStatsPanelEl = document.getElementById('pilot-name-stats-panel');
 const pilotTitleStatsPanelEl = document.getElementById('pilot-title-stats-panel');
+
+
+const PLAYER_BASE_SIZE = 96;
+const PLAYER_MIN_SIZE = 64;
+const PLAYER_MAX_SIZE = 132;
+const ENEMY_BASE_SIZE = 88;
+const ENEMY_MIN_SIZE = 56;
+const ENEMY_MAX_SIZE = 128;
+
+let playerSpriteDimensions = {
+    width: PLAYER_BASE_SIZE,
+    height: Math.round(PLAYER_BASE_SIZE * 0.85)
+};
+
+let enemySpriteDimensions = {
+    width: ENEMY_BASE_SIZE,
+    height: ENEMY_BASE_SIZE
+};
+
+let projectiles = [];
+let enemies = [];
+
+function computeSpriteDimensions(img, baseSize, minSize, maxSize) {
+    if (!img) {
+        return { width: baseSize, height: baseSize };
+    }
+
+    const naturalWidth = img.naturalWidth || img.width || baseSize;
+    const naturalHeight = img.naturalHeight || img.height || baseSize;
+    if (!naturalWidth || !naturalHeight) {
+        return { width: baseSize, height: baseSize };
+    }
+
+    const dominant = Math.max(naturalWidth, naturalHeight);
+    let scale = baseSize / dominant;
+    let width = Math.round(naturalWidth * scale);
+    let height = Math.round(naturalHeight * scale);
+
+    const ensureMin = Math.min(width, height);
+    if (ensureMin < minSize) {
+        const minScale = minSize / ensureMin;
+        width = Math.round(width * minScale);
+        height = Math.round(height * minScale);
+    }
+
+    const ensureMax = Math.max(width, height);
+    if (ensureMax > maxSize) {
+        const maxScale = maxSize / ensureMax;
+        width = Math.round(width * maxScale);
+        height = Math.round(height * maxScale);
+    }
+
+    return { width, height };
+}
+
+function whenImageReady(image, callback) {
+    if (!image || typeof callback !== 'function') return;
+    if (image.complete && image.naturalWidth) {
+        callback(image);
+        return;
+    }
+
+    const handler = () => {
+        image.removeEventListener('load', handler);
+        callback(image);
+    };
+
+    image.addEventListener('load', handler);
+}
+
+function updatePlayerSpriteMetrics(img) {
+    const dims = computeSpriteDimensions(img, PLAYER_BASE_SIZE, PLAYER_MIN_SIZE, PLAYER_MAX_SIZE);
+    playerSpriteDimensions = dims;
+    const centerX = player.x + player.width / 2;
+    const centerY = player.y + player.height / 2;
+    player.width = dims.width;
+    player.height = dims.height;
+    player.x = Math.max(0, Math.min(centerX - player.width / 2, gameCanvas.width - player.width));
+    player.y = Math.max(0, Math.min(centerY - player.height / 2, gameCanvas.height - player.height));
+}
+
+function updateEnemySpriteMetrics(img, applyToExisting = false) {
+    const dims = computeSpriteDimensions(img, ENEMY_BASE_SIZE, ENEMY_MIN_SIZE, ENEMY_MAX_SIZE);
+    enemySpriteDimensions = dims;
+    if (applyToExisting) {
+        enemies.forEach(enemy => {
+            if (enemy === boss) return;
+            const centerX = enemy.x + enemy.width / 2;
+            const centerY = enemy.y + enemy.height / 2;
+            enemy.width = dims.width;
+            enemy.height = dims.height;
+            enemy.x = Math.max(0, Math.min(centerX - enemy.width / 2, gameCanvas.width - enemy.width));
+            enemy.y = Math.max(0, Math.min(centerY - enemy.height / 2, gameCanvas.height - enemy.height));
+        });
+    }
+}
 
 
 // Runtime & timing helpers
@@ -133,10 +256,6 @@ function createBasePlayerData() {
 
 let playerData = createBasePlayerData();
 const ASTRO_CAT_COLLECTION_MINT = 'AstroCatMintAddress';
-let gl;
-let program;
-let vertexBuffer;
-let texture;
 
 // Game state & Constants
 let gameRunning = false; let gamePaused = true; 
@@ -167,7 +286,7 @@ const uiCache = {
     shopCredits: null
 };
 
-const STAR_COUNT = 120;
+const STAR_COUNT = 220;
 const starField = Array.from({ length: STAR_COUNT }, () => ({
     x: Math.random() * gameCanvas.width,
     y: Math.random() * gameCanvas.height,
@@ -790,17 +909,30 @@ function applySpriteImage(meta) {
     const cached = spriteImageCache[meta.id];
     if (cached && !cached.isFallback) {
         playerImg = cached;
+        whenImageReady(cached, (img) => {
+            updatePlayerSpriteMetrics(img);
+            updateTailLength();
+        });
         return;
     }
     const fallbackSrc = getSpriteFallback(meta);
     if (fallbackSrc) {
         const fallbackImage = new Image();
         fallbackImage.isFallback = true;
+        fallbackImage.onload = () => {
+            spriteImageCache[meta.id] = fallbackImage;
+            if (playerData.activeSpriteId === meta.id) {
+                playerImg = fallbackImage;
+                updatePlayerSpriteMetrics(fallbackImage);
+                updateTailLength();
+            }
+        };
         fallbackImage.src = fallbackSrc;
         spriteImageCache[meta.id] = fallbackImage;
         playerImg = fallbackImage;
     } else {
         playerImg = null;
+        updatePlayerSpriteMetrics(null);
     }
 
     if (meta.fileName) {
@@ -811,6 +943,8 @@ function applySpriteImage(meta) {
             spriteImageCache[meta.id] = assetImage;
             if (playerData.activeSpriteId === meta.id) {
                 playerImg = assetImage;
+                updatePlayerSpriteMetrics(assetImage);
+                updateTailLength();
             }
         };
         assetImage.onerror = () => {
@@ -846,7 +980,13 @@ let currentShopOptions = [];
 const DASH_WINDOW = 300; const DASH_DURATION = 500;
 
 const player = {
-    x: 50, y: gameCanvas.height / 2, width: 50, height: 50, speed: 5, dx: 0, dy: 0,
+    x: Math.round(BASE_CANVAS_WIDTH * 0.08),
+    y: gameCanvas.height / 2 - playerSpriteDimensions.height / 2,
+    width: playerSpriteDimensions.width,
+    height: playerSpriteDimensions.height,
+    speed: 8,
+    dx: 0,
+    dy: 0,
     damageMultiplier: 1, defenseRating: 0, luckRating: 0, critChance: 0, critMultiplier: 2.0,
     specialPerks: {
         dashCooldownFactor: 1,
@@ -861,8 +1001,6 @@ const player = {
 };
 
 applyStatEffects();
-
-let projectiles = []; let enemies = [];
 
 function prepareProjectile(proj) {
     if (!proj || typeof proj !== 'object') return;
@@ -897,6 +1035,8 @@ function prepareProjectile(proj) {
 const keys = {}; let joystickActive = false; let joystickDelta = { x: 0, y: 0 };
 let joystickSmoothed = { x: 0, y: 0 };
 const JOYSTICK_SMOOTHING = 0.15;
+const PLAYER_ACCELERATION = 12;
+const PLAYER_FRICTION = 0.86;
 const lastKeyTime = {};
 
 // Keyboard shooting helpers
@@ -1494,8 +1634,8 @@ function startNewRound(initialLoad = false) {
     pierceActive = false;
     ultraDashActive = false;
 
-    player.x = 50;
-    player.y = gameCanvas.height / 2;
+    player.x = Math.round(BASE_CANVAS_WIDTH * 0.08);
+    player.y = gameCanvas.height / 2 - player.height / 2;
     chargeStartTime = 0;
     isCharging = false;
     dashCooldown = 0;
@@ -1769,8 +1909,15 @@ if (dragDrop) {
                 reader.onload = (event) => {
                     const img = new Image();
                     img.onload = () => {
-                        if (file.name.toLowerCase().includes('player')) { playerImg = img; } 
-                        else if (file.name.toLowerCase().includes('enemy')) { enemyImg = img; }
+                        if (file.name.toLowerCase().includes('player')) {
+                            playerImg = img;
+                            updatePlayerSpriteMetrics(img);
+                            updateTailLength();
+                        }
+                        else if (file.name.toLowerCase().includes('enemy')) {
+                            enemyImg = img;
+                            updateEnemySpriteMetrics(img, true);
+                        }
                         assetsLoaded = true;
                         if (dragDrop) dragDrop.style.display = 'none';
                         startGame(true);
@@ -1927,7 +2074,7 @@ function applyStatEffects() {
     const luckStat = totals.luck || 0;
 
     const movementMultiplier = 1 + (perks.movementSpeed || 0);
-    const baseSpeed = 5 + (agilityStat * 0.5);
+    const baseSpeed = 6.5 + (agilityStat * 0.6);
     player.speed = baseSpeed * movementMultiplier;
 
     const damageMultiplierBonus = 1 + (perks.damageMultiplier || 0);
@@ -2417,12 +2564,16 @@ function updateEnemies() {
                         enemies.splice(e, 1);
                         bossActive = false;
                         if (boss.split) {
+                            const shardSize = {
+                                width: Math.max(ENEMY_MIN_SIZE * 0.75, Math.round(enemySpriteDimensions.width * 0.6)),
+                                height: Math.max(ENEMY_MIN_SIZE * 0.75, Math.round(enemySpriteDimensions.height * 0.6))
+                            };
                             for (let j = 0; j < 3; j++) {
                                 enemies.push({
                                     x: boss.x,
                                     y: boss.y + j * 40 - 40,
-                                    width: 30,
-                                    height: 30,
+                                    width: shardSize.width,
+                                    height: shardSize.height,
                                     speed: 4,
                                     dy: (Math.random() - 0.5) * 2,
                                     variant: 'mecha',
@@ -2501,8 +2652,25 @@ function updatePlayer() {
             inputY = vector.y;
         }
     }
-    player.dx = inputX * player.speed * dashMultiplier;
-    player.dy = inputY * player.speed * dashMultiplier;
+    const targetDX = inputX * player.speed * dashMultiplier;
+    const targetDY = inputY * player.speed * dashMultiplier;
+
+    if (dashActive) {
+        player.dx = targetDX;
+        player.dy = targetDY;
+    } else {
+        const accelFactor = Math.min(1, deltaMultiplier * (PLAYER_ACCELERATION / TARGET_FPS));
+        player.dx += (targetDX - player.dx) * accelFactor;
+        player.dy += (targetDY - player.dy) * accelFactor;
+
+        if (Math.abs(inputX) < 0.01 && Math.abs(inputY) < 0.01) {
+            const friction = Math.pow(PLAYER_FRICTION, deltaMultiplier);
+            player.dx *= friction;
+            player.dy *= friction;
+            if (Math.abs(player.dx) < 0.02) player.dx = 0;
+            if (Math.abs(player.dy) < 0.02) player.dy = 0;
+        }
+    }
 
     player.x += player.dx * deltaMultiplier;
     player.y += player.dy * deltaMultiplier;
@@ -2564,8 +2732,8 @@ function spawnEnemy() {
             const enemy = {
                 x: gameCanvas.width,
                 y,
-                width: 50,
-                height: 50,
+                width: enemySpriteDimensions.width,
+                height: enemySpriteDimensions.height,
                 speed: currentWaveConfig.speed,
                 dy: (Math.random() - 0.5) * (currentWaveConfig.dive ? 4 : 2),
                 variant: currentWaveConfig.type,
@@ -2588,8 +2756,13 @@ function spawnEnemy() {
 function setupNextWave() {
     currentWaveConfig = waveConfigs.find(config => config.level === level) || waveConfigs[waveConfigs.length - 1];
     const waveSize = currentWaveConfig.count; enemyWave = [];
+    const verticalPadding = Math.max(40, enemySpriteDimensions.height * 0.5);
+    const minY = Math.max(0, verticalPadding);
+    const maxY = Math.max(minY, gameCanvas.height - enemySpriteDimensions.height - verticalPadding);
+    const spawnRange = Math.max(0, maxY - minY);
     for (let i = 0; i < waveSize; i++) {
-        enemyWave.push(Math.random() * (gameCanvas.height - 100) + 50);
+        const offset = spawnRange > 0 ? Math.random() * spawnRange : 0;
+        enemyWave.push(minY + offset);
     }
     showAnnounce(waveAnnounceEl, `${currentWaveConfig.theme} Wave ${level}!`);
     if (currentWaveConfig.type === 'boss') {
@@ -2672,6 +2845,7 @@ function compileShader(type, source) {
 }
 
 function initWebGL() {
+    configureCanvasResolution();
     gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
     if (!gl) {
         console.warn('WebGL not supported, falling back to 2D');
@@ -2725,8 +2899,13 @@ function renderWithShader() {
         if (!ctx) {
             ctx = canvas.getContext('2d');
         }
-        ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(gameCanvas, 0, 0, canvas.width, canvas.height); return;
+        configureCanvasResolution();
+        ctx.imageSmoothingEnabled = true;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(gameCanvas, 0, 0, canvas.width, canvas.height);
+        return;
     }
+    configureCanvasResolution();
     gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), canvas.width, canvas.height);
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, gameCanvas);
