@@ -1654,7 +1654,7 @@ async function checkNFT(publicKey) {
         if (typeof solanaWeb3 === 'undefined' || typeof Metaplex === 'undefined') { if (nftStatusEl) nftStatusEl.textContent = 'NFT Check Failed (Libraries Missing)'; return; }
 
         const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'));
-        const metaplex = Metaplex.Metaplex(connection);
+        const metaplex = Metaplex.make(connection);
         const nfts = await metaplex.nfts().findAllByOwner({ owner: new solanaWeb3.PublicKey(publicKey) }).run();
         hasAstroCatNFT = nfts.some(nft => nft.collection?.key.toString() === ASTRO_CAT_COLLECTION_MINT);
         if (nftStatusEl) nftStatusEl.textContent = `NFT Status: ${hasAstroCatNFT ? 'Detected! Persistent Account' : 'Not Detected (Volatile Session)'}`;
@@ -2038,7 +2038,11 @@ function renderGameScene() {
 
 function compileShader(type, source) {
     const shader = gl.createShader(type); gl.shaderSource(shader, source); gl.compileShader(shader);
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) { console.error(`Shader ${type} error:`, gl.getProgramInfoLog(program)); gl.deleteShader(shader); return null; }
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error(`Shader ${type} error:`, gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+    }
     return shader;
 }
 
