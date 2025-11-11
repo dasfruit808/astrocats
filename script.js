@@ -54,6 +54,24 @@ const statLevelOverlayEl = document.getElementById('stat-level-overlay');
 const statPointsEl = document.getElementById('stat-points');
 const statOptionsEl = document.getElementById('stat-options');
 const statusClockEl = document.getElementById('status-clock');
+const openProfileBtn = document.getElementById('open-profile-modal');
+const profileModalEl = document.getElementById('profile-modal');
+const closeProfileBtn = document.getElementById('close-profile-modal');
+const cancelProfileBtn = document.getElementById('cancel-profile');
+const profileForm = document.getElementById('profile-form');
+const profileNameInput = document.getElementById('profile-name');
+const profileTitleInput = document.getElementById('profile-title');
+const profileAvatarInput = document.getElementById('profile-avatar');
+const profileBioInput = document.getElementById('profile-bio');
+const profileErrorEl = document.getElementById('profile-error');
+const pilotAvatarEl = document.getElementById('pilot-avatar');
+const pilotNameDisplayEl = document.getElementById('pilot-name-display');
+const pilotTitleDisplayEl = document.getElementById('pilot-title-display');
+const pilotBioDisplayEl = document.getElementById('pilot-bio-display');
+const pilotNameStatEl = document.getElementById('pilot-name-stat');
+const pilotTitleStatEl = document.getElementById('pilot-title-stat');
+const pilotNameStatsPanelEl = document.getElementById('pilot-name-stats-panel');
+const pilotTitleStatsPanelEl = document.getElementById('pilot-title-stats-panel');
 
 
 // Runtime & timing helpers
@@ -102,6 +120,12 @@ function createBasePlayerData() {
             lastLogin: 0,
             claimedLogin: false,
             quests: createDefaultQuests()
+        },
+        profile: {
+            name: '',
+            title: '',
+            avatar: '',
+            bio: ''
         }
     };
 }
@@ -155,6 +179,12 @@ const starField = Array.from({ length: STAR_COUNT }, () => ({
 const BASE_XP_TO_LEVEL = 100;
 const XP_MULTIPLIER = 1.15;
 const MAX_PLAYER_LEVEL = 50;
+const DEFAULT_PILOT_AVATAR = 'https://placehold.co/80x80?text=Pilot';
+
+if (openProfileBtn) openProfileBtn.addEventListener('click', showProfileModal);
+if (closeProfileBtn) closeProfileBtn.addEventListener('click', hideProfileModal);
+if (cancelProfileBtn) cancelProfileBtn.addEventListener('click', hideProfileModal);
+if (profileForm) profileForm.addEventListener('submit', handleProfileFormSubmit);
 
 const waveConfigs = [
     { level: 1, type: 'basic', speed: 2, count: 10, theme: 'Scouts' },
@@ -753,10 +783,31 @@ function updateQuestsUI() {
 
 function updateHubUI() {
     // This helper MUST be defined early as it's called immediately by loadPlayerData and checkNFT
+    const profile = playerData.profile || {};
+    const nameText = profile.name && profile.name.trim() ? profile.name.trim() : 'Rookie Pilot';
+    const titleText = profile.title && profile.title.trim() ? profile.title.trim() : 'Cadet';
+    const bioText = profile.bio && profile.bio.trim() ? profile.bio.trim() : 'Set your pilot bio to share your legend.';
+    const avatarCandidate = profile.avatar && profile.avatar.trim() ? profile.avatar.trim() : '';
+    const isAvatarValid = avatarCandidate && (/^https?:\/\//i.test(avatarCandidate) || avatarCandidate.startsWith('data:'));
+    const avatarSrc = isAvatarValid ? avatarCandidate : DEFAULT_PILOT_AVATAR;
+
+    if (openProfileBtn) openProfileBtn.textContent = profile.name && profile.name.trim() ? 'Edit Pilot' : 'Create Pilot';
+    if (pilotNameDisplayEl) pilotNameDisplayEl.textContent = nameText;
+    if (pilotTitleDisplayEl) pilotTitleDisplayEl.textContent = titleText;
+    if (pilotBioDisplayEl) pilotBioDisplayEl.textContent = bioText;
+    if (pilotAvatarEl) {
+        pilotAvatarEl.src = avatarSrc;
+        pilotAvatarEl.alt = `${nameText} avatar`;
+    }
+    if (pilotNameStatEl) pilotNameStatEl.textContent = nameText;
+    if (pilotTitleStatEl) pilotTitleStatEl.textContent = titleText;
+    if (pilotNameStatsPanelEl) pilotNameStatsPanelEl.textContent = nameText;
+    if (pilotTitleStatsPanelEl) pilotTitleStatsPanelEl.textContent = titleText;
+
     if (!walletPublicKey) return;
     if (walletAddressEl) walletAddressEl.textContent = walletPublicKey.slice(0, 8) + '...';
     if (gamesPlayedEl) gamesPlayedEl.textContent = playerData.gamesPlayed;
-    if (winsEl) winsEl.textContent = playerData.wins; 
+    if (winsEl) winsEl.textContent = playerData.wins;
     if (lossesEl) lossesEl.textContent = playerData.losses;
     if (bestScoreEl) bestScoreEl.textContent = playerData.bestScore;
     if (hubCreditsEl) hubCreditsEl.textContent = playerData.credits;
@@ -781,11 +832,73 @@ function updateHubUI() {
 // --------------------------------------------------------------------
 
 function hideAllOverlays() {
-    [startMenuEl, hubEl, shopEl, statAllocationEl].forEach(el => {
+    [startMenuEl, hubEl, shopEl, statAllocationEl, profileModalEl].forEach(el => {
         if (el) {
             el.style.display = 'none';
         }
     });
+    if (profileErrorEl) profileErrorEl.textContent = '';
+}
+
+function populateProfileForm() {
+    if (!profileForm) return;
+    const profile = playerData.profile || {};
+    if (profileNameInput) profileNameInput.value = profile.name || '';
+    if (profileTitleInput) profileTitleInput.value = profile.title || '';
+    if (profileAvatarInput) profileAvatarInput.value = profile.avatar || '';
+    if (profileBioInput) profileBioInput.value = profile.bio || '';
+    if (profileErrorEl) profileErrorEl.textContent = '';
+}
+
+function showProfileModal() {
+    if (!profileModalEl) return;
+    populateProfileForm();
+    profileModalEl.style.display = 'block';
+}
+
+function hideProfileModal() {
+    if (!profileModalEl) return;
+    profileModalEl.style.display = 'none';
+    if (profileErrorEl) profileErrorEl.textContent = '';
+}
+
+function handleProfileFormSubmit(event) {
+    if (event) event.preventDefault();
+    if (!profileForm) return;
+
+    const name = profileNameInput ? profileNameInput.value.trim() : '';
+    const title = profileTitleInput ? profileTitleInput.value.trim() : '';
+    const avatar = profileAvatarInput ? profileAvatarInput.value.trim() : '';
+    const bio = profileBioInput ? profileBioInput.value.trim() : '';
+
+    let error = '';
+    if (!name) {
+        error = 'Pilot name is required.';
+    } else if (name.length > 40) {
+        error = 'Pilot name must be 40 characters or fewer.';
+    } else if (title.length > 60) {
+        error = 'Title must be 60 characters or fewer.';
+    } else if (avatar && !/^https?:\/\//i.test(avatar) && !avatar.startsWith('data:')) {
+        error = 'Avatar must be a valid URL or data URI.';
+    } else if (bio.length > 280) {
+        error = 'Bio must be 280 characters or fewer.';
+    }
+
+    if (error) {
+        if (profileErrorEl) profileErrorEl.textContent = error;
+        return;
+    }
+
+    playerData.profile = {
+        name,
+        title,
+        avatar,
+        bio
+    };
+
+    updateHubUI();
+    savePlayerData();
+    hideProfileModal();
 }
 
 function showStartMenu() {
@@ -1284,6 +1397,7 @@ function loadPlayerData() {
             if (!Array.isArray(playerData.daily.quests) || playerData.daily.quests.length !== 3) {
                 playerData.daily.quests = createDefaultQuests();
             }
+            playerData.profile = { ...base.profile, ...(loadedData.profile || {}) };
         } else {
             playerData = createBasePlayerData();
         }
