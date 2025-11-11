@@ -86,6 +86,8 @@
                             <button id="open-profile-modal" type="button">Create Pilot</button>
                         </div>
 
+                        <div id="hub-announcement" class="announce announce-hub" role="status" aria-live="polite"></div>
+
                         <div class="pilot-identity">
                             <img id="pilot-avatar" src="https://placehold.co/80x80?text=Pilot" alt="Pilot avatar" />
                             <div class="pilot-identity-text">
@@ -135,6 +137,14 @@
                                 <div id="daily-quests">
                                     <h4>Daily Missions</h4>
                                     <p>Loading missions...</p>
+                                </div>
+                                <div id="daily-streak-widget" class="streak-widget">
+                                    <div class="streak-header">
+                                        <h4>Streak Rewards</h4>
+                                        <span id="daily-streak-count" class="streak-count">Streak: 0</span>
+                                    </div>
+                                    <p id="daily-streak-summary" class="streak-summary">Log in today to start your streak and unlock escalating rewards!</p>
+                                    <div id="daily-streak-calendar" class="streak-calendar"></div>
                                 </div>
                             </div>
 

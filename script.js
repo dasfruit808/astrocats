@@ -47,6 +47,11 @@ const ownedSpritesEl = document.getElementById('owned-sprites');
 const leaderboardEl = document.getElementById('leaderboard');
 const waveAnnounceEl = document.getElementById('wave-announce');
 const bossAnnounceEl = document.getElementById('boss-announce');
+const hubAnnouncementEl = document.getElementById('hub-announcement');
+const dailyStreakWidgetEl = document.getElementById('daily-streak-widget');
+const dailyStreakSummaryEl = document.getElementById('daily-streak-summary');
+const dailyStreakCountEl = document.getElementById('daily-streak-count');
+const dailyStreakCalendarEl = document.getElementById('daily-streak-calendar');
 // STAT UI ELEMENTS
 const statAllocationEl = document.getElementById('stat-allocation');
 const statLevelHubEl = document.getElementById('stat-level-hub');
@@ -95,6 +100,30 @@ function createDefaultQuests() {
     ];
 }
 
+function createDefaultRewardCalendar() {
+    return [
+        { day: 1, credits: 25, label: '+{credits} Credits' },
+        { day: 2, credits: 30, label: '+{credits} Credits' },
+        { day: 3, credits: 40, label: '+{credits} Credits' },
+        { day: 4, credits: 45, label: '+{credits} Credits' },
+        {
+            day: 5,
+            credits: 50,
+            label: '+{credits} Credits + Booster Pack',
+            loot: { id: 'booster-pack', name: 'Booster Pack' },
+            milestone: true
+        },
+        { day: 6, credits: 55, label: '+{credits} Credits' },
+        {
+            day: 7,
+            credits: 75,
+            label: 'Legendary Cache (+{credits} Credits)',
+            loot: { id: 'legendary-cache', name: 'Legendary Cache' },
+            milestone: true
+        }
+    ];
+}
+
 const DEFAULT_SPRITE_ID = 'astro-pioneer';
 
 function createBasePlayerData() {
@@ -119,6 +148,9 @@ function createBasePlayerData() {
         daily: {
             lastLogin: 0,
             claimedLogin: false,
+            streakCount: 0,
+            lastClaimDate: 0,
+            rewardCalendar: createDefaultRewardCalendar(),
             quests: createDefaultQuests()
         },
         profile: {
@@ -746,6 +778,91 @@ function updateUI() {
     }
 }
 
+function getStartOfDay(timestamp) {
+    if (!timestamp) return 0;
+    const date = new Date(timestamp);
+    date.setHours(0, 0, 0, 0);
+    return date.getTime();
+}
+
+function getRewardForStreak(streak) {
+    const calendar = (playerData.daily && Array.isArray(playerData.daily.rewardCalendar) && playerData.daily.rewardCalendar.length)
+        ? playerData.daily.rewardCalendar
+        : createDefaultRewardCalendar();
+
+    const safeStreak = Math.max(1, streak);
+    const index = (safeStreak - 1) % calendar.length;
+    const cycle = Math.floor((safeStreak - 1) / calendar.length);
+    const baseEntry = calendar[index] || calendar[0];
+    const credits = (baseEntry.credits || 0) + cycle * 25;
+
+    let label = baseEntry.label || '';
+    if (label && label.includes('{credits}')) {
+        label = label.replace('{credits}', credits);
+    } else if (!label) {
+        label = `+${credits} Credits`;
+    }
+
+    const loot = baseEntry.loot ? { ...baseEntry.loot } : null;
+    if (loot && !label.toLowerCase().includes((loot.name || loot.id || '').toLowerCase())) {
+        label += ` + ${loot.name || loot.id}`;
+    }
+
+    return {
+        day: safeStreak,
+        credits,
+        loot,
+        milestone: Boolean(baseEntry.milestone),
+        label
+    };
+}
+
+function updateDailyStreakUI() {
+    if (!dailyStreakWidgetEl) return;
+
+    const streak = playerData.daily?.streakCount || 0;
+    const nextReward = getRewardForStreak(streak + 1);
+
+    if (dailyStreakCountEl) {
+        dailyStreakCountEl.textContent = `Streak: ${streak}`;
+    }
+
+    if (dailyStreakSummaryEl) {
+        if (streak > 0) {
+            dailyStreakSummaryEl.textContent = `Current streak ${streak} day${streak === 1 ? '' : 's'} — next reward: ${nextReward.label}`;
+        } else {
+            dailyStreakSummaryEl.textContent = 'Log in today to start your streak and unlock escalating rewards!';
+        }
+    }
+
+    if (!dailyStreakCalendarEl) return;
+
+    dailyStreakCalendarEl.innerHTML = '';
+
+    const windowLength = (playerData.daily?.rewardCalendar?.length) || createDefaultRewardCalendar().length;
+    for (let i = 0; i < windowLength; i++) {
+        const futureDay = streak + i + 1;
+        const reward = getRewardForStreak(futureDay);
+
+        const cell = document.createElement('div');
+        cell.className = 'streak-cell';
+        if (i === 0) {
+            cell.classList.add('next');
+        }
+        if (reward.milestone) {
+            cell.classList.add('milestone');
+        }
+
+        cell.innerHTML = `
+            <span class="streak-day">Day ${futureDay}</span>
+            <span class="streak-reward">${reward.label}</span>
+            ${reward.loot ? `<span class="streak-loot">${reward.loot.name || reward.loot.id}</span>` : ''}
+        `;
+
+        dailyStreakCalendarEl.appendChild(cell);
+    }
+}
+
 function updateQuestsUI() {
     const questsEl = document.getElementById('daily-quests');
     if (!questsEl) return;
@@ -824,6 +941,7 @@ function updateHubUI() {
     credits = playerData.credits;
     updateUI();
     updateQuestsUI();
+    updateDailyStreakUI();
     loadAndDisplayLeaderboard();
 }
 
@@ -915,6 +1033,7 @@ function showHub() {
     gamePaused = true;
     hideAllOverlays();
     if (hubEl) hubEl.style.display = 'flex';
+    checkDailyLogin();
     updateUI();
     updateHubUI();
     loadAndDisplayLeaderboard();
@@ -1258,10 +1377,35 @@ function applyPowerup(type) {
     if (type === 'ultra_dash') playerData.items.push(type);
 }
 
-function showAnnounce(el, text) {
-    if (el) el.textContent = text; 
-    if (el) el.style.display = 'block';
-    if (el) setTimeout(() => { el.style.display = 'none'; }, 2000);
+function showAnnounce(el, message, options = {}) {
+    if (!el) return;
+
+    const text = typeof message === 'string'
+        ? message
+        : (message && typeof message.text === 'string' ? message.text : '');
+
+    if (!text) return;
+
+    const toneClass = options.tone === 'celebrate'
+        ? 'announce-celebrate'
+        : options.tone === 'warning'
+            ? 'announce-warning'
+            : 'announce-info';
+    const duration = typeof options.duration === 'number' ? options.duration : 2000;
+
+    ['announce-info', 'announce-warning', 'announce-celebrate'].forEach(cls => el.classList.remove(cls));
+    el.classList.add(toneClass);
+
+    el.textContent = text;
+    el.style.display = 'block';
+
+    if (el._announceTimeout) {
+        clearTimeout(el._announceTimeout);
+    }
+
+    el._announceTimeout = setTimeout(() => {
+        el.style.display = 'none';
+    }, duration);
 }
 
 // Drag-drop handlers
@@ -1396,6 +1540,15 @@ function loadPlayerData() {
             playerData.daily = { ...dailyFallback, ...(loadedData.daily || {}) };
             if (!Array.isArray(playerData.daily.quests) || playerData.daily.quests.length !== 3) {
                 playerData.daily.quests = createDefaultQuests();
+            }
+            if (!Array.isArray(playerData.daily.rewardCalendar) || playerData.daily.rewardCalendar.length === 0) {
+                playerData.daily.rewardCalendar = createDefaultRewardCalendar();
+            }
+            if (typeof playerData.daily.streakCount !== 'number' || Number.isNaN(playerData.daily.streakCount)) {
+                playerData.daily.streakCount = 0;
+            }
+            if (typeof playerData.daily.lastClaimDate !== 'number') {
+                playerData.daily.lastClaimDate = 0;
             }
             playerData.profile = { ...base.profile, ...(loadedData.profile || {}) };
         } else {
@@ -1646,18 +1799,18 @@ function allocateStat(statKey) {
     if (playerData.levelPoints > 0) {
         playerData.stats[statKey]++;
         playerData.levelPoints--;
-        
+
         applyStatEffects();
-        
+
         const statEl = document.getElementById(`stat-${statKey}`);
         if (statEl) statEl.textContent = playerData.stats[statKey];
         if (statPointsEl) statPointsEl.textContent = playerData.levelPoints;
-        
+
         if (playerData.levelPoints === 0 && statOptionsEl) {
             statOptionsEl.querySelectorAll('button').forEach(btn => btn.disabled = true);
         }
-        
-        updateUI(); 
+
+        updateUI();
         savePlayerData();
     }
 }
@@ -1666,33 +1819,94 @@ function allocateStat(statKey) {
 
 function checkDailyLogin() {
     const now = Date.now();
+    if (!playerData.daily) {
+        playerData.daily = { ...createBasePlayerData().daily };
+    }
 
     if (!Array.isArray(playerData.daily.quests) || playerData.daily.quests.length === 0) {
         playerData.daily.quests = createDefaultQuests();
     }
 
-    if (now - playerData.daily.lastLogin >= DAILY_INTERVAL_MS) {
-        // Reset daily state
+    if (!Array.isArray(playerData.daily.rewardCalendar) || playerData.daily.rewardCalendar.length === 0) {
+        playerData.daily.rewardCalendar = createDefaultRewardCalendar();
+    }
+
+    if (typeof playerData.daily.streakCount !== 'number' || Number.isNaN(playerData.daily.streakCount)) {
+        playerData.daily.streakCount = 0;
+    }
+
+    if (typeof playerData.daily.lastClaimDate !== 'number') {
+        playerData.daily.lastClaimDate = 0;
+    }
+
+    const todayStart = getStartOfDay(now);
+    const lastLoginDay = getStartOfDay(playerData.daily.lastLogin);
+    const lastClaimDay = getStartOfDay(playerData.daily.lastClaimDate);
+    const daysSinceClaim = playerData.daily.lastClaimDate
+        ? Math.floor((todayStart - lastClaimDay) / DAILY_INTERVAL_MS)
+        : null;
+
+    if (todayStart - lastLoginDay >= DAILY_INTERVAL_MS) {
         playerData.daily.claimedLogin = false;
-        playerData.daily.quests.forEach(q => {
-            q.progress = 0;
-            q.completed = false;
-        });
-        
-        playerData.daily.lastLogin = now; 
-        savePlayerData();
+        if (Array.isArray(playerData.daily.quests)) {
+            playerData.daily.quests.forEach(q => {
+                q.progress = 0;
+                q.completed = false;
+            });
+        }
     }
-    
-    // Grant Daily Login Reward
+
+    let prefixMessage = '';
+    if (daysSinceClaim !== null && daysSinceClaim > 1 && playerData.daily.streakCount > 0) {
+        const missed = daysSinceClaim - 1;
+        prefixMessage = `Streak reset after missing ${missed} day${missed === 1 ? '' : 's'}. `;
+        playerData.daily.streakCount = 0;
+    }
+
     if (!playerData.daily.claimedLogin) {
-        credits += 25; 
+        const continuing = daysSinceClaim === 1 && playerData.daily.streakCount > 0;
+        const newStreak = continuing ? playerData.daily.streakCount + 1 : 1;
+        const reward = getRewardForStreak(newStreak);
+
+        credits += reward.credits;
         playerData.credits = credits;
+
+        playerData.daily.streakCount = newStreak;
+        playerData.daily.lastClaimDate = now;
+        playerData.daily.lastLogin = now;
         playerData.daily.claimedLogin = true;
-        
-        showAnnounce(document.getElementById('hub-announcement') || document.getElementById('wave-announce'), 'Daily Login Bonus: +25 Credits!');
+
+        if (reward.loot) {
+            const lootName = reward.loot.name || reward.loot.id || 'Special Loot';
+            if (!playerData.items.includes(lootName)) {
+                playerData.items.push(lootName);
+            }
+        }
+
+        const nextReward = getRewardForStreak(newStreak + 1);
+        let announceText = `${prefixMessage}Daily Reward Day ${newStreak}: ${reward.label}. Next: ${nextReward.label}.`;
+        announceText = announceText.trim();
+
+        let tone = 'info';
+        if (reward.milestone || reward.loot) {
+            tone = 'celebrate';
+        } else if (prefixMessage) {
+            tone = 'warning';
+        }
+
+        showAnnounce(hubAnnouncementEl || waveAnnounceEl, announceText, {
+            tone,
+            duration: reward.milestone ? 5000 : 3600
+        });
+
         savePlayerData();
-        updateUI();
+    } else {
+        playerData.daily.lastLogin = now;
     }
+
+    updateDailyStreakUI();
+    updateQuestsUI();
+    updateUI();
 }
 
 function claimQuestReward(questId) {
@@ -1713,7 +1927,7 @@ function claimQuestReward(questId) {
         playerData.credits = credits;
         quest.completed = true;
         
-        showAnnounce(document.getElementById('hub-announcement') || document.getElementById('wave-announce'), `Quest Complete! ${rewardMsg}`);
+        showAnnounce(hubAnnouncementEl || waveAnnounceEl, `Quest Complete! ${rewardMsg}`);
         
         savePlayerData();
         updateUI();
