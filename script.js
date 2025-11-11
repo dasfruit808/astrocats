@@ -73,7 +73,7 @@ function createDefaultQuests() {
     return [
         { id: 'playRounds', desc: 'Play 3 Rounds', target: 3, progress: 0, reward: { type: 'credits', amount: 50 }, completed: false },
         { id: 'defeatBoss', desc: 'Defeat 1 Boss', target: 1, progress: 0, reward: { type: 'xpBonus', amount: 100 }, completed: false },
-        { id: 'achieveCombo', desc: 'Achieve Combo 5', target: 5, progress: 0, reward: { type: 'levelPoint', amount: 1 }, completed: false },
+        { id: 'achieveCombo', desc: 'Achieve Combo 5', target: 5, progress: 0, reward: { type: 'specializationPoint', amount: 1 }, completed: false },
     ];
 }
 
@@ -91,13 +91,14 @@ function createBasePlayerData() {
         activeSpriteId: DEFAULT_SPRITE_ID,
         level: 1,
         currentXP: 0,
-        levelPoints: 0,
+        specializationPoints: 0,
         stats: {
             attack: 0,
             defense: 0,
             agility: 0,
             luck: 0
         },
+        unlockedNodes: [],
         daily: {
             lastLogin: 0,
             claimedLogin: false,
@@ -107,7 +108,7 @@ function createBasePlayerData() {
 }
 
 let playerData = createBasePlayerData();
-const ASTRO_CAT_COLLECTION_MINT = 'AstroCatMintAddress'; 
+const ASTRO_CAT_COLLECTION_MINT = 'AstroCatMintAddress';
 let gl;
 let program;
 let vertexBuffer;
@@ -186,6 +187,460 @@ const UPGRADE_DETAILS = {
     pierce: { name: 'Piercing Rounds', description: 'Bullets pass through enemies, damaging multiple targets.' },
     ultra_dash: { name: 'Ultra Dash', description: 'Reduce dash cooldown dramatically for rapid repositioning.' }
 };
+
+const CORE_STATS = ['attack', 'defense', 'agility', 'luck'];
+
+const skillTree = {
+    attack: {
+        label: 'Attack Specialization',
+        description: 'Empower your plasma cannons with increased damage and projectile control.',
+        nodes: [
+            {
+                id: 'attack_core',
+                name: 'Sharpened Shots',
+                description: '+1 Attack. Unlocks the offensive path.',
+                cost: 1,
+                prerequisites: [],
+                bonuses: {
+                    stats: { attack: 1 }
+                },
+                children: [
+                    {
+                        id: 'attack_overdrive',
+                        name: 'Overdrive Lenses',
+                        description: '+1 Attack and +10% weapon damage.',
+                        cost: 1,
+                        prerequisites: ['attack_core'],
+                        bonuses: {
+                            stats: { attack: 1 },
+                            perks: { damageMultiplier: 0.1 }
+                        },
+                        children: [
+                            {
+                                id: 'attack_plasma_forge',
+                                name: 'Plasma Forge',
+                                description: '+1 Attack, projectiles grow by 20% and gain +1 pierce.',
+                                cost: 1,
+                                prerequisites: ['attack_overdrive'],
+                                bonuses: {
+                                    stats: { attack: 1 },
+                                    perks: { projectileSize: 0.2, extraPierce: 1 }
+                                },
+                                children: []
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    defense: {
+        label: 'Defense Specialization',
+        description: 'Fortify shields and survivability for the longest sorties.',
+        nodes: [
+            {
+                id: 'defense_core',
+                name: 'Reinforced Plating',
+                description: '+1 Defense. Grants sturdier base shielding.',
+                cost: 1,
+                prerequisites: [],
+                bonuses: {
+                    stats: { defense: 1 },
+                    perks: { shieldDurationBonus: 250 }
+                },
+                children: [
+                    {
+                        id: 'defense_barrier',
+                        name: 'Adaptive Barrier',
+                        description: '+1 Defense and shields last 0.5s longer.',
+                        cost: 1,
+                        prerequisites: ['defense_core'],
+                        bonuses: {
+                            stats: { defense: 1 },
+                            perks: { shieldDurationBonus: 500 }
+                        },
+                        children: [
+                            {
+                                id: 'defense_guardian',
+                                name: 'Guardian Protocol',
+                                description: '+1 Defense and 20% chance to negate a hit.',
+                                cost: 1,
+                                prerequisites: ['defense_barrier'],
+                                bonuses: {
+                                    stats: { defense: 1 },
+                                    perks: { guardChance: 0.2 }
+                                },
+                                children: []
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    agility: {
+        label: 'Agility Specialization',
+        description: 'Increase mobility, fire cadence, and dash responsiveness.',
+        nodes: [
+            {
+                id: 'agility_core',
+                name: 'Thruster Tuning',
+                description: '+1 Agility and +10% dash cooldown recovery.',
+                cost: 1,
+                prerequisites: [],
+                bonuses: {
+                    stats: { agility: 1 },
+                    perks: { dashCooldownMultiplier: -0.1 }
+                },
+                children: [
+                    {
+                        id: 'agility_afterburn',
+                        name: 'Afterburn Surge',
+                        description: '+1 Agility, +5% movement speed, +10% fire rate.',
+                        cost: 1,
+                        prerequisites: ['agility_core'],
+                        bonuses: {
+                            stats: { agility: 1 },
+                            perks: { movementSpeed: 0.05, fireRateBonus: 0.1 }
+                        },
+                        children: [
+                            {
+                                id: 'agility_quantum',
+                                name: 'Quantum Slipstream',
+                                description: '+1 Agility and dash cooldown reduced by an additional 20%.',
+                                cost: 1,
+                                prerequisites: ['agility_afterburn'],
+                                bonuses: {
+                                    stats: { agility: 1 },
+                                    perks: { dashCooldownMultiplier: -0.2 }
+                                },
+                                children: []
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    luck: {
+        label: 'Luck Specialization',
+        description: 'Enhance crits and drop odds for more rewards.',
+        nodes: [
+            {
+                id: 'luck_core',
+                name: "Fortune's Favor",
+                description: '+1 Luck and +2% crit chance.',
+                cost: 1,
+                prerequisites: [],
+                bonuses: {
+                    stats: { luck: 1 },
+                    perks: { critChanceBonus: 0.02 }
+                },
+                children: [
+                    {
+                        id: 'luck_hawkeye',
+                        name: 'Hawkeye Optics',
+                        description: '+1 Luck, +0.25 crit multiplier, +5% drop rate.',
+                        cost: 1,
+                        prerequisites: ['luck_core'],
+                        bonuses: {
+                            stats: { luck: 1 },
+                            perks: { critMultiplierBonus: 0.25, dropChanceBonus: 0.05 }
+                        },
+                        children: [
+                            {
+                                id: 'luck_destiny',
+                                name: 'Destiny Engine',
+                                description: '+1 Luck and +5% universal reward luck.',
+                                cost: 1,
+                                prerequisites: ['luck_hawkeye'],
+                                bonuses: {
+                                    stats: { luck: 1 },
+                                    perks: { critChanceBonus: 0.03, dropChanceBonus: 0.05 }
+                                },
+                                children: []
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+};
+
+const skillNodeIndex = {};
+
+function registerSkillNode(node, branchKey, parentId = null) {
+    const normalizedNode = node;
+    if (!Array.isArray(normalizedNode.prerequisites)) {
+        normalizedNode.prerequisites = [];
+    }
+    if (parentId && !normalizedNode.prerequisites.includes(parentId)) {
+        normalizedNode.prerequisites = [...normalizedNode.prerequisites, parentId];
+    }
+    normalizedNode.branch = branchKey;
+    normalizedNode.children = Array.isArray(normalizedNode.children) ? normalizedNode.children : [];
+    normalizedNode.cost = typeof normalizedNode.cost === 'number' ? normalizedNode.cost : 1;
+    skillNodeIndex[normalizedNode.id] = normalizedNode;
+    normalizedNode.children.forEach(child => registerSkillNode(child, branchKey, normalizedNode.id));
+}
+
+Object.entries(skillTree).forEach(([branchKey, branch]) => {
+    (branch.nodes || []).forEach(node => registerSkillNode(node, branchKey));
+});
+
+let cachedTotalStats = CORE_STATS.reduce((acc, key) => ({ ...acc, [key]: 0 }), {});
+let cachedPerks = {};
+
+const STAT_DISPLAY_NAMES = {
+    attack: 'Attack (Damage/Bullet Size)',
+    defense: 'Defense (Shield Time/Durability)',
+    agility: 'Agility (Movement Speed)',
+    luck: 'Luck (Crit Chance/Drops)'
+};
+
+function recomputeSpecializationTotals() {
+    const totals = CORE_STATS.reduce((acc, key) => {
+        acc[key] = (playerData?.stats?.[key] || 0);
+        return acc;
+    }, {});
+
+    const perks = {};
+    const unlocked = Array.isArray(playerData?.unlockedNodes) ? playerData.unlockedNodes : [];
+
+    unlocked.forEach(nodeId => {
+        const node = skillNodeIndex[nodeId];
+        if (!node || !node.bonuses) return;
+        if (node.bonuses.stats) {
+            Object.entries(node.bonuses.stats).forEach(([key, value]) => {
+                if (!CORE_STATS.includes(key)) return;
+                totals[key] = (totals[key] || 0) + value;
+            });
+        }
+        if (node.bonuses.perks) {
+            Object.entries(node.bonuses.perks).forEach(([key, value]) => {
+                if (typeof value === 'number') {
+                    perks[key] = (perks[key] || 0) + value;
+                }
+            });
+        }
+    });
+
+    cachedTotalStats = totals;
+    cachedPerks = perks;
+    return { totals, perks };
+}
+
+function getTotalStats() {
+    return { ...cachedTotalStats };
+}
+
+function getSpecializationPerks() {
+    return { ...cachedPerks };
+}
+
+function isNodeUnlocked(nodeId) {
+    return Array.isArray(playerData?.unlockedNodes) && playerData.unlockedNodes.includes(nodeId);
+}
+
+function prerequisitesMet(node) {
+    if (!node) return false;
+    const prereqs = Array.isArray(node.prerequisites) ? node.prerequisites : [];
+    return prereqs.every(prereqId => isNodeUnlocked(prereqId));
+}
+
+function canUnlockNode(node) {
+    if (!node || isNodeUnlocked(node.id)) return false;
+    const cost = node.cost ?? 1;
+    const hasPoints = typeof playerData?.specializationPoints === 'number' && playerData.specializationPoints >= cost;
+    return hasPoints && prerequisitesMet(node);
+}
+
+function unlockSpecializationNode(nodeId) {
+    const node = skillNodeIndex[nodeId];
+    if (!node || !canUnlockNode(node)) return;
+
+    playerData.specializationPoints -= node.cost;
+    if (!Array.isArray(playerData.unlockedNodes)) {
+        playerData.unlockedNodes = [];
+    }
+    if (!playerData.unlockedNodes.includes(nodeId)) {
+        playerData.unlockedNodes.push(nodeId);
+    }
+
+    applyStatEffects();
+
+    if (statPointsEl) statPointsEl.textContent = playerData.specializationPoints;
+    renderSkillTree();
+    updateUI();
+    savePlayerData();
+}
+
+function formatNodeBonuses(node) {
+    const parts = [];
+    if (node.bonuses?.stats) {
+        Object.entries(node.bonuses.stats).forEach(([key, value]) => {
+            if (!CORE_STATS.includes(key)) return;
+            const label = STAT_DISPLAY_NAMES[key] || key;
+            const amount = value >= 0 ? `+${value}` : value;
+            parts.push(`${label}: ${amount}`);
+        });
+    }
+    if (node.bonuses?.perks) {
+        Object.entries(node.bonuses.perks).forEach(([key, value]) => {
+            if (typeof value !== 'number') return;
+            const percentKeys = new Set(['damageMultiplier', 'fireRateBonus', 'movementSpeed', 'dashCooldownMultiplier', 'critChanceBonus', 'dropChanceBonus']);
+            const perkLabels = {
+                damageMultiplier: 'Damage Bonus',
+                fireRateBonus: 'Fire Rate',
+                movementSpeed: 'Movement Speed',
+                dashCooldownMultiplier: 'Dash Cooldown',
+                critChanceBonus: 'Crit Chance',
+                dropChanceBonus: 'Drop Chance'
+            };
+            if (percentKeys.has(key)) {
+                const label = perkLabels[key] || key.replace(/([A-Z])/g, ' $1');
+                parts.push(`${label}: ${(value * 100).toFixed(0)}%`);
+            } else if (key === 'shieldDurationBonus') {
+                parts.push('Shield Duration +' + value + 'ms');
+            } else if (key === 'critMultiplierBonus') {
+                parts.push('Crit Multiplier +' + value.toFixed(2));
+            } else if (key === 'extraPierce') {
+                parts.push('Pierce +' + value);
+            } else if (key === 'projectileSize') {
+                parts.push('Projectile Size +' + Math.round(value * 100) + '%');
+            } else if (key === 'guardChance') {
+                parts.push('Guard Chance ' + Math.round(value * 100) + '%');
+            }
+        });
+    }
+    return parts.join(' • ');
+}
+
+function createSkillNodeElement(node, depth = 0) {
+    const container = document.createElement('div');
+    container.className = `skill-node depth-${depth}`;
+
+    const unlocked = isNodeUnlocked(node.id);
+    const prerequisitesSatisfied = prerequisitesMet(node);
+
+    if (unlocked) container.classList.add('unlocked');
+    if (!prerequisitesSatisfied && !unlocked) container.classList.add('locked');
+
+    const header = document.createElement('div');
+    header.className = 'skill-node-header';
+
+    const button = document.createElement('button');
+    button.textContent = unlocked ? `${node.name} ✓` : `${node.name} (-${node.cost})`;
+    button.disabled = unlocked || !canUnlockNode(node);
+    if (!unlocked) {
+        button.addEventListener('click', () => unlockSpecializationNode(node.id));
+        if (!prerequisitesSatisfied) {
+            button.title = 'Unlock prerequisite nodes first';
+        } else if ((playerData.specializationPoints || 0) < node.cost) {
+            button.title = 'Not enough specialization points';
+        }
+    } else {
+        button.title = 'Specialization unlocked';
+    }
+
+    const description = document.createElement('p');
+    description.className = 'skill-node-description';
+    description.textContent = node.description;
+
+    const bonusesText = formatNodeBonuses(node);
+    const bonusesEl = document.createElement('p');
+    bonusesEl.className = 'skill-node-bonuses';
+    bonusesEl.textContent = bonusesText;
+
+    const requirementEl = document.createElement('p');
+    requirementEl.className = 'skill-node-requirements';
+    if (node.prerequisites && node.prerequisites.length) {
+        const names = node.prerequisites
+            .map(id => skillNodeIndex[id]?.name)
+            .filter(Boolean)
+            .join(', ');
+        requirementEl.textContent = `Requires: ${names}`;
+    } else {
+        requirementEl.textContent = 'Requires: None';
+    }
+
+    header.appendChild(button);
+    container.appendChild(header);
+    container.appendChild(description);
+    if (bonusesText) container.appendChild(bonusesEl);
+    container.appendChild(requirementEl);
+
+    if (Array.isArray(node.children) && node.children.length) {
+        const childrenWrapper = document.createElement('div');
+        childrenWrapper.className = 'skill-node-children';
+        node.children.forEach(child => {
+            childrenWrapper.appendChild(createSkillNodeElement(child, depth + 1));
+        });
+        container.appendChild(childrenWrapper);
+    }
+
+    return container;
+}
+
+function renderSkillTree() {
+    if (!statOptionsEl) return;
+
+    if (!Array.isArray(playerData.unlockedNodes)) {
+        playerData.unlockedNodes = [];
+    }
+
+    statOptionsEl.innerHTML = '';
+    if (statPointsEl) statPointsEl.textContent = playerData.specializationPoints;
+
+    const { totals } = recomputeSpecializationTotals();
+    const summaryWrapper = document.createElement('div');
+    summaryWrapper.className = 'skill-summary';
+
+    CORE_STATS.forEach(key => {
+        const total = totals[key] || 0;
+        const base = playerData.stats?.[key] || 0;
+        const bonus = total - base;
+        const statLine = document.createElement('div');
+        statLine.className = 'skill-summary-line';
+        statLine.textContent = `${STAT_DISPLAY_NAMES[key]}: ${total}${bonus > 0 ? ` (Base ${base} + ${bonus})` : ''}`;
+        summaryWrapper.appendChild(statLine);
+    });
+
+    statOptionsEl.appendChild(summaryWrapper);
+
+    Object.entries(skillTree).forEach(([branchKey, branch]) => {
+        const branchEl = document.createElement('div');
+        branchEl.className = 'skill-branch';
+
+        const title = document.createElement('h4');
+        title.textContent = branch.label;
+        branchEl.appendChild(title);
+
+        if (branch.description) {
+            const desc = document.createElement('p');
+            desc.className = 'skill-branch-description';
+            desc.textContent = branch.description;
+            branchEl.appendChild(desc);
+        }
+
+        const nodesContainer = document.createElement('div');
+        nodesContainer.className = 'skill-node-container';
+        (branch.nodes || []).forEach(node => {
+            nodesContainer.appendChild(createSkillNodeElement(node));
+        });
+
+        branchEl.appendChild(nodesContainer);
+        statOptionsEl.appendChild(branchEl);
+    });
+
+    if (playerData.specializationPoints <= 0) {
+        const hint = document.createElement('p');
+        hint.className = 'skill-hint';
+        hint.textContent = 'Earn more specialization points by leveling up or completing quests to unlock additional nodes.';
+        statOptionsEl.appendChild(hint);
+    }
+}
 
 const SPRITE_DIRECTORY = 'assets/sprites/';
 
@@ -362,8 +817,20 @@ const DASH_WINDOW = 300; const DASH_DURATION = 500;
 
 const player = {
     x: 50, y: gameCanvas.height / 2, width: 50, height: 50, speed: 5, dx: 0, dy: 0,
-    damageMultiplier: 1, defenseRating: 0, luckRating: 0, critChance: 0, critMultiplier: 2.0
+    damageMultiplier: 1, defenseRating: 0, luckRating: 0, critChance: 0, critMultiplier: 2.0,
+    specialPerks: {
+        dashCooldownFactor: 1,
+        fireRateBonus: 0,
+        movementSpeed: 1,
+        projectileSize: 0,
+        extraPierce: 0,
+        shieldDurationBonus: 0,
+        guardChance: 0,
+        dropChanceBonus: 0
+    }
 };
+
+applyStatEffects();
 
 let projectiles = []; let enemies = [];
 
@@ -388,8 +855,10 @@ function prepareProjectile(proj) {
     }
 
     if (!proj.isBeam && !proj.scaledForAttack) {
-        const attackStat = playerData?.stats?.attack ?? 0;
-        const widthScale = 1 + attackStat * 0.1;
+        const stats = getTotalStats();
+        const perks = player.specialPerks || {};
+        const attackStat = stats.attack ?? 0;
+        const widthScale = 1 + attackStat * 0.1 + (perks.projectileSize || 0);
         proj.width = proj.baseWidth * widthScale;
         proj.height = proj.baseHeight;
         proj.scaledForAttack = true;
@@ -458,9 +927,12 @@ function spawnProjectile(config = {}) {
 
 function triggerDash(directionKey) {
     const now = Date.now();
-    const agilityCooldownReduction = playerData.stats.agility * 50;
+    const stats = getTotalStats();
+    const perks = player.specialPerks || {};
+    const agilityCooldownReduction = (stats.agility || 0) * 50;
     const baseDuration = Math.max(500, DASH_COOLDOWN_DURATION - agilityCooldownReduction);
-    const finalCooldown = ultraDashActive ? baseDuration / 2 : baseDuration;
+    const perkAdjusted = baseDuration * (perks.dashCooldownFactor || 1);
+    const finalCooldown = ultraDashActive ? perkAdjusted / 2 : perkAdjusted;
     if (dashActive || dashCooldown > now || gamePaused) return;
 
     dashActive = true;
@@ -501,22 +973,26 @@ function releaseCharge() {
 function fireShot(chargeLevel = 0) {
     if (!gameRunning || gamePaused) return;
     const now = Date.now();
-    const agilityBonus = playerData.stats.agility * 15;
+    const stats = getTotalStats();
+    const perks = player.specialPerks || {};
+    const agilityBonus = (stats.agility || 0) * 15;
     const baseInterval = rapidFire ? RAPID_SHOT_INTERVAL : BASE_SHOT_INTERVAL;
-    const finalInterval = Math.max(80, baseInterval - agilityBonus);
+    const fireRateFactor = Math.max(0.3, 1 - (perks.fireRateBonus || 0));
+    const finalInterval = Math.max(80, (baseInterval - agilityBonus) * fireRateFactor);
 
     if (chargeLevel === 0 && now - lastShotTime < finalInterval) {
         return;
     }
     lastShotTime = now;
 
-    const attackStat = playerData.stats.attack || 0;
+    const attackStat = stats.attack || 0;
     const baseDamage = 1 + attackStat;
     const damageMultiplier = 1 + chargeLevel * 2;
     const projectileDamage = baseDamage * damageMultiplier * (player.damageMultiplier || 1);
     const projectileSpeed = 12 + chargeLevel * 6;
     const isBeam = chargeLevel >= 0.95;
-    const pierceHits = pierceActive || isBeam ? 3 + Math.floor(chargeLevel * 2) : 1;
+    const extraPierce = perks.extraPierce || 0;
+    const pierceHits = pierceActive || isBeam ? 3 + Math.floor(chargeLevel * 2) + extraPierce : 1 + extraPierce;
 
     const nearest = homingActive ? findNearestEnemy() : null;
 
@@ -735,9 +1211,17 @@ function updateQuestsUI() {
             statusText = `Progress: ${quest.progress}/${quest.target}`;
         }
         
-        const rewardText = quest.reward.type === 'credits' ? `+${quest.reward.amount} Cr` :
-                           quest.reward.type === 'xpBonus' ? `+${quest.reward.amount} XP` :
-                           `+${quest.reward.amount} Stat Point`;
+        let rewardText;
+        if (quest.reward.type === 'credits') {
+            rewardText = `+${quest.reward.amount} Cr`;
+        } else if (quest.reward.type === 'xpBonus') {
+            rewardText = `+${quest.reward.amount} XP`;
+        } else if (quest.reward.type === 'specializationPoint' || quest.reward.type === 'levelPoint') {
+            const suffix = quest.reward.amount === 1 ? 'Spec Point' : 'Spec Points';
+            rewardText = `+${quest.reward.amount} ${suffix}`;
+        } else {
+            rewardText = 'Special Reward';
+        }
 
         const div = document.createElement('div');
         div.className = `quest-entry ${quest.completed ? 'completed' : (quest.progress >= quest.target ? 'ready-to-claim' : '')}`;
@@ -762,7 +1246,7 @@ function updateHubUI() {
     if (hubCreditsEl) hubCreditsEl.textContent = playerData.credits;
     if (statLevelHubEl) statLevelHubEl.textContent = playerData.level;
     if (statLevelOverlayEl) statLevelOverlayEl.textContent = playerData.level;
-    if (statPointsEl) statPointsEl.textContent = playerData.levelPoints;
+    if (statPointsEl) statPointsEl.textContent = playerData.specializationPoints;
     if (itemsEl) itemsEl.textContent = playerData.items.length ? playerData.items.join(', ') : 'None';
     ensureSpriteProgression();
     if (activeSpriteEl) activeSpriteEl.textContent = getSpriteDisplayName(playerData.activeSpriteId);
@@ -774,6 +1258,10 @@ function updateHubUI() {
     updateUI();
     updateQuestsUI();
     loadAndDisplayLeaderboard();
+
+    if (statAllocationEl && statAllocationEl.style.display !== 'none') {
+        renderSkillTree();
+    }
 }
 
 // --------------------------------------------------------------------
@@ -1029,14 +1517,18 @@ function purchaseSprite(spriteId) {
 
 function updateDashCooldown() {
     const now = Date.now();
-    const agilityCooldownReduction = playerData.stats.agility * 50; 
-    const currentDashDuration = Math.max(500, DASH_COOLDOWN_DURATION - agilityCooldownReduction); 
-    const finalDashDuration = ultraDashActive ? currentDashDuration / 2 : currentDashDuration;
+    const stats = getTotalStats();
+    const perks = player.specialPerks || {};
+    const agilityCooldownReduction = (stats.agility || 0) * 50;
+    const baseDuration = Math.max(500, DASH_COOLDOWN_DURATION - agilityCooldownReduction);
+    const perkAdjusted = baseDuration * (perks.dashCooldownFactor || 1);
+    const finalDashDuration = ultraDashActive ? perkAdjusted / 2 : perkAdjusted;
 
 
     if (dashCooldown > now) {
         if (dashCooldownEl) dashCooldownEl.style.display = 'block';
-        const progress = Math.max(0, (now - (dashCooldown - finalDashDuration)) / finalDashDuration); 
+        const dashWindow = finalDashDuration || 1;
+        const progress = Math.max(0, (now - (dashCooldown - dashWindow)) / dashWindow);
         if (dashBarEl) dashBarEl.style.width = `${progress * 100}%`;
         if (dashCooldownEl) dashCooldownEl.classList.remove('ready');
     } else {
@@ -1113,7 +1605,7 @@ function applyPowerup(type) {
         case 'rapid':
             rapidFire = true; timeoutId = setTimeout(() => { rapidFire = false; }, 10000); powerupTimeouts.push(timeoutId); break;
         case 'shield':
-            const shieldDuration = 5000 + (player.defenseRating * 1000); 
+            const shieldDuration = 5000 + (player.defenseRating * 1000) + (player.specialPerks?.shieldDurationBonus || 0);
             shieldActive = true; timeoutId = setTimeout(() => { shieldActive = false; }, shieldDuration); powerupTimeouts.push(timeoutId); break;
         case 'life':
             lives++;
@@ -1277,6 +1769,16 @@ function loadPlayerData() {
             const base = createBasePlayerData();
             playerData = { ...base, ...loadedData };
             playerData.stats = { ...base.stats, ...(loadedData.stats || {}) };
+            if (typeof loadedData.specializationPoints === 'number') {
+                playerData.specializationPoints = loadedData.specializationPoints;
+            } else if (typeof loadedData.levelPoints === 'number') {
+                playerData.specializationPoints = loadedData.levelPoints;
+            }
+            if ('levelPoints' in playerData) {
+                delete playerData.levelPoints;
+            }
+            const unlocked = Array.isArray(loadedData.unlockedNodes) ? loadedData.unlockedNodes.filter(id => skillNodeIndex[id]) : [];
+            playerData.unlockedNodes = Array.from(new Set(unlocked));
 
             // Ensure daily object exists and merge quest structure
             const dailyFallback = base.daily;
@@ -1289,6 +1791,7 @@ function loadPlayerData() {
         }
         ensureSpriteProgression();
         setActiveSprite(playerData.activeSpriteId, { skipSave: true, skipUI: true });
+        applyStatEffects();
         updateHubUI();
     }
 }
@@ -1302,13 +1805,35 @@ function getXPForNextLevel(currentLevel) {
 }
 
 function applyStatEffects() {
-    const stats = playerData.stats;
-    
-    player.speed = 5 + (stats.agility * 0.5); 
-    player.damageMultiplier = 1 + (stats.attack * 0.2); 
-    player.defenseRating = stats.defense; 
-    player.luckRating = stats.luck;
-    player.critChance = stats.luck * 0.01; 
+    const { totals, perks } = recomputeSpecializationTotals();
+
+    const agilityStat = totals.agility || 0;
+    const attackStat = totals.attack || 0;
+    const defenseStat = totals.defense || 0;
+    const luckStat = totals.luck || 0;
+
+    const movementMultiplier = 1 + (perks.movementSpeed || 0);
+    const baseSpeed = 5 + (agilityStat * 0.5);
+    player.speed = baseSpeed * movementMultiplier;
+
+    const damageMultiplierBonus = 1 + (perks.damageMultiplier || 0);
+    player.damageMultiplier = (1 + (attackStat * 0.2)) * damageMultiplierBonus;
+
+    player.defenseRating = defenseStat;
+    player.luckRating = luckStat;
+    player.critChance = (luckStat * 0.01) + (perks.critChanceBonus || 0);
+    player.critMultiplier = 2.0 + (perks.critMultiplierBonus || 0);
+
+    player.specialPerks = {
+        dashCooldownFactor: Math.max(0.3, 1 + (perks.dashCooldownMultiplier || 0)),
+        fireRateBonus: Math.max(0, perks.fireRateBonus || 0),
+        movementSpeed: movementMultiplier,
+        projectileSize: perks.projectileSize || 0,
+        extraPierce: Math.max(0, Math.round(perks.extraPierce || 0)),
+        shieldDurationBonus: Math.max(0, perks.shieldDurationBonus || 0),
+        guardChance: Math.min(0.95, Math.max(0, perks.guardChance || 0)),
+        dropChanceBonus: Math.max(0, perks.dropChanceBonus || 0)
+    };
 
     level = playerData.level;
 }
@@ -1322,18 +1847,22 @@ function gainXP(amount) {
 
     while (playerData.currentXP >= requiredXP) {
         playerData.level++;
-        playerData.levelPoints += 3;
+        playerData.specializationPoints += 3;
         playerData.currentXP -= requiredXP;
-        
-        showAnnounce(waveAnnounceEl, `LEVEL UP! Lv.${playerData.level}! (+3 Points)`);
-        
+
+        showAnnounce(waveAnnounceEl, `LEVEL UP! Lv.${playerData.level}! (+3 Spec Points)`);
+
         requiredXP = getXPForNextLevel(playerData.level);
-        
+
         if (playerData.level >= MAX_PLAYER_LEVEL) {
             playerData.level = MAX_PLAYER_LEVEL;
             playerData.currentXP = 0;
             break;
         }
+    }
+    if (statPointsEl) statPointsEl.textContent = playerData.specializationPoints;
+    if (statAllocationEl && statAllocationEl.style.display !== 'none') {
+        renderSkillTree();
     }
     updateUI();
     savePlayerData();
@@ -1498,54 +2027,14 @@ function pickRarity(weights) {
 }
 
 function showStatAllocation() {
-    if (playerData.levelPoints === 0 && playerData.level > 1) {
-        showHub(); return;
-    }
     gamePaused = true;
     hideAllOverlays();
     if (statAllocationEl) statAllocationEl.style.display = 'flex';
 
     if (statLevelOverlayEl) statLevelOverlayEl.textContent = playerData.level;
-    if (statPointsEl) statPointsEl.textContent = playerData.levelPoints;
-    if (statOptionsEl) statOptionsEl.innerHTML = '';
+    if (statPointsEl) statPointsEl.textContent = playerData.specializationPoints;
 
-    const stats = playerData.stats;
-    const statNames = {
-        attack: 'Attack (Damage/Bullet Size)',
-        defense: 'Defense (Shield Time/Durability)',
-        agility: 'Agility (Movement Speed)',
-        luck: 'Luck (Crit Chance/Drops)'
-    };
-
-    for (const key in stats) {
-        const div = document.createElement('div');
-        div.className = 'stat-entry';
-        div.innerHTML = `
-            <p>${statNames[key]}: <span id="stat-${key}">${stats[key]}</span></p>
-            <button onclick="allocateStat('${key}')" ${playerData.levelPoints > 0 ? '' : 'disabled'}>+</button>
-        `;
-        if (statOptionsEl) statOptionsEl.appendChild(div);
-    }
-}
-
-function allocateStat(statKey) {
-    if (playerData.levelPoints > 0) {
-        playerData.stats[statKey]++;
-        playerData.levelPoints--;
-        
-        applyStatEffects();
-        
-        const statEl = document.getElementById(`stat-${statKey}`);
-        if (statEl) statEl.textContent = playerData.stats[statKey];
-        if (statPointsEl) statPointsEl.textContent = playerData.levelPoints;
-        
-        if (playerData.levelPoints === 0 && statOptionsEl) {
-            statOptionsEl.querySelectorAll('button').forEach(btn => btn.disabled = true);
-        }
-        
-        updateUI(); 
-        savePlayerData();
-    }
+    renderSkillTree();
 }
 
 // --- DAILY LOGIN AND QUEST SYSTEM ---
@@ -1591,20 +2080,25 @@ function claimQuestReward(questId) {
         } else if (quest.reward.type === 'xpBonus') {
             gainXP(quest.reward.amount);
             rewardMsg = `+${quest.reward.amount} XP`;
-        } else if (quest.reward.type === 'levelPoint') {
-            playerData.levelPoints += quest.reward.amount;
-            rewardMsg = `+${quest.reward.amount} Stat Point`;
+        } else if (quest.reward.type === 'specializationPoint' || quest.reward.type === 'levelPoint') {
+            playerData.specializationPoints += quest.reward.amount;
+            const suffix = quest.reward.amount === 1 ? 'Spec Point' : 'Spec Points';
+            rewardMsg = `+${quest.reward.amount} ${suffix}`;
         }
-        
+
         playerData.credits = credits;
         quest.completed = true;
-        
+
         showAnnounce(document.getElementById('hub-announcement') || document.getElementById('wave-announce'), `Quest Complete! ${rewardMsg}`);
-        
+
         savePlayerData();
         updateUI();
-        updateQuestsUI(); 
-        showHub(); 
+        updateQuestsUI();
+        if (statPointsEl) statPointsEl.textContent = playerData.specializationPoints;
+        if (statAllocationEl && statAllocationEl.style.display !== 'none') {
+            renderSkillTree();
+        }
+        showHub();
     }
 }
 
@@ -1680,6 +2174,15 @@ function updateEnemies() {
     const now = Date.now();
     if (bossActive && boss) { updateBossAI(now, deltaMultiplier); }
 
+    const guardChance = player.specialPerks?.guardChance || 0;
+    const tryGuard = () => {
+        if (guardChance > 0 && Math.random() < guardChance) {
+            showAnnounce(waveAnnounceEl, 'Guardian Protocol absorbed the hit!');
+            return true;
+        }
+        return false;
+    };
+
     for (let i = enemies.length - 1; i >= 0; i--) {
         const enemy = enemies[i];
         if (bossActive && enemy !== boss && enemy.variant !== 'mecha') continue;
@@ -1701,16 +2204,19 @@ function updateEnemies() {
             if (rectOverlap(enemy, seg)) { tailHit = true; break; }
         }
         if (tailHit) {
-            lives--;
-            uiCache.lives = null;
-            if (livesEl) livesEl.textContent = `Lives: ${lives}`;
-            enemies.splice(i, 1);
-            if (lives <= 0) {
-                gameRunning = false;
-                playerData.losses++;
-                savePlayerData();
-                setTimeout(() => alert(`Game Over! Level: ${level} Score: ${score}\nReload to play again.`), 100);
+            const blocked = tryGuard();
+            if (!blocked) {
+                lives--;
+                uiCache.lives = null;
+                if (livesEl) livesEl.textContent = `Lives: ${lives}`;
+                if (lives <= 0) {
+                    gameRunning = false;
+                    playerData.losses++;
+                    savePlayerData();
+                    setTimeout(() => alert(`Game Over! Level: ${level} Score: ${score}\nReload to play again.`), 100);
+                }
             }
+            enemies.splice(i, 1);
             continue;
         }
 
@@ -1722,15 +2228,19 @@ function updateEnemies() {
                 enemies.splice(i, 1);
                 shieldActive = false;
             } else {
-                lives--;
-                uiCache.lives = null;
-                enemies.splice(i, 1);
-                if (lives <= 0) {
-                    gameRunning = false;
-                    playerData.losses++;
-                    savePlayerData();
-                    setTimeout(() => alert(`Game Over! Level: ${level} Score: ${score}\nReload to play again.`), 100);
+                const blocked = tryGuard();
+                if (!blocked) {
+                    lives--;
+                    uiCache.lives = null;
+                    if (livesEl) livesEl.textContent = `Lives: ${lives}`;
+                    if (lives <= 0) {
+                        gameRunning = false;
+                        playerData.losses++;
+                        savePlayerData();
+                        setTimeout(() => alert(`Game Over! Level: ${level} Score: ${score}\nReload to play again.`), 100);
+                    }
                 }
+                enemies.splice(i, 1);
             }
             continue;
         }
@@ -1819,7 +2329,8 @@ function updateEnemies() {
                         // -----------------------------------------
                         
                     } else {
-                        if (Math.random() < 0.2 + (player.luckRating * 0.01)) {
+                        const dropChance = Math.min(0.95, 0.2 + (player.luckRating * 0.01) + (player.specialPerks?.dropChanceBonus || 0));
+                        if (Math.random() < dropChance) {
                             const puTypes = ['speed', 'rapid', 'shield', 'life', 'spread', 'homing', 'pierce'];
                             const puType = puTypes[Math.floor(Math.random() * puTypes.length)];
                             powerups.push({ x: enemy.x + enemy.width / 2 - 10, y: enemy.y + enemy.height / 2 - 10, type: puType, width: 20, height: 20 });
@@ -2170,7 +2681,6 @@ window.rollUpgrade = rollUpgrade;
 window.skipShop = skipShop;
 window.purchaseUpgrade = purchaseUpgrade;
 window.purchaseSprite = purchaseSprite;
-window.allocateStat = allocateStat;
 window.claimQuestReward = claimQuestReward;
 window.hideAllOverlays = hideAllOverlays;
 
