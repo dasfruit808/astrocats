@@ -407,8 +407,8 @@ const RAPID_SHOT_INTERVAL = 120;
 const DASH_VECTORS = {
     ArrowLeft: { x: -1, y: 0 },
     ArrowRight: { x: 1, y: 0 },
-    ArrowUp: { x: 0, y: 1 },
-    ArrowDown: { x: 0, y: -1 }
+    ArrowUp: { x: 0, y: -1 },
+    ArrowDown: { x: 0, y: 1 }
 };
 
 function resetKeyState() {
@@ -1848,15 +1848,15 @@ function updatePlayer() {
 
     if (keys['ArrowLeft'] || keys['KeyA']) inputX -= 1;
     if (keys['ArrowRight'] || keys['KeyD']) inputX += 1;
-    if (keys['ArrowUp'] || keys['KeyW']) inputY += 1;
-    if (keys['ArrowDown'] || keys['KeyS']) inputY -= 1;
+    if (keys['ArrowUp'] || keys['KeyW']) inputY -= 1;
+    if (keys['ArrowDown'] || keys['KeyS']) inputY += 1;
 
     if (joystickActive) {
         const smoothingFactor = Math.min(1, deltaMultiplier * JOYSTICK_SMOOTHING * TARGET_FPS);
         joystickSmoothed.x += (joystickDelta.x - joystickSmoothed.x) * smoothingFactor;
         joystickSmoothed.y += (joystickDelta.y - joystickSmoothed.y) * smoothingFactor;
         inputX += joystickSmoothed.x;
-        inputY -= joystickSmoothed.y;
+        inputY += joystickSmoothed.y;
     } else {
         joystickSmoothed.x += (0 - joystickSmoothed.x) * 0.2;
         joystickSmoothed.y += (0 - joystickSmoothed.y) * 0.2;
@@ -1877,7 +1877,7 @@ function updatePlayer() {
         }
     }
     player.dx = inputX * player.speed * dashMultiplier;
-    player.dy = -inputY * player.speed * dashMultiplier;
+    player.dy = inputY * player.speed * dashMultiplier;
 
     player.x += player.dx * deltaMultiplier;
     player.y += player.dy * deltaMultiplier;
