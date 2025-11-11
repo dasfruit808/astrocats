@@ -281,6 +281,8 @@ let chargeStartTime = 0; let isCharging = false;
 const COMBO_WINDOW = 5000; const COMBO_THRESHOLD = 3;
 let killStreak = 0; let lastKillTime = 0;
 let powerupTimeouts = [];
+const activeSpeedBuffs = new Map();
+let speedModifierSequence = 0;
 let screenShakeDuration = 0; let hitStopDuration = 0;
 const DAILY_INTERVAL_MS = 24 * 60 * 60 * 1000;
 let lastClockUpdate = 0;
@@ -1034,6 +1036,7 @@ const player = {
     width: playerSpriteDimensions.width,
     height: playerSpriteDimensions.height,
     speed: 8,
+    baseSpeed: 8,
     dx: 0,
     dy: 0,
     damageMultiplier: 1, defenseRating: 0, luckRating: 0, critChance: 0, critMultiplier: 2.0,
@@ -1098,6 +1101,67 @@ const DASH_VECTORS = {
     ArrowUp: { x: 0, y: -1 },
     ArrowDown: { x: 0, y: 1 }
 };
+
+function getActiveSpeedMultiplier() {
+    if (!activeSpeedBuffs.size) return 1;
+    let total = 1;
+    activeSpeedBuffs.forEach(multiplier => {
+        if (typeof multiplier === 'number' && Number.isFinite(multiplier)) {
+            total *= multiplier;
+        }
+    });
+    return total;
+}
+
+function getCurrentPlayerSpeed() {
+    const base = typeof player.baseSpeed === 'number' && Number.isFinite(player.baseSpeed)
+        ? player.baseSpeed
+        : (typeof player.speed === 'number' && Number.isFinite(player.speed) ? player.speed : 6);
+    const finalSpeed = base * getActiveSpeedMultiplier();
+    player.speed = finalSpeed;
+    return finalSpeed;
+}
+
+function registerSpeedModifier(multiplier, duration, source = 'modifier') {
+    if (typeof multiplier !== 'number' || !Number.isFinite(multiplier) || multiplier <= 0) {
+        return null;
+    }
+
+    const modifierId = `${source}_${Date.now()}_${speedModifierSequence++}`;
+    activeSpeedBuffs.set(modifierId, multiplier);
+    getCurrentPlayerSpeed();
+
+    if (typeof duration !== 'number' || duration <= 0) {
+        return { modifierId, timeoutEntry: null };
+    }
+
+    const timeoutEntry = {
+        id: null,
+        cleanup: () => {
+            activeSpeedBuffs.delete(modifierId);
+            getCurrentPlayerSpeed();
+        }
+    };
+
+    const timeoutId = setTimeout(() => {
+        timeoutEntry.cleanup();
+        powerupTimeouts = powerupTimeouts.filter(entry => entry !== timeoutEntry);
+    }, duration);
+
+    timeoutEntry.id = timeoutId;
+    powerupTimeouts.push(timeoutEntry);
+
+    return { modifierId, timeoutEntry };
+}
+
+function clearSpeedModifiers() {
+    if (activeSpeedBuffs.size === 0) {
+        getCurrentPlayerSpeed();
+        return;
+    }
+    activeSpeedBuffs.clear();
+    getCurrentPlayerSpeed();
+}
 
 function resetKeyState() {
     Object.keys(keys).forEach(code => {
@@ -1628,8 +1692,17 @@ function startGame(isNewSession = true) {
     uiCache.lives = null;
     uiCache.combo = null;
 
-    powerupTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+    powerupTimeouts.forEach(entry => {
+        if (!entry && entry !== 0) return;
+        if (entry && typeof entry === 'object' && typeof entry.cleanup === 'function') {
+            if (entry.id) clearTimeout(entry.id);
+            entry.cleanup();
+        } else {
+            clearTimeout(entry);
+        }
+    });
     powerupTimeouts = [];
+    clearSpeedModifiers();
 
     resetKeyState();
     lastShotTime = 0;
@@ -1897,29 +1970,46 @@ function drawImageOrProcedural(img, x, y, w, h, isPlayer = false, extra = {}) {
 }
 
 function applyPowerup(type) {
-    let timeoutId;
+    let timeoutHandle = null;
 
     switch (type) {
         case 'speed':
-            player.speed *= 1.5; timeoutId = setTimeout(() => { player.speed /= 1.5; }, 5000); powerupTimeouts.push(timeoutId); break;
+            registerSpeedModifier(1.5, 5000, 'powerup_speed');
+            break;
         case 'rapid':
-            rapidFire = true; timeoutId = setTimeout(() => { rapidFire = false; }, 10000); powerupTimeouts.push(timeoutId); break;
+            rapidFire = true;
+            timeoutHandle = setTimeout(() => { rapidFire = false; }, 10000);
+            break;
         case 'shield':
             const shieldDuration = 5000 + (player.defenseRating * 1000) + (player.specialPerks?.shieldDurationBonus || 0);
-            shieldActive = true; timeoutId = setTimeout(() => { shieldActive = false; }, shieldDuration); powerupTimeouts.push(timeoutId); break;
+            shieldActive = true;
+            timeoutHandle = setTimeout(() => { shieldActive = false; }, shieldDuration);
+            break;
         case 'life':
             lives++;
             uiCache.lives = null;
             if (livesEl) livesEl.textContent = `Lives: ${lives}`;
             break;
         case 'spread':
-            spreadActive = true; timeoutId = setTimeout(() => { spreadActive = false; }, 8000); powerupTimeouts.push(timeoutId); break;
+            spreadActive = true;
+            timeoutHandle = setTimeout(() => { spreadActive = false; }, 8000);
+            break;
         case 'homing':
-            homingActive = true; timeoutId = setTimeout(() => { homingActive = false; }, 6000); powerupTimeouts.push(timeoutId); break;
+            homingActive = true;
+            timeoutHandle = setTimeout(() => { homingActive = false; }, 6000);
+            break;
         case 'pierce':
-            pierceActive = true; timeoutId = setTimeout(() => { pierceActive = false; }, 10000); powerupTimeouts.push(timeoutId); break;
+            pierceActive = true;
+            timeoutHandle = setTimeout(() => { pierceActive = false; }, 10000);
+            break;
         case 'ultra_dash':
-            ultraDashActive = true; timeoutId = setTimeout(() => { ultraDashActive = false; }, 30000); powerupTimeouts.push(timeoutId); break;
+            ultraDashActive = true;
+            timeoutHandle = setTimeout(() => { ultraDashActive = false; }, 30000);
+            break;
+    }
+
+    if (timeoutHandle !== null && timeoutHandle !== undefined) {
+        powerupTimeouts.push(timeoutHandle);
     }
 
     if (Math.random() < 0.5) {
@@ -2122,7 +2212,8 @@ function applyStatEffects() {
 
     const movementMultiplier = 1 + (perks.movementSpeed || 0);
     const baseSpeed = 6.5 + (agilityStat * 0.6);
-    player.speed = baseSpeed * movementMultiplier;
+    player.baseSpeed = baseSpeed * movementMultiplier;
+    getCurrentPlayerSpeed();
 
     const damageMultiplierBonus = 1 + (perks.damageMultiplier || 0);
     player.damageMultiplier = (1 + (attackStat * 0.2)) * damageMultiplierBonus;
@@ -2601,7 +2692,7 @@ function updateEnemies() {
                     }
                     // ---------------------------------------------
                     
-                    if (killStreak >= COMBO_THRESHOLD) { player.speed *= 1.2; setTimeout(() => { player.speed /= 1.2; }, 3000); }
+                    if (killStreak >= COMBO_THRESHOLD) { registerSpeedModifier(1.2, 3000, 'combo_streak'); }
     
                     if (enemy === boss) {
                         enemies.splice(e, 1);
@@ -2687,8 +2778,9 @@ function updatePlayer() {
             inputY = vector.y;
         }
     }
-    const targetDX = inputX * player.speed * dashMultiplier;
-    const targetDY = inputY * player.speed * dashMultiplier;
+    const playerSpeed = getCurrentPlayerSpeed();
+    const targetDX = inputX * playerSpeed * dashMultiplier;
+    const targetDY = inputY * playerSpeed * dashMultiplier;
 
     if (dashActive) {
         player.dx = targetDX;
