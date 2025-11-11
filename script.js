@@ -77,6 +77,26 @@ function createDefaultQuests() {
     ];
 }
 
+function createDailyRewardCalendar() {
+    return [
+        { day: 1, type: 'credits', amount: 25, label: '+25 Credits' },
+        { day: 2, type: 'credits', amount: 35, label: '+35 Credits' },
+        { day: 3, type: 'item', item: 'Starshine Booster', label: 'Starshine Booster (Item)' },
+        { day: 4, type: 'credits', amount: 50, label: '+50 Credits' },
+        { day: 5, type: 'credits', amount: 75, label: '+75 Credits' },
+        { day: 6, type: 'credits', amount: 100, label: '+100 Credits' },
+        { day: 7, type: 'specialLoot', item: 'Cosmic Supply Drop', credits: 150, label: 'Cosmic Drop +150 Cr', milestone: true }
+    ];
+}
+
+function formatDailyReward(reward) {
+    if (!reward) return '';
+    if (reward.label) return reward.label;
+    if (reward.type === 'credits') return `+${reward.amount} Credits`;
+    if (reward.type === 'item' || reward.type === 'specialLoot') return reward.item;
+    return 'Mystery Reward';
+}
+
 const DEFAULT_SPRITE_ID = 'astro-pioneer';
 
 function createBasePlayerData() {
@@ -101,6 +121,9 @@ function createBasePlayerData() {
         daily: {
             lastLogin: 0,
             claimedLogin: false,
+            lastClaimDate: 0,
+            streakCount: 0,
+            rewardCalendar: createDailyRewardCalendar(),
             quests: createDefaultQuests()
         }
     };
@@ -719,7 +742,7 @@ function updateUI() {
 function updateQuestsUI() {
     const questsEl = document.getElementById('daily-quests');
     if (!questsEl) return;
-    
+
     const staticTitle = questsEl.querySelector('h4') || document.createElement('h4');
     staticTitle.textContent = 'Daily Missions';
     questsEl.innerHTML = '';
@@ -751,12 +774,68 @@ function updateQuestsUI() {
     });
 }
 
+function renderStreakCalendar() {
+    const calendarEl = document.getElementById('streak-calendar');
+    const streakCountEl = document.getElementById('streak-count');
+    const statusEl = document.getElementById('streak-status');
+    if (!calendarEl) return;
+
+    const dailyData = playerData.daily || {};
+    const calendar = Array.isArray(dailyData.rewardCalendar) && dailyData.rewardCalendar.length
+        ? dailyData.rewardCalendar
+        : createDailyRewardCalendar();
+
+    const streak = dailyData.streakCount || 0;
+    const claimedToday = Boolean(dailyData.claimedLogin);
+    const cycleLength = calendar.length || 1;
+    const completedInCycle = streak > 0 ? streak % cycleLength : 0;
+    const completedAll = streak > 0 && completedInCycle === 0;
+    const earnedCount = completedAll ? cycleLength : completedInCycle;
+    const nextIndex = completedAll ? 0 : completedInCycle;
+    const nextReward = calendar[nextIndex] || calendar[0];
+
+    calendarEl.innerHTML = '';
+
+    calendar.forEach((reward, idx) => {
+        const cell = document.createElement('div');
+        cell.className = 'streak-day';
+
+        if (idx < earnedCount) {
+            cell.classList.add('streak-earned');
+        }
+        if (idx === nextIndex) {
+            cell.classList.add(claimedToday ? 'streak-next' : 'streak-today');
+        }
+        if (reward.milestone) {
+            cell.classList.add('streak-milestone');
+        }
+
+        cell.innerHTML = `
+            <span class="day-label">Day ${reward.day}</span>
+            <span class="reward-label">${formatDailyReward(reward)}</span>
+        `;
+        calendarEl.appendChild(cell);
+    });
+
+    if (streakCountEl) {
+        streakCountEl.textContent = streak;
+    }
+
+    if (statusEl && nextReward) {
+        const rewardText = formatDailyReward(nextReward);
+        statusEl.textContent = claimedToday
+            ? `Next reward arrives tomorrow: ${rewardText}`
+            : `Claim today's reward: ${rewardText}`;
+    }
+}
+
 function updateHubUI() {
     // This helper MUST be defined early as it's called immediately by loadPlayerData and checkNFT
     if (!walletPublicKey) return;
+    checkDailyLogin();
     if (walletAddressEl) walletAddressEl.textContent = walletPublicKey.slice(0, 8) + '...';
     if (gamesPlayedEl) gamesPlayedEl.textContent = playerData.gamesPlayed;
-    if (winsEl) winsEl.textContent = playerData.wins; 
+    if (winsEl) winsEl.textContent = playerData.wins;
     if (lossesEl) lossesEl.textContent = playerData.losses;
     if (bestScoreEl) bestScoreEl.textContent = playerData.bestScore;
     if (hubCreditsEl) hubCreditsEl.textContent = playerData.credits;
@@ -773,6 +852,7 @@ function updateHubUI() {
     credits = playerData.credits;
     updateUI();
     updateQuestsUI();
+    renderStreakCalendar();
     loadAndDisplayLeaderboard();
 }
 
@@ -1145,10 +1225,28 @@ function applyPowerup(type) {
     if (type === 'ultra_dash') playerData.items.push(type);
 }
 
-function showAnnounce(el, text) {
-    if (el) el.textContent = text; 
-    if (el) el.style.display = 'block';
-    if (el) setTimeout(() => { el.style.display = 'none'; }, 2000);
+function showAnnounce(el, text, options = {}) {
+    if (!el) return;
+    const { duration = 2000, accentClass = '' } = options;
+
+    if (el._announceTimeout) {
+        clearTimeout(el._announceTimeout);
+    }
+
+    el.classList.remove('announce-positive', 'announce-warning');
+    if (accentClass) {
+        el.classList.add(accentClass);
+    }
+
+    el.textContent = text;
+    el.style.display = 'block';
+
+    el._announceTimeout = setTimeout(() => {
+        el.style.display = 'none';
+        if (accentClass) {
+            el.classList.remove(accentClass);
+        }
+    }, duration);
 }
 
 // Drag-drop handlers
@@ -1283,6 +1381,9 @@ function loadPlayerData() {
             playerData.daily = { ...dailyFallback, ...(loadedData.daily || {}) };
             if (!Array.isArray(playerData.daily.quests) || playerData.daily.quests.length !== 3) {
                 playerData.daily.quests = createDefaultQuests();
+            }
+            if (!Array.isArray(playerData.daily.rewardCalendar) || playerData.daily.rewardCalendar.length === 0) {
+                playerData.daily.rewardCalendar = createDailyRewardCalendar();
             }
         } else {
             playerData = createBasePlayerData();
@@ -1550,35 +1651,121 @@ function allocateStat(statKey) {
 
 // --- DAILY LOGIN AND QUEST SYSTEM ---
 
+function getDayStart(timestamp) {
+    const date = new Date(timestamp || 0);
+    date.setHours(0, 0, 0, 0);
+    return date.getTime();
+}
+
 function checkDailyLogin() {
     const now = Date.now();
+    const hubAnnounce = document.getElementById('hub-announcement') || waveAnnounceEl;
+    const dailyData = playerData.daily || {};
+    let didChange = false;
 
-    if (!Array.isArray(playerData.daily.quests) || playerData.daily.quests.length === 0) {
-        playerData.daily.quests = createDefaultQuests();
+    if (!Array.isArray(dailyData.quests) || dailyData.quests.length === 0) {
+        dailyData.quests = createDefaultQuests();
+        didChange = true;
     }
 
-    if (now - playerData.daily.lastLogin >= DAILY_INTERVAL_MS) {
-        // Reset daily state
-        playerData.daily.claimedLogin = false;
-        playerData.daily.quests.forEach(q => {
+    if (!Array.isArray(dailyData.rewardCalendar) || dailyData.rewardCalendar.length === 0) {
+        dailyData.rewardCalendar = createDailyRewardCalendar();
+        didChange = true;
+    }
+
+    const todayStart = getDayStart(now);
+    const lastLoginStart = getDayStart(dailyData.lastLogin || 0);
+    const lastClaimStart = getDayStart(dailyData.lastClaimDate || 0);
+    const hasClaimHistory = Boolean(dailyData.lastClaimDate);
+    const daysSinceClaim = hasClaimHistory ? Math.floor((todayStart - lastClaimStart) / DAILY_INTERVAL_MS) : Infinity;
+
+    if (todayStart > lastLoginStart) {
+        dailyData.claimedLogin = false;
+        dailyData.quests.forEach(q => {
             q.progress = 0;
             q.completed = false;
         });
-        
-        playerData.daily.lastLogin = now; 
-        savePlayerData();
+        didChange = true;
+
+        if (daysSinceClaim > 1 && (dailyData.streakCount || 0) > 0) {
+            dailyData.streakCount = 0;
+            showAnnounce(hubAnnounce, 'Your streak cooled off. Jump in to start a new run!', { accentClass: 'announce-warning', duration: 4500 });
+            didChange = true;
+        } else {
+            showAnnounce(hubAnnounce, 'New day! Claim your reward to keep the streak alive.', { accentClass: 'announce-warning', duration: 3500 });
+        }
     }
-    
-    // Grant Daily Login Reward
-    if (!playerData.daily.claimedLogin) {
-        credits += 25; 
-        playerData.credits = credits;
-        playerData.daily.claimedLogin = true;
-        
-        showAnnounce(document.getElementById('hub-announcement') || document.getElementById('wave-announce'), 'Daily Login Bonus: +25 Credits!');
-        savePlayerData();
-        updateUI();
+
+    dailyData.lastLogin = now;
+
+    if (dailyData.claimedLogin) {
+        if (didChange) {
+            playerData.daily = dailyData;
+            savePlayerData();
+        }
+        renderStreakCalendar();
+        return;
     }
+
+    if (hasClaimHistory && daysSinceClaim === 0) {
+        // Already claimed today according to timestamp but flag drifted
+        dailyData.claimedLogin = true;
+        playerData.daily = dailyData;
+        if (didChange) savePlayerData();
+        renderStreakCalendar();
+        return;
+    }
+
+    let newStreakCount = 1;
+    if (hasClaimHistory) {
+        if (daysSinceClaim === 1) {
+            newStreakCount = (dailyData.streakCount || 0) + 1;
+        } else if (daysSinceClaim > 1) {
+            newStreakCount = 1;
+        } else {
+            newStreakCount = Math.max(1, dailyData.streakCount || 1);
+        }
+    }
+
+    const rewardCalendar = dailyData.rewardCalendar;
+    const rewardIndex = (newStreakCount - 1) % rewardCalendar.length;
+    const reward = rewardCalendar[rewardIndex];
+    let rewardLabel = formatDailyReward(reward);
+
+    if (reward.type === 'credits') {
+        credits += reward.amount;
+    } else if (reward.type === 'item') {
+        if (reward.item) {
+            if (!playerData.items.includes(reward.item)) {
+                playerData.items.push(reward.item);
+            } else {
+                playerData.items.push(`${reward.item} (Duplicate)`);
+            }
+        }
+    } else if (reward.type === 'specialLoot') {
+        credits += reward.credits || 0;
+        if (reward.item) {
+            playerData.items.push(reward.item);
+        }
+    }
+
+    playerData.credits = credits;
+    dailyData.streakCount = newStreakCount;
+    dailyData.lastClaimDate = now;
+    dailyData.claimedLogin = true;
+    playerData.daily = dailyData;
+
+    const announceOptions = reward.milestone
+        ? { accentClass: 'announce-positive', duration: 5200 }
+        : { accentClass: '', duration: 3200 };
+    const announceText = reward.milestone
+        ? `Streak ${newStreakCount}! ${rewardLabel}`
+        : `Daily Reward Unlocked: ${rewardLabel}`;
+
+    showAnnounce(hubAnnounce, announceText, announceOptions);
+
+    savePlayerData();
+    renderStreakCalendar();
 }
 
 function claimQuestReward(questId) {

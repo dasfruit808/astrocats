@@ -404,6 +404,84 @@ button:disabled {
     color: var(--xp-blue-dark);
 }
 
+.streak-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+.streak-summary p {
+    margin: 0;
+}
+
+.streak-calendar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+}
+
+.streak-day {
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(12, 39, 96, 0.2);
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    text-align: center;
+    font-size: 13px;
+    transition: transform 0.2s ease;
+}
+
+.streak-day .day-label {
+    font-weight: 700;
+    color: var(--xp-blue-dark);
+}
+
+.streak-day .reward-label {
+    color: #2f3c56;
+}
+
+.streak-day.streak-earned {
+    background: linear-gradient(180deg, rgba(125, 182, 255, 0.85) 0%, rgba(84, 150, 236, 0.85) 100%);
+    color: #ffffff;
+    border-color: rgba(18, 66, 155, 0.5);
+}
+
+.streak-day.streak-earned .day-label,
+.streak-day.streak-earned .reward-label {
+    color: #ffffff;
+}
+
+.streak-day.streak-next,
+.streak-day.streak-today {
+    border: 2px solid rgba(255, 207, 90, 0.9);
+    box-shadow: 0 0 0 3px rgba(255, 207, 90, 0.3);
+    transform: translateY(-2px);
+}
+
+.streak-day.streak-today {
+    background: linear-gradient(180deg, rgba(255, 243, 203, 0.95) 0%, rgba(255, 220, 140, 0.95) 100%);
+}
+
+.streak-day.streak-next {
+    background: linear-gradient(180deg, rgba(193, 255, 209, 0.95) 0%, rgba(121, 223, 154, 0.95) 100%);
+}
+
+.streak-day.streak-milestone {
+    border-style: double;
+    border-width: 3px;
+    border-color: rgba(255, 215, 0, 0.8);
+}
+
+.streak-calendar-loading {
+    margin: 0;
+    text-align: center;
+    color: #2f3c56;
+}
+
 .quest-entry {
     display: flex;
     justify-content: space-between;
@@ -524,6 +602,27 @@ button:disabled {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
     display: none;
     z-index: 25;
+}
+
+.announce-inline {
+    position: relative;
+    top: auto;
+    left: auto;
+    transform: none;
+    font-size: 16px;
+    margin-bottom: 12px;
+    text-align: center;
+    width: 100%;
+}
+
+.announce-positive {
+    background: linear-gradient(180deg, #6ed36a 0%, #2f9c37 100%);
+    border-color: rgba(16, 89, 21, 0.65);
+}
+
+.announce-warning {
+    background: linear-gradient(180deg, #ffd36a 0%, #ff9340 100%);
+    border-color: rgba(162, 73, 0, 0.65);
 }
 
 #bezel-bottom,

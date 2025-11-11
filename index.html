@@ -83,12 +83,25 @@
                     <div class="xp-window-content">
                         <h2>PLAYER HUB <span class="xp-subheading">Wallet: <span id="wallet-address">-</span></span></h2>
 
+                        <div id="hub-announcement" class="announce announce-inline" aria-live="polite"></div>
+
                         <div class="hub-section-wrapper">
 
                             <div class="hub-section">
                                 <div id="daily-quests">
                                     <h4>Daily Missions</h4>
                                     <p>Loading missions...</p>
+                                </div>
+                            </div>
+
+                            <div class="hub-section">
+                                <h4>Daily Streak</h4>
+                                <div class="streak-summary">
+                                    <p class="streak-count">Current Streak: <span id="streak-count">0</span> days</p>
+                                    <p class="streak-status" id="streak-status">Claim today's reward to begin your streak!</p>
+                                </div>
+                                <div id="streak-calendar" class="streak-calendar">
+                                    <p class="streak-calendar-loading">Syncing rewards...</p>
                                 </div>
                             </div>
 
