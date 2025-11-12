@@ -25,12 +25,13 @@
 
 body {
     margin: 0;
-    height: 100vh;
+    min-height: 100vh;
     padding: clamp(12px, 2vh, 24px);
     display: flex;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     background: linear-gradient(180deg, #61a6ff 0%, #b7d7ff 45%, #6dcf74 46%, #94df97 100%);
     color: var(--xp-text);
 }
@@ -175,8 +176,8 @@ body {
     background: rgba(236, 233, 216, 0.9);
     border: 1px solid rgba(12, 39, 96, 0.5);
     border-radius: 6px;
-    padding: 8px 12px;
-    font-size: 13px;
+    padding: clamp(6px, 1.6vw, 8px) clamp(10px, 2.8vw, 12px);
+    font-size: clamp(11px, 2.8vw, 13px);
     color: var(--xp-text);
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
     z-index: 10;
@@ -188,12 +189,12 @@ body {
 #lives,
 #combo {
     position: absolute;
-    font-size: 16px;
+    font-size: clamp(12px, 2.8vw, 16px);
     font-weight: 600;
     background: rgba(236, 233, 216, 0.94);
     border: 1px solid rgba(12, 39, 96, 0.45);
     border-radius: 6px;
-    padding: 6px 12px;
+    padding: clamp(4px, 1.8vw, 6px) clamp(8px, 3.4vw, 12px);
     color: var(--xp-text);
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.18);
     z-index: 10;
@@ -805,7 +806,7 @@ button:disabled {
 
 @media (max-width: 960px) {
     body {
-        padding: 20px 10px 30px;
+        padding: 18px 12px 28px;
     }
 
     .xp-primary-window,
@@ -845,5 +846,95 @@ button:disabled {
 
     #controls {
         display: none;
+    }
+}
+
+@media (max-width: 768px) {
+    body {
+        align-items: stretch;
+        justify-content: flex-start;
+    }
+
+    .xp-desktop {
+        height: auto;
+        gap: clamp(10px, 3vh, 16px);
+    }
+
+    .xp-titlebar {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .xp-title-group {
+        flex: 1 1 160px;
+    }
+
+    .xp-window-controls {
+        margin-left: auto;
+    }
+
+    .xp-app-name {
+        font-size: clamp(16px, 4vw, 18px);
+    }
+
+    .xp-app-caption,
+    .xp-subheading {
+        font-size: clamp(11px, 3.2vw, 12px);
+    }
+
+    #game-container {
+        margin: 12px 8px;
+        max-height: min(72vh, 520px);
+    }
+
+    #dash-cooldown {
+        top: 96px;
+        width: calc(100% - 24px);
+        left: 12px;
+    }
+
+    .hub-panel,
+    .xp-modal {
+        max-width: 100%;
+    }
+
+    .hub-header {
+        align-items: flex-start;
+    }
+}
+
+@media (max-width: 540px) {
+    body {
+        padding: 16px 10px 24px;
+    }
+
+    .xp-window-controls {
+        width: 100%;
+        justify-content: flex-end;
+        gap: 6px;
+    }
+
+    #score {
+        top: 12px;
+        left: 12px;
+    }
+
+    #credits {
+        top: 48px;
+        right: 12px;
+    }
+
+    #dash-cooldown {
+        top: 86px;
+    }
+
+    #lives {
+        top: 44px;
+        left: 12px;
+    }
+
+    #combo {
+        top: 82px;
+        right: 12px;
     }
 }
