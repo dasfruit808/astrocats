@@ -207,7 +207,18 @@ let deltaMultiplier = 1;
 
 // Wallet & Blockchain
 let walletPublicKey = null;
+let walletProvider = null;
 let hasAstroCatNFT = false;
+let solanaConnection = null;
+
+const PROGRESS_MEMO_PREFIX = 'ASTRO_INVADERS_PROGRESS:';
+const MEMO_PROGRAM_ID = 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr';
+const MEMO_MAX_BYTES = 566;
+const CHAIN_SYNC_THROTTLE_MS = 60 * 1000;
+
+let pendingChainSnapshot = null;
+let chainSyncTimeoutId = null;
+let lastChainSyncTime = 0;
 
 function createDefaultQuests() {
     return [
@@ -2138,49 +2149,309 @@ function loadAndDisplayLeaderboard() {
     leaderboardEl.appendChild(listEl);
 }
 
-function savePlayerData() {
-    if (walletPublicKey && hasAstroCatNFT) {
-        localStorage.setItem(`astro_invaders_${walletPublicKey}`, JSON.stringify(playerData));
-        saveLocalLeaderboard(playerData);
-        loadAndDisplayLeaderboard();
+function getSolanaConnection() {
+    if (typeof solanaWeb3 === 'undefined') return null;
+
+    if (!solanaConnection) {
+        try {
+            solanaConnection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'), 'confirmed');
+        } catch (err) {
+            console.error('Failed to initialize Solana connection:', err);
+            solanaConnection = null;
+            return null;
+        }
+    }
+
+    return solanaConnection;
+}
+
+function sanitizePlayerDataForChain(data) {
+    if (!data) return null;
+
+    const base = createBasePlayerData();
+    const snapshot = {
+        version: 1,
+        timestamp: Date.now(),
+        gamesPlayed: typeof data.gamesPlayed === 'number' ? data.gamesPlayed : base.gamesPlayed,
+        wins: typeof data.wins === 'number' ? data.wins : base.wins,
+        losses: typeof data.losses === 'number' ? data.losses : base.losses,
+        bestScore: typeof data.bestScore === 'number' ? data.bestScore : base.bestScore,
+        credits: typeof data.credits === 'number' ? data.credits : base.credits,
+        items: Array.isArray(data.items) ? data.items.slice(0, 32) : base.items,
+        ownedSprites: Array.isArray(data.ownedSprites) ? data.ownedSprites.slice(0, 32) : base.ownedSprites,
+        activeSpriteId: data.activeSpriteId || base.activeSpriteId,
+        level: typeof data.level === 'number' ? data.level : base.level,
+        currentXP: typeof data.currentXP === 'number' ? data.currentXP : base.currentXP,
+        specializationPoints: typeof data.specializationPoints === 'number' ? data.specializationPoints : base.specializationPoints,
+        stats: { ...base.stats, ...(data.stats || {}) },
+        unlockedNodes: Array.isArray(data.unlockedNodes) ? data.unlockedNodes.slice(0, 128) : base.unlockedNodes,
+        daily: data.daily ? { ...data.daily } : base.daily,
+        profile: data.profile ? { ...data.profile } : base.profile
+    };
+
+    if (snapshot.daily && Array.isArray(snapshot.daily.quests)) {
+        snapshot.daily.quests = snapshot.daily.quests.slice(0, 3).map(quest => ({ ...quest }));
+    }
+
+    return snapshot;
+}
+
+function encodeSnapshotForChain(snapshot) {
+    if (!snapshot) return null;
+
+    let payload = JSON.parse(JSON.stringify(snapshot));
+    let encoded = JSON.stringify(payload);
+
+    if (encoded.length <= MEMO_MAX_BYTES) {
+        return encoded;
+    }
+
+    const optionalFields = ['daily', 'items', 'profile', 'unlockedNodes', 'ownedSprites'];
+    for (const field of optionalFields) {
+        delete payload[field];
+        encoded = JSON.stringify(payload);
+        if (encoded.length <= MEMO_MAX_BYTES) {
+            return encoded;
+        }
+    }
+
+    console.warn('On-chain snapshot too large to encode; skipping chain sync for this update.');
+    return null;
+}
+
+async function syncProgressToChain(snapshot) {
+    if (!walletPublicKey || !walletProvider) return false;
+    if (typeof solanaWeb3 === 'undefined') return false;
+
+    const connection = getSolanaConnection();
+    if (!connection) return false;
+
+    const memoString = encodeSnapshotForChain(snapshot);
+    if (!memoString) return false;
+
+    try {
+        const memoInstruction = new solanaWeb3.TransactionInstruction({
+            keys: [],
+            programId: new solanaWeb3.PublicKey(MEMO_PROGRAM_ID),
+            data: new TextEncoder().encode(PROGRESS_MEMO_PREFIX + memoString)
+        });
+
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+        const transaction = new solanaWeb3.Transaction({
+            recentBlockhash: blockhash,
+            feePayer: new solanaWeb3.PublicKey(walletPublicKey)
+        }).add(memoInstruction);
+
+        let signature = null;
+
+        if (typeof walletProvider.signAndSendTransaction === 'function') {
+            const result = await walletProvider.signAndSendTransaction(transaction);
+            signature = typeof result === 'string' ? result : result?.signature || null;
+        } else if (typeof walletProvider.signTransaction === 'function') {
+            const signedTransaction = await walletProvider.signTransaction(transaction);
+            signature = await connection.sendRawTransaction(signedTransaction.serialize());
+        } else {
+            console.warn('Wallet provider does not support transaction signing; cannot sync progress on-chain.');
+            return false;
+        }
+
+        if (!signature) {
+            console.warn('No signature returned from wallet; skipping on-chain confirmation.');
+            return false;
+        }
+
+        await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed');
+        console.log('Progress synced on-chain:', signature);
+        return true;
+    } catch (err) {
+        console.error('Failed to sync progress on-chain:', err);
+        return false;
     }
 }
 
+function queueOnChainSync(snapshot) {
+    if (!snapshot || !walletPublicKey) return;
 
-function loadPlayerData() {
-    if (walletPublicKey && hasAstroCatNFT) {
-        const saved = localStorage.getItem(`astro_invaders_${walletPublicKey}`);
-        if (saved) {
-            const loadedData = JSON.parse(saved);
-            const base = createBasePlayerData();
-            playerData = { ...base, ...loadedData };
-            playerData.stats = { ...base.stats, ...(loadedData.stats || {}) };
-            if (typeof loadedData.specializationPoints === 'number') {
-                playerData.specializationPoints = loadedData.specializationPoints;
-            } else if (typeof loadedData.levelPoints === 'number') {
-                playerData.specializationPoints = loadedData.levelPoints;
-            }
-            if ('levelPoints' in playerData) {
-                delete playerData.levelPoints;
-            }
-            const unlocked = Array.isArray(loadedData.unlockedNodes) ? loadedData.unlockedNodes.filter(id => skillNodeIndex[id]) : [];
-            playerData.unlockedNodes = Array.from(new Set(unlocked));
+    try {
+        pendingChainSnapshot = JSON.parse(JSON.stringify(snapshot));
+    } catch (err) {
+        console.error('Failed to clone snapshot for chain sync:', err);
+        return;
+    }
 
-            // Ensure daily object exists and merge quest structure
-            const dailyFallback = base.daily;
-            playerData.daily = { ...dailyFallback, ...(loadedData.daily || {}) };
-            if (!Array.isArray(playerData.daily.quests) || playerData.daily.quests.length !== 3) {
-                playerData.daily.quests = createDefaultQuests();
-            }
-            playerData.profile = { ...base.profile, ...(loadedData.profile || {}) };
-        } else {
-            playerData = createBasePlayerData();
+    if (chainSyncTimeoutId) {
+        return;
+    }
+
+    const now = Date.now();
+    const elapsed = now - lastChainSyncTime;
+    const delay = Math.max(0, CHAIN_SYNC_THROTTLE_MS - elapsed);
+
+    chainSyncTimeoutId = setTimeout(async () => {
+        chainSyncTimeoutId = null;
+
+        if (!pendingChainSnapshot) {
+            return;
         }
+
+        const snapshotToSync = pendingChainSnapshot;
+        pendingChainSnapshot = null;
+
+        const success = await syncProgressToChain(snapshotToSync);
+        if (success) {
+            lastChainSyncTime = Date.now();
+        } else if (walletPublicKey) {
+            queueOnChainSync(snapshotToSync);
+        }
+
+        if (pendingChainSnapshot) {
+            queueOnChainSync(pendingChainSnapshot);
+        }
+    }, delay);
+}
+
+async function fetchLatestOnChainSnapshot(publicKey) {
+    if (typeof solanaWeb3 === 'undefined') return null;
+
+    const connection = getSolanaConnection();
+    if (!connection) return null;
+
+    try {
+        const ownerKey = new solanaWeb3.PublicKey(publicKey);
+        const signatures = await connection.getSignaturesForAddress(ownerKey, { limit: 25 });
+
+        for (const signatureInfo of signatures) {
+            try {
+                const parsedTx = await connection.getParsedTransaction(signatureInfo.signature, {
+                    maxSupportedTransactionVersion: 0,
+                    commitment: 'confirmed'
+                });
+
+                if (!parsedTx) continue;
+
+                const instructions = parsedTx.transaction?.message?.instructions || [];
+                for (const instruction of instructions) {
+                    const programId = typeof instruction.programId === 'string'
+                        ? instruction.programId
+                        : instruction.programId?.toString?.();
+                    const programMatch = instruction.program === 'spl-memo'
+                        || programId === MEMO_PROGRAM_ID;
+
+                    if (!programMatch) continue;
+
+                    const memoText = typeof instruction.parsed === 'string'
+                        ? instruction.parsed
+                        : (instruction.parsed && typeof instruction.parsed === 'object' ? instruction.parsed.text : null);
+
+                    if (!memoText || !memoText.startsWith(PROGRESS_MEMO_PREFIX)) continue;
+
+                    const payload = memoText.slice(PROGRESS_MEMO_PREFIX.length);
+                    try {
+                        return JSON.parse(payload);
+                    } catch (parseErr) {
+                        console.warn('Failed to parse on-chain progress payload:', parseErr);
+                    }
+                }
+            } catch (txErr) {
+                console.error('Error reading on-chain progress transaction:', txErr);
+            }
+        }
+    } catch (err) {
+        console.error('Failed to fetch on-chain progress for wallet:', err);
+    }
+
+    return null;
+}
+
+function savePlayerData() {
+    if (!walletPublicKey) return;
+
+    try {
+        localStorage.setItem(`astro_invaders_${walletPublicKey}`, JSON.stringify(playerData));
+    } catch (err) {
+        console.error('Failed to save local player data:', err);
+    }
+
+    saveLocalLeaderboard(playerData);
+    loadAndDisplayLeaderboard();
+
+    const snapshot = sanitizePlayerDataForChain(playerData);
+    queueOnChainSync(snapshot);
+}
+
+
+async function loadPlayerData() {
+    if (!walletPublicKey) {
+        playerData = createBasePlayerData();
         ensureSpriteProgression();
         setActiveSprite(playerData.activeSpriteId, { skipSave: true, skipUI: true });
         applyStatEffects();
         updateHubUI();
+        return;
     }
+
+    let loadedData = null;
+
+    try {
+        loadedData = await fetchLatestOnChainSnapshot(walletPublicKey);
+    } catch (err) {
+        console.error('On-chain progress load failed:', err);
+    }
+
+    if (!loadedData) {
+        const saved = localStorage.getItem(`astro_invaders_${walletPublicKey}`);
+        if (saved) {
+            try {
+                loadedData = JSON.parse(saved);
+            } catch (err) {
+                console.error('Failed to parse local player data:', err);
+            }
+        }
+    }
+
+    const base = createBasePlayerData();
+
+    if (loadedData) {
+        playerData = { ...base, ...loadedData };
+        playerData.stats = { ...base.stats, ...(loadedData.stats || {}) };
+
+        if (typeof loadedData.specializationPoints === 'number') {
+            playerData.specializationPoints = loadedData.specializationPoints;
+        } else if (typeof loadedData.levelPoints === 'number') {
+            playerData.specializationPoints = loadedData.levelPoints;
+        }
+
+        if ('levelPoints' in playerData) {
+            delete playerData.levelPoints;
+        }
+
+        if ('timestamp' in playerData) {
+            delete playerData.timestamp;
+        }
+        if ('version' in playerData) {
+            delete playerData.version;
+        }
+
+        const unlocked = Array.isArray(loadedData.unlockedNodes)
+            ? loadedData.unlockedNodes.filter(id => skillNodeIndex[id])
+            : [];
+        playerData.unlockedNodes = Array.from(new Set(unlocked));
+
+        const dailyFallback = base.daily;
+        playerData.daily = { ...dailyFallback, ...(loadedData.daily || {}) };
+        if (!Array.isArray(playerData.daily.quests) || playerData.daily.quests.length !== 3) {
+            playerData.daily.quests = createDefaultQuests();
+        }
+
+        playerData.profile = { ...base.profile, ...(loadedData.profile || {}) };
+    } else {
+        playerData = base;
+    }
+
+    ensureSpriteProgression();
+    setActiveSprite(playerData.activeSpriteId, { skipSave: true, skipUI: true });
+    applyStatEffects();
+    updateHubUI();
 }
 
 
@@ -2500,26 +2771,50 @@ async function connectWallet() {
     try {
         const resp = await provider.connect();
         walletPublicKey = resp.publicKey.toString();
-        
+        walletProvider = provider;
+
+        pendingChainSnapshot = null;
+        if (chainSyncTimeoutId) {
+            clearTimeout(chainSyncTimeoutId);
+            chainSyncTimeoutId = null;
+        }
+
         if (walletStatusEl) walletStatusEl.textContent = `Connected: ${walletPublicKey.slice(0, 8)}...`;
-        if (connectBtn) connectBtn.textContent = 'Disconnect'; 
+        if (connectBtn) connectBtn.textContent = 'Disconnect';
         if (connectBtn) connectBtn.onclick = disconnectWallet;
-        
+
         if (typeof solanaWeb3 === 'undefined' || typeof Metaplex === 'undefined') {
             console.error('Solana Web3 libraries failed to load.');
             if (nftStatusEl) nftStatusEl.textContent = 'NFT Status: Check Failed (No Libraries)';
         } else { await checkNFT(walletPublicKey); }
 
-        loadPlayerData(); showHub();
+        await loadPlayerData();
+        showHub();
     } catch (err) {
         console.error('Wallet connect error:', err);
         if (walletStatusEl) walletStatusEl.textContent = 'Connection Rejected/Failed';
     }
 }
 
-function disconnectWallet() {
-    if (hasAstroCatNFT) { savePlayerData(); }
-    walletPublicKey = null; hasAstroCatNFT = false;
+async function disconnectWallet() {
+    if (walletPublicKey) {
+        savePlayerData();
+        if (chainSyncTimeoutId) {
+            clearTimeout(chainSyncTimeoutId);
+            chainSyncTimeoutId = null;
+        }
+        if (pendingChainSnapshot) {
+            await syncProgressToChain(pendingChainSnapshot);
+            pendingChainSnapshot = null;
+        }
+    }
+
+    walletPublicKey = null;
+    walletProvider = null;
+    hasAstroCatNFT = false;
+    pendingChainSnapshot = null;
+    solanaConnection = null;
+
     if (walletStatusEl) walletStatusEl.textContent = 'Not Connected';
     if (nftStatusEl) nftStatusEl.textContent = 'Not Detected';
     if (connectBtn) connectBtn.textContent = 'Connect Phantom Wallet';
@@ -2535,7 +2830,8 @@ async function checkNFT(publicKey) {
     try {
         if (typeof solanaWeb3 === 'undefined' || typeof Metaplex === 'undefined') { if (nftStatusEl) nftStatusEl.textContent = 'NFT Check Failed (Libraries Missing)'; return; }
 
-        const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'));
+        const connection = getSolanaConnection();
+        if (!connection) { if (nftStatusEl) nftStatusEl.textContent = 'NFT Check Failed (No Connection)'; return; }
         const metaplex = Metaplex.make(connection);
         const nfts = await metaplex.nfts().findAllByOwner({ owner: new solanaWeb3.PublicKey(publicKey) }).run();
         hasAstroCatNFT = nfts.some(nft => nft.collection?.key.toString() === ASTRO_CAT_COLLECTION_MINT);
