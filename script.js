@@ -2455,6 +2455,33 @@ function updateQuestsUI() {
     });
 }
 
+function updateGuestStatTooltip(pointsAvailableOverride) {
+    if (!openStatAllocationBtn) return;
+
+    if (walletPublicKey) {
+        openStatAllocationBtn.removeAttribute('title');
+        return;
+    }
+
+    const resolvedPoints = typeof pointsAvailableOverride === 'number'
+        ? pointsAvailableOverride
+        : (() => {
+            const baseData = (typeof playerData === 'object' && playerData) ? playerData : {};
+            const numericPoints = Number(baseData.specializationPoints);
+            return Number.isFinite(numericPoints) ? Math.max(0, numericPoints) : 0;
+        })();
+
+    if (guestStorageAvailable) {
+        openStatAllocationBtn.title = resolvedPoints > 0
+            ? "Allocate specialization points (progress stored locally)."
+            : "View your specialization tree (progress stored locally).";
+    } else {
+        openStatAllocationBtn.title = resolvedPoints > 0
+            ? "Allocate specialization points (local storage unavailable; progress resets after refresh)."
+            : "View your specialization tree (local storage unavailable; progress resets after refresh).";
+    }
+}
+
 function updateHubUI() {
     // This helper MUST be defined early as it's called immediately by loadPlayerData and checkNFT
     const profile = playerData.profile || {};
@@ -2489,13 +2516,7 @@ function updateHubUI() {
         openStatAllocationBtn.disabled = false;
         openStatAllocationBtn.removeAttribute('aria-disabled');
 
-        if (!walletPublicKey) {
-            openStatAllocationBtn.title = pointsAvailable > 0
-                ? "Allocate specialization points (progress stored locally)."
-                : "View your specialization tree (progress stored locally).";
-        } else {
-            openStatAllocationBtn.removeAttribute('title');
-        }
+        updateGuestStatTooltip(pointsAvailable);
     }
 
     if (!walletPublicKey) return;
@@ -3241,6 +3262,7 @@ function sanitizeLeaderboardEntry(entry) {
     return { publicKey, level, bestScore, stats };
 }
 
+const GUEST_PROFILE_STORAGE_KEY = 'astro_invaders_guest';
 const LEADERBOARD_STORAGE_KEY = 'astro_invaders_leaderboard';
 const STORAGE_WARNING_MESSAGE = 'Progress may not be saved: storage unavailable.';
 
@@ -3824,12 +3846,37 @@ async function fetchLatestOnChainSnapshot(publicKey) {
 }
 
 function savePlayerData() {
-    if (!walletPublicKey) return;
+    if (!walletPublicKey) {
+        if (typeof localStorage === 'undefined') {
+            guestStorageAvailable = false;
+            showStorageWarning();
+            updateGuestStatTooltip();
+            return;
+        }
+
+        try {
+            localStorage.setItem(GUEST_PROFILE_STORAGE_KEY, JSON.stringify(playerData));
+            if (!guestStorageAvailable) {
+                guestStorageAvailable = true;
+                updateGuestStatTooltip();
+            }
+            hideStorageWarning();
+        } catch (err) {
+            guestStorageAvailable = false;
+            console.error('Failed to save guest player data:', err);
+            showStorageWarning();
+            updateGuestStatTooltip();
+        }
+
+        return;
+    }
 
     try {
         localStorage.setItem(`astro_invaders_${walletPublicKey}`, JSON.stringify(playerData));
+        hideStorageWarning();
     } catch (err) {
         console.error('Failed to save local player data:', err);
+        showStorageWarning();
     }
 
     saveLocalLeaderboard(playerData);
@@ -3841,30 +3888,58 @@ function savePlayerData() {
 
 
 async function loadPlayerData() {
-    if (!walletPublicKey) {
-        playerData = createBasePlayerData();
-        ensureSpriteProgression();
-        setActiveSprite(playerData.activeSpriteId, { skipSave: true, skipUI: true });
-        applyStatEffects();
-        updateHubUI();
-        return;
-    }
-
     let loadedData = null;
 
-    try {
-        loadedData = await fetchLatestOnChainSnapshot(walletPublicKey);
-    } catch (err) {
-        console.error('On-chain progress load failed:', err);
-    }
+    if (!walletPublicKey) {
+        guestStorageAvailable = false;
 
-    if (!loadedData) {
-        const saved = localStorage.getItem(`astro_invaders_${walletPublicKey}`);
-        if (saved) {
+        if (typeof localStorage === 'undefined') {
+            showStorageWarning();
+        } else {
             try {
-                loadedData = JSON.parse(saved);
+                const saved = localStorage.getItem(GUEST_PROFILE_STORAGE_KEY);
+                guestStorageAvailable = true;
+                hideStorageWarning();
+                if (saved) {
+                    try {
+                        loadedData = JSON.parse(saved);
+                    } catch (err) {
+                        console.error('Failed to parse guest player data:', err);
+                    }
+                }
             } catch (err) {
-                console.error('Failed to parse local player data:', err);
+                guestStorageAvailable = false;
+                console.error('Failed to access guest player data:', err);
+                showStorageWarning();
+            }
+        }
+    } else {
+        guestStorageAvailable = false;
+
+        try {
+            loadedData = await fetchLatestOnChainSnapshot(walletPublicKey);
+        } catch (err) {
+            console.error('On-chain progress load failed:', err);
+        }
+
+        if (!loadedData) {
+            if (typeof localStorage === 'undefined') {
+                showStorageWarning();
+            } else {
+                try {
+                    const saved = localStorage.getItem(`astro_invaders_${walletPublicKey}`);
+                    if (saved) {
+                        try {
+                            loadedData = JSON.parse(saved);
+                        } catch (err) {
+                            console.error('Failed to parse local player data:', err);
+                        }
+                    }
+                    hideStorageWarning();
+                } catch (err) {
+                    console.error('Failed to access local player data:', err);
+                    showStorageWarning();
+                }
             }
         }
     }
