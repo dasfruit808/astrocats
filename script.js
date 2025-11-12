@@ -2155,7 +2155,16 @@ function updateHubUI() {
             : 'View Specialization Tree';
         openStatAllocationBtn.textContent = label;
         openStatAllocationBtn.classList.toggle('stat-button-ready', pointsAvailable > 0);
-        openStatAllocationBtn.disabled = !walletPublicKey;
+        openStatAllocationBtn.disabled = false;
+        openStatAllocationBtn.removeAttribute('aria-disabled');
+
+        if (!walletPublicKey) {
+            openStatAllocationBtn.title = pointsAvailable > 0
+                ? "Allocate specialization points (progress stored locally)."
+                : "View your specialization tree (progress stored locally).";
+        } else {
+            openStatAllocationBtn.removeAttribute('title');
+        }
     }
 
     if (!walletPublicKey) return;
