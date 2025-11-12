@@ -52,6 +52,8 @@ const dashCooldownEl = document.getElementById('dash-cooldown');
 const dashBarEl = document.getElementById('dash-bar');
 const joystick = document.getElementById('joystick');
 const knob = document.getElementById('knob');
+const touchControlsContainer = document.getElementById('touch-controls');
+const fireButton = document.getElementById('fire-button');
 const startMenuEl = document.getElementById('start-menu');
 const hubEl = document.getElementById('hub');
 const storageWarningEl = document.getElementById('storage-warning');
@@ -129,6 +131,12 @@ const DEFAULT_STATUS_TIP_TEXT = statusTipEl ? statusTipEl.textContent : '';
 const FOCUSABLE_SELECTOR = "a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type='hidden']), select:not([disabled]), [tabindex]:not([tabindex='-1'])";
 const focusTrapStates = new Map();
 let hasInitialized = false;
+let touchControlsEnabled = false;
+let joystickEventsBound = false;
+let fireButtonEventsBound = false;
+let joystickPointerId = null;
+let joystickInputType = null;
+let pointerCapabilityQuery = null;
 
 function bindButtonClick(element, handler, { preventDefault = true } = {}) {
     const target = typeof element === 'string' ? document.getElementById(element) : element;
@@ -183,6 +191,287 @@ function initializeUIEvents() {
     bindButtonClick(statCloseBtn, showHub);
     bindButtonClick(statReturnHubBtn, showHub);
     bindButtonClick(focusPauseResumeBtn, () => resumeGameFromFocusLoss({ triggeredByUser: true }));
+}
+
+function detectTouchSupport() {
+    if (navigator.maxTouchPoints && navigator.maxTouchPoints > 0) return true;
+    if (navigator.msMaxTouchPoints && navigator.msMaxTouchPoints > 0) return true;
+    if ('ontouchstart' in window) return true;
+    try {
+        const coarseQuery = window.matchMedia ? window.matchMedia('(pointer: coarse)') : null;
+        if (coarseQuery?.matches) {
+            pointerCapabilityQuery = coarseQuery;
+            return true;
+        }
+        if (!pointerCapabilityQuery && coarseQuery) {
+            pointerCapabilityQuery = coarseQuery;
+        }
+    } catch (error) {
+        // Ignore matchMedia errors; fallback to other detection methods.
+    }
+    return false;
+}
+
+function configureTouchControls(forceTouch = null) {
+    const supportsTouch = typeof forceTouch === 'boolean' ? forceTouch : detectTouchSupport();
+    touchControlsEnabled = supportsTouch;
+
+    if (supportsTouch) {
+        document.body.classList.add('touch-supported');
+        if (touchControlsContainer) {
+            touchControlsContainer.style.display = 'flex';
+            touchControlsContainer.setAttribute('aria-hidden', 'false');
+        }
+        setupJoystickControls();
+        setupFireButtonControls();
+    } else {
+        document.body.classList.remove('touch-supported');
+        if (touchControlsContainer) {
+            touchControlsContainer.style.display = 'none';
+            touchControlsContainer.setAttribute('aria-hidden', 'true');
+        }
+        resetJoystickState();
+        if (isCharging) {
+            releaseCharge();
+        }
+    }
+
+    if (fireButton) {
+        fireButton.classList.remove('active');
+        fireButton.tabIndex = supportsTouch ? 0 : -1;
+        if (!supportsTouch && typeof fireButton.blur === 'function') {
+            fireButton.blur();
+        }
+    }
+}
+
+function monitorPointerCapabilityChanges() {
+    if (!window.matchMedia) return;
+    try {
+        if (!pointerCapabilityQuery) {
+            pointerCapabilityQuery = window.matchMedia('(pointer: coarse)');
+        }
+        if (!pointerCapabilityQuery) return;
+        const listener = (event) => configureTouchControls(event.matches);
+        if (typeof pointerCapabilityQuery.addEventListener === 'function') {
+            pointerCapabilityQuery.addEventListener('change', listener);
+        } else if (typeof pointerCapabilityQuery.addListener === 'function') {
+            pointerCapabilityQuery.addListener(listener);
+        }
+    } catch (error) {
+        pointerCapabilityQuery = null;
+    }
+}
+
+function setupJoystickControls() {
+    if (!joystick || !knob || joystickEventsBound) return;
+
+    const startOptions = { passive: false };
+    joystick.addEventListener('pointerdown', handleJoystickStart);
+    knob.addEventListener('pointerdown', handleJoystickStart);
+    joystick.addEventListener('touchstart', handleJoystickStart, startOptions);
+    knob.addEventListener('touchstart', handleJoystickStart, startOptions);
+
+    window.addEventListener('pointermove', handleJoystickMove);
+    window.addEventListener('pointerup', handleJoystickEnd);
+    window.addEventListener('pointercancel', handleJoystickEnd);
+    window.addEventListener('touchmove', handleJoystickMove, { passive: false });
+    window.addEventListener('touchend', handleJoystickEnd, { passive: false });
+    window.addEventListener('touchcancel', handleJoystickEnd, { passive: false });
+
+    joystickEventsBound = true;
+}
+
+function setupFireButtonControls() {
+    if (!fireButton || fireButtonEventsBound) return;
+
+    const startPress = (event) => {
+        if (!touchControlsEnabled) return;
+        event.preventDefault();
+        fireButton.classList.add('active');
+        if (typeof event.pointerId === 'number' && typeof fireButton.setPointerCapture === 'function') {
+            try {
+                fireButton.setPointerCapture(event.pointerId);
+            } catch (error) {
+                // Ignore pointer capture errors.
+            }
+        }
+        startCharge();
+    };
+
+    const endPress = (event) => {
+        if (!touchControlsEnabled) return;
+        event.preventDefault();
+        fireButton.classList.remove('active');
+        if (typeof event.pointerId === 'number' && typeof fireButton.releasePointerCapture === 'function') {
+            try {
+                fireButton.releasePointerCapture(event.pointerId);
+            } catch (error) {
+                // Ignore release errors.
+            }
+        }
+        releaseCharge();
+    };
+
+    fireButton.addEventListener('pointerdown', startPress);
+    fireButton.addEventListener('pointerup', endPress);
+    fireButton.addEventListener('pointercancel', endPress);
+    fireButton.addEventListener('pointerleave', endPress);
+    fireButton.addEventListener('touchstart', startPress, { passive: false });
+    fireButton.addEventListener('touchend', endPress, { passive: false });
+    fireButton.addEventListener('touchcancel', endPress, { passive: false });
+    fireButton.addEventListener('contextmenu', (event) => event.preventDefault());
+    fireButton.addEventListener('click', (event) => {
+        if (touchControlsEnabled) {
+            event.preventDefault();
+        }
+    });
+
+    fireButtonEventsBound = true;
+}
+
+function handleJoystickStart(event) {
+    if (!touchControlsEnabled || !joystick || !knob) return;
+    const isTouchEvent = event.type.startsWith('touch');
+    if (!isTouchEvent && event.pointerType === 'mouse' && event.button !== 0) {
+        return;
+    }
+    if (joystickActive) {
+        event.preventDefault();
+        return;
+    }
+
+    event.preventDefault();
+    joystickActive = true;
+    joystick.classList.add('active');
+
+    if (isTouchEvent) {
+        const touch = event.changedTouches?.[0];
+        joystickInputType = 'touch';
+        joystickPointerId = touch ? touch.identifier : null;
+    } else {
+        joystickInputType = 'pointer';
+        joystickPointerId = event.pointerId;
+        if (typeof knob.setPointerCapture === 'function' && typeof event.pointerId === 'number') {
+            try {
+                knob.setPointerCapture(event.pointerId);
+            } catch (error) {
+                // Ignore pointer capture errors.
+            }
+        }
+    }
+
+    const position = getEventPosition(event);
+    if (position) {
+        updateJoystickFromPosition(position.x, position.y);
+    }
+}
+
+function handleJoystickMove(event) {
+    if (!touchControlsEnabled || !joystickActive) return;
+
+    if (event.type === 'pointermove') {
+        if (event.pointerId !== joystickPointerId) {
+            return;
+        }
+    } else if ((event.type === 'touchmove') && joystickPointerId !== null) {
+        const touches = Array.from(event.touches || []);
+        if (!touches.some(touch => touch.identifier === joystickPointerId)) {
+            return;
+        }
+    }
+
+    const position = getEventPosition(event);
+    if (!position) return;
+
+    event.preventDefault();
+    updateJoystickFromPosition(position.x, position.y);
+}
+
+function handleJoystickEnd(event) {
+    if (!joystickActive) return;
+
+    if (event.type === 'pointerup' || event.type === 'pointercancel') {
+        if (event.pointerId !== joystickPointerId) {
+            return;
+        }
+    } else if ((event.type === 'touchend' || event.type === 'touchcancel') && joystickPointerId !== null) {
+        const touches = Array.from(event.changedTouches || []);
+        if (!touches.some(touch => touch.identifier === joystickPointerId)) {
+            return;
+        }
+    }
+
+    event.preventDefault();
+    resetJoystickState();
+}
+
+function getEventPosition(event) {
+    if (event.type.startsWith('touch')) {
+        const touchList = event.touches && event.touches.length
+            ? Array.from(event.touches)
+            : Array.from(event.changedTouches || []);
+        if (!touchList.length) return null;
+        let touch = null;
+        if (joystickPointerId !== null) {
+            touch = touchList.find(t => t.identifier === joystickPointerId) || null;
+        }
+        if (!touch) {
+            touch = touchList[0];
+        }
+        return touch ? { x: touch.clientX, y: touch.clientY } : null;
+    }
+
+    if (typeof event.clientX === 'number' && typeof event.clientY === 'number') {
+        return { x: event.clientX, y: event.clientY };
+    }
+    return null;
+}
+
+function updateJoystickFromPosition(clientX, clientY) {
+    if (!joystick || !knob) return;
+    const rect = joystick.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const maxDistance = Math.max(1, rect.width / 2);
+    const dx = clientX - centerX;
+    const dy = clientY - centerY;
+
+    const clampedX = Math.max(-maxDistance, Math.min(maxDistance, dx));
+    const clampedY = Math.max(-maxDistance, Math.min(maxDistance, dy));
+
+    const normalizedX = Math.max(-1, Math.min(1, clampedX / maxDistance));
+    const normalizedY = Math.max(-1, Math.min(1, clampedY / maxDistance));
+
+    joystickDelta.x = normalizedX;
+    joystickDelta.y = normalizedY;
+
+    knob.style.transform = `translate(calc(-50% + ${clampedX}px), calc(-50% + ${clampedY}px))`;
+}
+
+function resetJoystickState() {
+    const activePointerId = joystickPointerId;
+    const inputType = joystickInputType;
+    joystickActive = false;
+    joystickDelta.x = 0;
+    joystickDelta.y = 0;
+    joystickPointerId = null;
+    joystickInputType = null;
+
+    if (joystick) {
+        joystick.classList.remove('active');
+    }
+
+    if (knob) {
+        knob.style.transform = '';
+        if (inputType === 'pointer' && activePointerId !== null && typeof knob.releasePointerCapture === 'function') {
+            try {
+                knob.releasePointerCapture(activePointerId);
+            } catch (error) {
+                // Ignore release errors.
+            }
+        }
+    }
 }
 
 function isFocusableElement(element) {
@@ -4909,6 +5198,8 @@ function initializeApp() {
     }
     initializeSpriteSystem();
     initializeUIEvents();
+    configureTouchControls();
+    monitorPointerCapabilityChanges();
     showStartMenu();
     loadAndDisplayLeaderboard();
 
