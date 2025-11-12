@@ -1,0 +1,24 @@
+<svg width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="spread-core" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(48 48) scale(40)">
+      <stop offset="0" stop-color="#F3E8FF"/>
+      <stop offset="0.55" stop-color="#AD8CFF"/>
+      <stop offset="1" stop-color="#5E2BFF"/>
+    </radialGradient>
+    <linearGradient id="spread-arc" x1="32" y1="24" x2="68" y2="72" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#D3BCFF"/>
+      <stop offset="1" stop-color="#7D4BFF"/>
+    </linearGradient>
+    <filter id="spread-glow" x="-24" y="-24" width="144" height="144" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="16" result="glow"/>
+    </filter>
+  </defs>
+  <g filter="url(#spread-glow)">
+    <circle cx="48" cy="48" r="40" fill="#845EF7" fill-opacity="0.38"/>
+  </g>
+  <circle cx="48" cy="48" r="34" fill="#1F0B40" fill-opacity="0.25" stroke="#CFB5FF" stroke-width="4"/>
+  <path d="M48 26C61 26 72 37 72 48C72 59 61 70 48 70C35 70 24 59 24 48C24 37 35 26 48 26Z" fill="url(#spread-core)"/>
+  <path d="M48 32C58.4934 32 67 40.5066 67 51C67 61.4934 58.4934 70 48 70C37.5066 70 29 61.4934 29 51C29 40.5066 37.5066 32 48 32Z" fill="#F5ECFF" fill-opacity="0.4"/>
+  <path d="M48 24L60 36L48 44L36 36L48 24Z" fill="url(#spread-arc)"/>
+  <path d="M48 44L64 54L48 66L32 54L48 44Z" fill="url(#spread-arc)" opacity="0.75"/>
+</svg>
