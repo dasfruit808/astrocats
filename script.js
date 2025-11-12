@@ -73,6 +73,7 @@ const hubCreditsEl = document.getElementById('hub-credits');
 const itemsEl = document.getElementById('items');
 const activeSpriteEl = document.getElementById('active-sprite');
 const ownedSpritesEl = document.getElementById('owned-sprites');
+const dailyQuestsEl = document.getElementById('daily-quests');
 const leaderboardEl = document.getElementById('leaderboard');
 const waveAnnounceEl = document.getElementById('wave-announce');
 const bossAnnounceEl = document.getElementById('boss-announce');
@@ -187,6 +188,22 @@ function initializeUIEvents() {
     bindButtonClick(taskbarStartBtn, showStartMenu);
     bindButtonClick(taskbarOpenHubBtn, showHub);
     bindButtonClick(taskbarOpenShopBtn, openShop);
+
+    if (dailyQuestsEl && !dailyQuestsEl.dataset.listenerAttached) {
+        dailyQuestsEl.addEventListener('click', (event) => {
+            const button = event.target instanceof Element
+                ? event.target.closest('button[data-quest-id]')
+                : null;
+            if (!button || button.disabled) return;
+
+            event.preventDefault();
+            const { questId } = button.dataset;
+            if (questId) {
+                claimQuestReward(questId);
+            }
+        });
+        dailyQuestsEl.dataset.listenerAttached = 'true';
+    }
 
     bindButtonClick(openStatAllocationBtn, showStatAllocation);
     bindButtonClick(statCloseBtn, showHub);
@@ -2414,24 +2431,37 @@ function updateUI() {
 }
 
 function updateQuestsUI() {
-    const questsEl = document.getElementById('daily-quests');
-    if (!questsEl) return;
-    
-    const staticTitle = questsEl.querySelector('h4') || document.createElement('h4');
+    if (!dailyQuestsEl) return;
+
+    const staticTitle = dailyQuestsEl.querySelector('h4') || document.createElement('h4');
     staticTitle.textContent = 'Daily Missions';
-    questsEl.innerHTML = '';
-    questsEl.appendChild(staticTitle);
-    
-    playerData.daily.quests.forEach(quest => {
-        let statusText = '';
+
+    const fragment = document.createDocumentFragment();
+    fragment.appendChild(staticTitle);
+
+    if (!Array.isArray(playerData?.daily?.quests) || playerData.daily.quests.length === 0) {
+        const emptyMessage = document.createElement('p');
+        emptyMessage.className = 'status-text';
+        emptyMessage.textContent = 'No missions available.';
+        fragment.appendChild(emptyMessage);
+        dailyQuestsEl.replaceChildren(fragment);
+        return;
+    }
+
+    playerData.daily.quests.forEach((quest) => {
+        const container = document.createElement('div');
+        container.classList.add('quest-entry');
         if (quest.completed) {
-            statusText = '✅ Claimed';
+            container.classList.add('completed');
         } else if (quest.progress >= quest.target) {
-            statusText = `Ready to Claim!`;
-        } else {
-            statusText = `Progress: ${quest.progress}/${quest.target}`;
+            container.classList.add('ready-to-claim');
         }
-        
+
+        const description = document.createElement('p');
+        description.textContent = quest.desc;
+
+        const reward = document.createElement('p');
+        reward.className = 'reward-text';
         let rewardText;
         if (quest.reward.type === 'credits') {
             rewardText = `+${quest.reward.amount} Cr`;
@@ -2443,17 +2473,29 @@ function updateQuestsUI() {
         } else {
             rewardText = 'Special Reward';
         }
+        reward.textContent = `Reward: ${rewardText}`;
 
-        const div = document.createElement('div');
-        div.className = `quest-entry ${quest.completed ? 'completed' : (quest.progress >= quest.target ? 'ready-to-claim' : '')}`;
-        div.innerHTML = `
-            <p>${quest.desc}</p>
-            <p class="reward-text">Reward: ${rewardText}</p>
-            <p class="status-text">${statusText}</p>
-            <button onclick="claimQuestReward('${quest.id}')" ${quest.completed || quest.progress < quest.target ? 'disabled' : ''}>Claim</button>
-        `;
-        questsEl.appendChild(div);
+        const status = document.createElement('p');
+        status.className = 'status-text';
+        if (quest.completed) {
+            status.textContent = '✅ Claimed';
+        } else if (quest.progress >= quest.target) {
+            status.textContent = 'Ready to Claim!';
+        } else {
+            status.textContent = `Progress: ${quest.progress}/${quest.target}`;
+        }
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = 'Claim';
+        button.dataset.questId = quest.id;
+        button.disabled = Boolean(quest.completed || quest.progress < quest.target);
+
+        container.append(description, reward, status, button);
+        fragment.appendChild(container);
     });
+
+    dailyQuestsEl.replaceChildren(fragment);
 }
 
 function updateGuestStatTooltip(pointsAvailableOverride) {
@@ -5282,7 +5324,6 @@ window.rollUpgrade = rollUpgrade;
 window.skipShop = skipShop;
 window.purchaseUpgrade = purchaseUpgrade;
 window.purchaseSprite = purchaseSprite;
-window.claimQuestReward = claimQuestReward;
 window.hideAllOverlays = hideAllOverlays;
 window.showStatAllocation = showStatAllocation;
 window.resumeGameFromFocusLoss = resumeGameFromFocusLoss;
