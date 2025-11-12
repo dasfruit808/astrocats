@@ -1,0 +1,23 @@
+<svg width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="shield-core" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(48 48) scale(40)">
+      <stop offset="0" stop-color="#E6F7FF"/>
+      <stop offset="0.6" stop-color="#7DD3FF"/>
+      <stop offset="1" stop-color="#2176FF"/>
+    </radialGradient>
+    <linearGradient id="shield-ring" x1="24" y1="24" x2="72" y2="72" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#B8E6FF"/>
+      <stop offset="1" stop-color="#3B9FFF"/>
+    </linearGradient>
+    <filter id="shield-glow" x="-24" y="-24" width="144" height="144" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="16" result="glow"/>
+    </filter>
+  </defs>
+  <g filter="url(#shield-glow)">
+    <circle cx="48" cy="48" r="40" fill="#4DAFF7" fill-opacity="0.4"/>
+  </g>
+  <circle cx="48" cy="48" r="34" fill="#0B294A" fill-opacity="0.25" stroke="url(#shield-ring)" stroke-width="4"/>
+  <circle cx="48" cy="48" r="28" fill="url(#shield-core)"/>
+  <path d="M48 26C52 31 60 34.5 64 36V48C64 57.9411 56.9411 65 47 65C37.0589 65 30 57.9411 30 48V36C34 34.5 42 31 48 26Z" fill="#C5ECFF" fill-opacity="0.6"/>
+  <path d="M32 38C36.5 36.2 43.5 33 48 28C52.5 33 59.5 36.2 64 38V46C64 55.9411 56.9411 63 47 63C37.0589 63 30 55.9411 30 46V38H32Z" fill="#FFFFFF" fill-opacity="0.35"/>
+</svg>

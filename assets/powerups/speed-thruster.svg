@@ -1,0 +1,23 @@
+<svg width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="speed-core" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(48 48) scale(44)">
+      <stop offset="0" stop-color="#FFE8B0"/>
+      <stop offset="0.5" stop-color="#FFAE45"/>
+      <stop offset="1" stop-color="#C95900"/>
+    </radialGradient>
+    <linearGradient id="speed-arrow" x1="28" y1="48" x2="76" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF4D1"/>
+      <stop offset="0.4" stop-color="#FFCB5C"/>
+      <stop offset="1" stop-color="#FF8F1F"/>
+    </linearGradient>
+    <filter id="speed-glow" x="-20" y="-20" width="136" height="136" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="12" result="glow"/>
+    </filter>
+  </defs>
+  <g filter="url(#speed-glow)">
+    <circle cx="48" cy="48" r="40" fill="#FFB347" fill-opacity="0.35"/>
+  </g>
+  <circle cx="48" cy="48" r="36" fill="url(#speed-core)" stroke="#FFEED6" stroke-width="4"/>
+  <path d="M30 48L54 26C55.5 24.6406 58 25.6968 58 27.75V38H68.5C70.433 38 72 39.567 72 41.5V54.5C72 56.433 70.433 58 68.5 58H58V68.25C58 70.3032 55.5 71.3594 54 70L30 48Z" fill="url(#speed-arrow)"/>
+  <path d="M36 48L56 31V40H68V56H56V65L36 48Z" fill="#FFF3CF" fill-opacity="0.5"/>
+</svg>

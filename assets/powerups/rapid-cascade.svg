@@ -1,0 +1,24 @@
+<svg width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="rapid-core" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(48 48) scale(42)">
+      <stop offset="0" stop-color="#FFF7C2"/>
+      <stop offset="0.45" stop-color="#FFE666"/>
+      <stop offset="1" stop-color="#FFBE17"/>
+    </radialGradient>
+    <linearGradient id="rapid-chevron" x1="24" y1="48" x2="72" y2="48" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF2A8"/>
+      <stop offset="0.5" stop-color="#FFD53F"/>
+      <stop offset="1" stop-color="#FF9C00"/>
+    </linearGradient>
+    <filter id="rapid-glow" x="-24" y="-24" width="144" height="144" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="14" result="glow"/>
+    </filter>
+  </defs>
+  <g filter="url(#rapid-glow)">
+    <circle cx="48" cy="48" r="40" fill="#FFE066" fill-opacity="0.35"/>
+  </g>
+  <circle cx="48" cy="48" r="34" fill="url(#rapid-core)" stroke="#FFF4C4" stroke-width="4"/>
+  <path d="M32 32L48 20L64 32L48 44L32 32Z" fill="url(#rapid-chevron)"/>
+  <path d="M28 48L48 34L68 48L48 62L28 48Z" fill="url(#rapid-chevron)" opacity="0.85"/>
+  <path d="M32 64L48 52L64 64L48 76L32 64Z" fill="url(#rapid-chevron)" opacity="0.7"/>
+</svg>

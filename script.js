@@ -373,6 +373,49 @@ function whenImageReady(image, callback) {
     image.addEventListener('load', handler);
 }
 
+function isImageReady(image) {
+    return Boolean(image && image.complete && image.naturalWidth && image.naturalHeight);
+}
+
+function loadProjectileAssets() {
+    Object.entries(PROJECTILE_ASSETS).forEach(([key, src]) => {
+        if (!src) return;
+        const img = new Image();
+        img.onload = () => {
+            projectileImageCache[key] = img;
+        };
+        img.onerror = () => {
+            delete projectileImageCache[key];
+        };
+        projectileImageCache[key] = img;
+        img.src = src;
+    });
+}
+
+function loadPowerupAssets() {
+    const sources = new Set(Object.values(POWERUP_ASSETS));
+    sources.forEach(src => {
+        if (!src) return;
+        if (powerupImageCache[src] && isImageReady(powerupImageCache[src])) {
+            return;
+        }
+        const img = new Image();
+        img.onload = () => {
+            powerupImageCache[src] = img;
+        };
+        img.onerror = () => {
+            delete powerupImageCache[src];
+        };
+        powerupImageCache[src] = img;
+        img.src = src;
+    });
+}
+
+function initializeVisualAssets() {
+    loadProjectileAssets();
+    loadPowerupAssets();
+}
+
 function updatePlayerSpriteMetrics(img) {
     const dims = computeSpriteDimensions(img, PLAYER_BASE_SIZE, PLAYER_MIN_SIZE, PLAYER_MAX_SIZE);
     playerSpriteDimensions = dims;
@@ -477,6 +520,8 @@ const ASTRO_CAT_COLLECTION_MINT = 'AstroCatMintAddress';
 let gameRunning = false; let gamePaused = true; 
 let score = 0; let credits = 0; let level = 1; let lives = 3; let pendingLifeDamage = 0;
 let playerImg = null; let enemyImg = null; let assetsLoaded = false;
+const projectileImageCache = {};
+const powerupImageCache = {};
 let powerups = [];
 let rapidFire = false; let shieldActive = false; let spreadActive = false;
 let homingActive = false; let pierceActive = false; let ultraDashActive = false;
@@ -1286,6 +1331,22 @@ function renderSkillTree() {
 }
 
 const SPRITE_DIRECTORY = 'assets/sprites/';
+const PROJECTILE_ASSETS = {
+    bolt: 'assets/projectiles/plasma-bolt.svg',
+    beam: 'assets/projectiles/plasma-beam.svg'
+};
+
+const POWERUP_ASSETS = {
+    speed: 'assets/powerups/speed-thruster.svg',
+    rapid: 'assets/powerups/rapid-cascade.svg',
+    shield: 'assets/powerups/arc-shield.svg',
+    life: 'assets/powerups/life-heart.svg',
+    spread: 'assets/powerups/spread-array.svg',
+    homing: 'assets/powerups/homing-orb.svg',
+    pierce: 'assets/powerups/pierce-spike.svg',
+    ultra_dash: 'assets/powerups/ultra-dash.svg',
+    default: 'assets/powerups/mystery-core.svg'
+};
 
 const SPACECRAFT_CATALOG = [
     {
@@ -1536,6 +1597,10 @@ function prepareProjectile(proj) {
         proj.height = proj.baseHeight;
         proj.scaledForAttack = true;
     }
+
+    if (!proj.spriteKey) {
+        proj.spriteKey = proj.isBeam ? 'beam' : 'bolt';
+    }
 }
 const keys = {}; let joystickActive = false; let joystickDelta = { x: 0, y: 0 };
 let joystickSmoothed = { x: 0, y: 0 };
@@ -1656,7 +1721,8 @@ function spawnProjectile(config = {}) {
         isBeam: Boolean(config.isBeam),
         targetX: config.targetX ?? null,
         targetY: config.targetY ?? null,
-        scaledForAttack: false
+        scaledForAttack: false,
+        spriteKey: config.spriteKey || (config.isBeam ? 'beam' : 'bolt')
     };
     projectiles.push(projectile);
 }
@@ -1743,7 +1809,8 @@ function fireShot(chargeLevel = 0) {
             hits: pierceHits,
             isBeam: true,
             targetX: nearest ? nearest.x : null,
-            targetY: nearest ? nearest.y : null
+            targetY: nearest ? nearest.y : null,
+            spriteKey: 'beam'
         });
     } else {
         const baseConfig = {
@@ -1753,7 +1820,8 @@ function fireShot(chargeLevel = 0) {
             damage: projectileDamage,
             hits: pierceHits,
             targetX: nearest ? nearest.x : null,
-            targetY: nearest ? nearest.y : null
+            targetY: nearest ? nearest.y : null,
+            spriteKey: 'bolt'
         };
 
         projectilesToSpawn.push({ ...baseConfig, dy: 0 });
@@ -1833,15 +1901,15 @@ function handleKeyUp(event) {
 }
 
 const POWERUP_VISUALS = {
-    speed: { color: '#ff9f1c', letter: 'S' },
-    rapid: { color: '#ffe066', letter: 'R' },
-    shield: { color: '#4dabf7', letter: 'D' },
-    life: { color: '#fa5252', letter: '♥' },
-    spread: { color: '#845ef7', letter: 'W' },
-    homing: { color: '#3bc9db', letter: 'H' },
-    pierce: { color: '#e64980', letter: 'P' },
-    ultra_dash: { color: '#ffd43b', letter: 'U' },
-    default: { color: '#ffffff', letter: '?' }
+    speed: { color: '#ff9f1c', letter: 'S', asset: POWERUP_ASSETS.speed, glowColor: '#ffb347' },
+    rapid: { color: '#ffe066', letter: 'R', asset: POWERUP_ASSETS.rapid, glowColor: '#ffd479' },
+    shield: { color: '#4dabf7', letter: 'D', asset: POWERUP_ASSETS.shield, glowColor: '#7dd3ff' },
+    life: { color: '#fa5252', letter: '♥', asset: POWERUP_ASSETS.life, glowColor: '#ff8ea1' },
+    spread: { color: '#845ef7', letter: 'W', asset: POWERUP_ASSETS.spread, glowColor: '#b59aff' },
+    homing: { color: '#3bc9db', letter: 'H', asset: POWERUP_ASSETS.homing, glowColor: '#79f2ff' },
+    pierce: { color: '#e64980', letter: 'P', asset: POWERUP_ASSETS.pierce, glowColor: '#ff85b8' },
+    ultra_dash: { color: '#ffd43b', letter: 'U', asset: POWERUP_ASSETS.ultra_dash, glowColor: '#ffe380' },
+    default: { color: '#ffffff', letter: '?', asset: POWERUP_ASSETS.default, glowColor: '#9fa9ff' }
 };
 
 const framesToMs = (frames) => frames * FRAME_MS;
@@ -2466,12 +2534,29 @@ function drawTail() {
 }
 
 function drawPowerup(x, y, w, h, visuals) {
-    const { color, letter } = visuals;
-    gameCtx.fillStyle = color; gameCtx.fillRect(x, y, w, h);
-    gameCtx.fillStyle = '#000000'; gameCtx.font = 'bold 12px "MS PGothic", monospace';
-    gameCtx.textAlign = 'center'; gameCtx.textBaseline = 'middle';
+    const { color, letter, asset, glowColor } = visuals;
+    const assetImage = asset ? powerupImageCache[asset] : null;
+
+    if (isImageReady(assetImage)) {
+        gameCtx.save();
+        if (glowColor) {
+            gameCtx.shadowColor = glowColor;
+            gameCtx.shadowBlur = Math.max(w, h) * 0.5;
+        }
+        gameCtx.drawImage(assetImage, x, y, w, h);
+        gameCtx.restore();
+        return;
+    }
+
+    gameCtx.fillStyle = color;
+    gameCtx.fillRect(x, y, w, h);
+    gameCtx.fillStyle = '#000000';
+    gameCtx.font = 'bold 12px "MS PGothic", monospace';
+    gameCtx.textAlign = 'center';
+    gameCtx.textBaseline = 'middle';
     gameCtx.fillText(letter, x + w / 2, y + h / 2);
-    gameCtx.textAlign = 'start'; gameCtx.textBaseline = 'alphabetic';
+    gameCtx.textAlign = 'start';
+    gameCtx.textBaseline = 'alphabetic';
 }
 
 function drawImageOrProcedural(img, x, y, w, h, isPlayer = false, extra = {}) {
@@ -3879,8 +3964,34 @@ function renderGameScene() {
     });
 
     projectiles.forEach(proj => {
-        gameCtx.fillStyle = proj.isBeam ? '#ff00ff' : '#ffff00';
-        gameCtx.fillRect(proj.x, proj.y, proj.width, proj.height);
+        const spriteKey = proj.spriteKey || (proj.isBeam ? 'beam' : 'bolt');
+        const projectileSprite = projectileImageCache[spriteKey];
+
+        if (isImageReady(projectileSprite)) {
+            gameCtx.save();
+            const width = proj.width;
+            const height = proj.height;
+            const centerX = proj.x + width / 2;
+            const centerY = proj.y + height / 2;
+            gameCtx.translate(centerX, centerY);
+
+            if (!proj.isBeam) {
+                const angle = Math.atan2(proj.dy || 0, Math.max(0.001, proj.speed || 0.001));
+                gameCtx.rotate(angle);
+                gameCtx.shadowColor = '#ffe066';
+                gameCtx.shadowBlur = Math.max(width, height);
+            } else {
+                gameCtx.shadowColor = '#ff82ff';
+                gameCtx.shadowBlur = Math.max(width, height) * 0.6;
+                gameCtx.globalAlpha = 0.95;
+            }
+
+            gameCtx.drawImage(projectileSprite, -width / 2, -height / 2, width, height);
+            gameCtx.restore();
+        } else {
+            gameCtx.fillStyle = proj.isBeam ? '#ff00ff' : '#ffff00';
+            gameCtx.fillRect(proj.x, proj.y, proj.width, proj.height);
+        }
     });
 
     enemies.forEach(enemy => {
@@ -4082,6 +4193,7 @@ window.addEventListener('keyup', handleKeyUp);
 window.addEventListener('blur', resetKeyState);
 
 window.onload = function() {
+    initializeVisualAssets();
     initWebGL();
     initializeSpriteSystem();
     initializeUIEvents();
