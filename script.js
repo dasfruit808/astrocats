@@ -2821,11 +2821,15 @@ function drawImageOrProcedural(img, x, y, w, h, isPlayer = false, extra = {}) {
         glowBlur,
         chargeLevel = 0,
         variant = 'basic',
-        hp = 1
+        hp = 1,
+        applyGlow
     } = extra;
 
+    const usingCustomPlayerSprite = Boolean(isPlayer && img && img.isFallback === false);
+    const allowGlow = applyGlow !== undefined ? applyGlow : !usingCustomPlayerSprite;
+
     let glowApplied = false;
-    if (glowColor) {
+    if (glowColor && allowGlow) {
         gameCtx.save();
         gameCtx.shadowColor = glowColor;
         if (typeof glowBlur === 'number') {
