@@ -98,9 +98,78 @@ const pilotNameStatEl = document.getElementById('pilot-name-stat');
 const pilotTitleStatEl = document.getElementById('pilot-title-stat');
 const pilotNameStatsPanelEl = document.getElementById('pilot-name-stats-panel');
 const pilotTitleStatsPanelEl = document.getElementById('pilot-title-stats-panel');
+const windowShowDesktopBtn = document.getElementById('window-show-desktop');
+const windowOpenHubBtn = document.getElementById('window-open-hub');
+const windowBackToStartBtn = document.getElementById('window-back-to-start');
+const startMenuCloseBtn = document.getElementById('start-menu-close');
+const hubCloseBtn = document.getElementById('hub-close');
+const hubOpenShopBtn = document.getElementById('hub-open-shop');
+const hubPlayNextBtn = document.getElementById('hub-play-next');
+const hubBackMenuBtn = document.getElementById('hub-back-menu');
+const shopCloseBtn = document.getElementById('shop-close');
+const shopSkipBtn = document.getElementById('shop-skip');
+const shopRollBasicBtn = document.getElementById('shop-roll-basic');
+const shopRollPremiumBtn = document.getElementById('shop-roll-premium');
+const taskbarStartBtn = document.getElementById('taskbar-start');
+const taskbarOpenHubBtn = document.getElementById('taskbar-open-hub');
+const taskbarOpenShopBtn = document.getElementById('taskbar-open-shop');
+const statCloseBtn = document.getElementById('stat-close');
+const statReturnHubBtn = document.getElementById('stat-return-hub');
 
 const FOCUSABLE_SELECTOR = "a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type='hidden']), select:not([disabled]), [tabindex]:not([tabindex='-1'])";
 const focusTrapStates = new Map();
+
+function bindButtonClick(element, handler, { preventDefault = true } = {}) {
+    const target = typeof element === 'string' ? document.getElementById(element) : element;
+    if (!target || typeof handler !== 'function') return;
+    target.addEventListener('click', (event) => {
+        if (preventDefault) {
+            event.preventDefault();
+        }
+        if (target.disabled) return;
+        handler(event);
+    });
+}
+
+function hideOverlaysAndResumeGame() {
+    hideAllOverlays();
+    if (gameRunning) {
+        gamePaused = false;
+    }
+}
+
+function initializeUIEvents() {
+    bindButtonClick(playBtn, () => startGame(true));
+    bindButtonClick(connectBtn, () => {
+        if (walletPublicKey) {
+            disconnectWallet();
+        } else {
+            connectWallet();
+        }
+    });
+
+    bindButtonClick(windowOpenHubBtn, showHub);
+    bindButtonClick(windowBackToStartBtn, showStartMenu);
+    bindButtonClick(windowShowDesktopBtn, hideOverlaysAndResumeGame);
+    bindButtonClick(startMenuCloseBtn, hideOverlaysAndResumeGame);
+
+    bindButtonClick(hubCloseBtn, showStartMenu);
+    bindButtonClick(hubOpenShopBtn, openShop);
+    bindButtonClick(hubPlayNextBtn, () => startGame(true));
+    bindButtonClick(hubBackMenuBtn, showStartMenu);
+
+    bindButtonClick(shopCloseBtn, showHub);
+    bindButtonClick(shopSkipBtn, skipShop);
+    bindButtonClick(shopRollBasicBtn, () => rollUpgrade('basic'));
+    bindButtonClick(shopRollPremiumBtn, () => rollUpgrade('premium'));
+
+    bindButtonClick(taskbarStartBtn, showStartMenu);
+    bindButtonClick(taskbarOpenHubBtn, showHub);
+    bindButtonClick(taskbarOpenShopBtn, openShop);
+
+    bindButtonClick(statCloseBtn, showHub);
+    bindButtonClick(statReturnHubBtn, showHub);
+}
 
 function isFocusableElement(element) {
     if (!element) return false;
@@ -3974,6 +4043,7 @@ window.addEventListener('blur', resetKeyState);
 window.onload = function() {
     initWebGL();
     initializeSpriteSystem();
+    initializeUIEvents();
     showStartMenu();
 
     gameLoop();
