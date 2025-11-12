@@ -2729,7 +2729,7 @@ function saveLocalLeaderboard(currentData) {
         publicKey: walletPublicKey,
         level: currentData.level,
         bestScore: currentData.bestScore,
-        stats: currentData.stats 
+        stats: currentData.stats
     };
 
     leaderboard.push(newEntry);
@@ -2740,15 +2740,62 @@ function saveLocalLeaderboard(currentData) {
 
     leaderboard = leaderboard.slice(0, 10);
     localStorage.setItem('astro_invaders_leaderboard', JSON.stringify(leaderboard));
+
+    if (window.LeaderboardAPI && typeof window.LeaderboardAPI.postEntry === 'function') {
+        window.LeaderboardAPI.postEntry(newEntry);
+    }
 }
 
-function loadAndDisplayLeaderboard() {
+async function loadAndDisplayLeaderboard() {
     if (!leaderboardEl) return;
 
-    const stored = JSON.parse(localStorage.getItem('astro_invaders_leaderboard') || '[]');
-    const leaderboard = Array.isArray(stored) ? [...stored] : [];
+    leaderboardEl.innerHTML = '';
+
+    const loadingMessage = document.createElement('p');
+    loadingMessage.textContent = 'Loading leaderboard...';
+    leaderboardEl.appendChild(loadingMessage);
+
+    let leaderboard = [];
+    let remoteLoaded = false;
+
+    if (window.LeaderboardAPI && typeof window.LeaderboardAPI.fetchTopEntries === 'function') {
+        try {
+            if (typeof window.LeaderboardAPI.flushQueue === 'function') {
+                await window.LeaderboardAPI.flushQueue();
+            }
+
+            const remote = await window.LeaderboardAPI.fetchTopEntries();
+            if (Array.isArray(remote) && remote.length) {
+                leaderboard = [...remote];
+                remoteLoaded = true;
+            }
+        } catch (error) {
+            console.warn('Remote leaderboard unavailable, falling back to local cache:', error);
+        }
+    }
+
+    if (!remoteLoaded) {
+        try {
+            const stored = JSON.parse(localStorage.getItem('astro_invaders_leaderboard') || '[]');
+            leaderboard = Array.isArray(stored) ? [...stored] : [];
+        } catch (error) {
+            console.error('Failed to load local leaderboard data:', error);
+            leaderboard = [];
+        }
+    } else {
+        try {
+            localStorage.setItem('astro_invaders_leaderboard', JSON.stringify(leaderboard));
+        } catch (error) {
+            console.warn('Unable to cache remote leaderboard locally:', error);
+        }
+    }
 
     leaderboardEl.innerHTML = '';
+
+    leaderboard.sort((a, b) => {
+        if (b.level !== a.level) { return b.level - a.level; }
+        return (b.bestScore || 0) - (a.bestScore || 0);
+    });
 
     if (!leaderboard.length) {
         const emptyMessage = document.createElement('p');
@@ -2756,11 +2803,6 @@ function loadAndDisplayLeaderboard() {
         leaderboardEl.appendChild(emptyMessage);
         return;
     }
-
-    leaderboard.sort((a, b) => {
-        if (b.level !== a.level) { return b.level - a.level; }
-        return (b.bestScore || 0) - (a.bestScore || 0);
-    });
 
     const headerEl = document.createElement('div');
     headerEl.className = 'leaderboard-header';
