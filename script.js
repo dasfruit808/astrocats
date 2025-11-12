@@ -2420,33 +2420,59 @@ function sanitizePlayerDataForChain(data) {
 function encodeSnapshotForChain(snapshot) {
     if (!snapshot) return null;
 
-function loadPlayerData() {
-    if (walletPublicKey && hasAstroCatNFT) {
-        const saved = localStorage.getItem(`astro_invaders_${walletPublicKey}`);
-        if (saved) {
-            const loadedData = JSON.parse(saved);
-            const base = createBasePlayerData();
-            playerData = { ...base, ...loadedData };
-            playerData.stats = { ...base.stats, ...(loadedData.stats || {}) };
-            if (typeof loadedData.specializationPoints === 'number') {
-                playerData.specializationPoints = loadedData.specializationPoints;
-            } else if (typeof loadedData.levelPoints === 'number') {
-                playerData.specializationPoints = loadedData.levelPoints;
-            }
-            playerData.restedXP = typeof loadedData.restedXP === 'number' ? loadedData.restedXP : 0;
-            if ('levelPoints' in playerData) {
-                delete playerData.levelPoints;
-            }
-            const unlocked = Array.isArray(loadedData.unlockedNodes) ? loadedData.unlockedNodes.filter(id => skillNodeIndex[id]) : [];
-            playerData.unlockedNodes = Array.from(new Set(unlocked));
+    try {
+        const memoText = `${PROGRESS_MEMO_PREFIX}${JSON.stringify(snapshot)}`;
+        const byteLength = new TextEncoder().encode(memoText).length;
 
-            // Ensure daily object exists and merge quest structure
-            const dailyFallback = base.daily;
-            playerData.daily = { ...dailyFallback, ...(loadedData.daily || {}) };
-            if (!Array.isArray(playerData.daily.quests) || playerData.daily.quests.length !== 3) {
-                playerData.daily.quests = createDefaultQuests();
+        if (byteLength > MEMO_MAX_BYTES) {
+            console.warn('On-chain progress payload too large for memo; skipping sync.');
+            return null;
+        }
+
+        return memoText;
+    } catch (err) {
+        console.error('Failed to encode snapshot for chain sync:', err);
+        return null;
+    }
+}
+
+async function syncProgressToChain(snapshot) {
+    if (!snapshot || typeof solanaWeb3 === 'undefined') return false;
+
+    if (!walletPublicKey || !walletProvider) {
+        console.warn('Wallet not connected; cannot sync progress on-chain.');
+        return false;
+    }
+
+    const connection = getSolanaConnection();
+    if (!connection) return false;
+
+    const memoText = encodeSnapshotForChain(snapshot);
+    if (!memoText) return false;
+
+    try {
+        const memoInstruction = new solanaWeb3.TransactionInstruction({
+            keys: [],
+            programId: new solanaWeb3.PublicKey(MEMO_PROGRAM_ID),
+            data: new TextEncoder().encode(memoText)
+        });
+
+        const transaction = new solanaWeb3.Transaction().add(memoInstruction);
+        transaction.feePayer = new solanaWeb3.PublicKey(walletPublicKey);
+
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+        transaction.recentBlockhash = blockhash;
+
+        let signature = null;
+
+        if (typeof walletProvider.signAndSendTransaction === 'function') {
+            const result = await walletProvider.signAndSendTransaction(transaction);
+            if (result) {
+                signature = typeof result === 'string' ? result : result.signature;
             }
-            playerData.profile = { ...base.profile, ...(loadedData.profile || {}) };
+        } else if (typeof walletProvider.signTransaction === 'function') {
+            const signedTx = await walletProvider.signTransaction(transaction);
+            signature = await connection.sendRawTransaction(signedTx.serialize());
         } else {
             console.warn('Wallet provider does not support transaction signing; cannot sync progress on-chain.');
             return false;
