@@ -3438,17 +3438,31 @@ async function loadAndDisplayLeaderboard() {
             const rowEl = document.createElement('li');
             rowEl.className = 'leaderboard-row';
 
+            const rankEl = document.createElement('span');
+            rankEl.className = 'leaderboard-rank';
+            rankEl.textContent = `#${index + 1}`;
+
             const publicKey = entry.publicKey || 'Unknown Player';
             const snippet = publicKey.length > 10
                 ? `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`
                 : publicKey;
 
-            rowEl.innerHTML = `
-                <span class="leaderboard-rank">#${index + 1}</span>
-                <span class="leaderboard-wallet">${snippet}</span>
-                <span class="leaderboard-level">Lv.${entry.level}</span>
-                <span class="leaderboard-score">${entry.bestScore}</span>
-            `;
+            const walletEl = document.createElement('span');
+            walletEl.className = 'leaderboard-wallet';
+            walletEl.textContent = snippet;
+
+            const levelEl = document.createElement('span');
+            levelEl.className = 'leaderboard-level';
+            levelEl.textContent = `Lv.${entry.level}`;
+
+            const scoreEl = document.createElement('span');
+            scoreEl.className = 'leaderboard-score';
+            scoreEl.textContent = `${entry.bestScore}`;
+
+            rowEl.appendChild(rankEl);
+            rowEl.appendChild(walletEl);
+            rowEl.appendChild(levelEl);
+            rowEl.appendChild(scoreEl);
 
             fragment.appendChild(rowEl);
         });
