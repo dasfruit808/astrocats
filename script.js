@@ -99,59 +99,140 @@ const pilotTitleStatEl = document.getElementById('pilot-title-stat');
 const pilotNameStatsPanelEl = document.getElementById('pilot-name-stats-panel');
 const pilotTitleStatsPanelEl = document.getElementById('pilot-title-stats-panel');
 
-const showDesktopBtn = document.getElementById('window-show-desktop');
-const openHubBtn = document.getElementById('window-open-hub');
-const backToStartBtn = document.getElementById('window-back-to-start');
-const startMenuCloseBtn = document.getElementById('start-menu-close');
-const hubCloseBtn = document.getElementById('hub-close');
-const hubOpenShopBtn = document.getElementById('hub-open-shop');
-const hubPlayNextBtn = document.getElementById('hub-play-next');
-const hubBackMenuBtn = document.getElementById('hub-back-menu');
-const shopCloseBtn = document.getElementById('shop-close');
-const shopRollBasicBtn = document.getElementById('shop-roll-basic');
-const shopRollPremiumBtn = document.getElementById('shop-roll-premium');
-const shopSkipBtn = document.getElementById('shop-skip');
-const statCloseBtn = document.getElementById('stat-close');
-const statReturnHubBtn = document.getElementById('stat-return-hub');
-const taskbarStartBtn = document.getElementById('taskbar-start');
-const taskbarOpenHubBtn = document.getElementById('taskbar-open-hub');
-const taskbarOpenShopBtn = document.getElementById('taskbar-open-shop');
+const FOCUSABLE_SELECTOR = "a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type='hidden']), select:not([disabled]), [tabindex]:not([tabindex='-1'])";
+const focusTrapStates = new Map();
 
+function isFocusableElement(element) {
+    if (!element) return false;
+    if (element.disabled) return false;
+    if (element.getAttribute('aria-hidden') === 'true') return false;
+    if (element.tagName === 'INPUT' && element.type === 'hidden') return false;
 
-function handleConnectButtonClick() {
-    if (walletPublicKey) {
-        disconnectWallet();
-    } else {
-        connectWallet();
+    const tabIndexAttr = element.getAttribute('tabindex');
+    if (tabIndexAttr !== null && Number(tabIndexAttr) < 0) return false;
+
+    const style = window.getComputedStyle(element);
+    if (style.visibility === 'hidden' || style.display === 'none') return false;
+
+    if (element.offsetParent === null && element.getClientRects().length === 0) return false;
+
+    return true;
+}
+
+function getFocusableElements(container) {
+    if (!container) return [];
+    return Array.from(container.querySelectorAll(FOCUSABLE_SELECTOR)).filter(isFocusableElement);
+}
+
+function activateFocusTrap(modalEl, options = {}) {
+    if (!modalEl) return;
+
+    const existingState = focusTrapStates.get(modalEl);
+    if (existingState) {
+        modalEl.removeEventListener('keydown', existingState.keydownHandler);
+        focusTrapStates.delete(modalEl);
+    }
+
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const state = {
+        previouslyFocused,
+        keydownHandler: null,
+        tabIndexChanged: false
+    };
+
+    const keydownHandler = (event) => {
+        if (event.key !== 'Tab') return;
+        event.stopPropagation();
+
+        const focusableElements = getFocusableElements(modalEl);
+        if (focusableElements.length === 0) {
+            if (options.fallbackToModal !== false) {
+                if (!modalEl.hasAttribute('tabindex')) {
+                    modalEl.setAttribute('tabindex', '-1');
+                    state.tabIndexChanged = true;
+                }
+                modalEl.focus();
+            }
+            event.preventDefault();
+            return;
+        }
+
+        const first = focusableElements[0];
+        const last = focusableElements[focusableElements.length - 1];
+        const active = document.activeElement;
+
+        if (event.shiftKey) {
+            if (!modalEl.contains(active) || active === first) {
+                event.preventDefault();
+                last.focus();
+            }
+        } else {
+            if (!modalEl.contains(active) || active === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        }
+    };
+
+    state.keydownHandler = keydownHandler;
+    modalEl.addEventListener('keydown', keydownHandler);
+
+    let focusTarget = options.initialFocus || null;
+    if (focusTarget && !modalEl.contains(focusTarget)) {
+        focusTarget = null;
+    }
+    if (focusTarget && !isFocusableElement(focusTarget)) {
+        focusTarget = null;
+    }
+
+    if (!focusTarget) {
+        const focusableElements = getFocusableElements(modalEl);
+        if (focusableElements.length > 0) {
+            focusTarget = focusableElements[0];
+        }
+    }
+
+    if (!focusTarget && options.fallbackToModal !== false) {
+        const hadTabIndex = modalEl.hasAttribute('tabindex');
+        if (!hadTabIndex) {
+            modalEl.setAttribute('tabindex', '-1');
+            state.tabIndexChanged = true;
+        }
+        focusTarget = modalEl;
+    }
+
+    focusTrapStates.set(modalEl, state);
+
+    if (focusTarget && typeof focusTarget.focus === 'function') {
+        focusTarget.focus();
     }
 }
 
-function initializeDomEventHandlers() {
-    if (showDesktopBtn) showDesktopBtn.addEventListener('click', hideAllOverlays);
-    if (openHubBtn) openHubBtn.addEventListener('click', showHub);
-    if (backToStartBtn) backToStartBtn.addEventListener('click', showStartMenu);
-    if (startMenuCloseBtn) startMenuCloseBtn.addEventListener('click', hideAllOverlays);
-    if (connectBtn) connectBtn.addEventListener('click', handleConnectButtonClick);
-    if (playBtn) playBtn.addEventListener('click', () => startGame(true));
-    if (hubCloseBtn) hubCloseBtn.addEventListener('click', showStartMenu);
-    if (hubOpenShopBtn) hubOpenShopBtn.addEventListener('click', openShop);
-    if (hubPlayNextBtn) hubPlayNextBtn.addEventListener('click', () => startGame(false));
-    if (hubBackMenuBtn) hubBackMenuBtn.addEventListener('click', showStartMenu);
-    if (shopCloseBtn) shopCloseBtn.addEventListener('click', skipShop);
-    if (shopRollBasicBtn) shopRollBasicBtn.addEventListener('click', () => rollUpgrade('basic'));
-    if (shopRollPremiumBtn) shopRollPremiumBtn.addEventListener('click', () => rollUpgrade('premium'));
-    if (shopSkipBtn) shopSkipBtn.addEventListener('click', skipShop);
-    if (statCloseBtn) statCloseBtn.addEventListener('click', showHub);
-    if (statReturnHubBtn) statReturnHubBtn.addEventListener('click', showHub);
-    if (taskbarStartBtn) taskbarStartBtn.addEventListener('click', showStartMenu);
-    if (taskbarOpenHubBtn) taskbarOpenHubBtn.addEventListener('click', showHub);
-    if (taskbarOpenShopBtn) taskbarOpenShopBtn.addEventListener('click', openShop);
+function deactivateFocusTrap(modalEl, { restoreFocus = true } = {}) {
+    if (!modalEl) return;
+
+    const state = focusTrapStates.get(modalEl);
+    if (!state) return;
+
+    modalEl.removeEventListener('keydown', state.keydownHandler);
+
+    if (state.tabIndexChanged) {
+        modalEl.removeAttribute('tabindex');
+    }
+
+    focusTrapStates.delete(modalEl);
+
+    if (restoreFocus && state.previouslyFocused && typeof state.previouslyFocused.focus === 'function') {
+        const target = state.previouslyFocused;
+        if (document.contains(target) && isFocusableElement(target)) {
+            target.focus();
+        }
+    }
 }
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeDomEventHandlers);
-} else {
-    initializeDomEventHandlers();
+function findFirstContentControl(container) {
+    if (!container) return null;
+    return container.querySelector(".xp-window-content button, .xp-window-content [href], .xp-window-content input, .xp-window-content select, .xp-window-content textarea, .xp-window-content [tabindex]:not([tabindex='-1'])");
 }
 
 
@@ -1885,6 +1966,7 @@ function hideAllOverlays() {
     [startMenuEl, hubEl, shopEl, statAllocationEl, profileModalEl].forEach(el => {
         if (el) {
             el.style.display = 'none';
+            deactivateFocusTrap(el);
         }
     });
     if (profileErrorEl) profileErrorEl.textContent = '';
@@ -1904,11 +1986,14 @@ function showProfileModal() {
     if (!profileModalEl) return;
     populateProfileForm();
     profileModalEl.style.display = 'block';
+    const firstFormControl = profileForm ? profileForm.querySelector("input, select, textarea, button, [tabindex]:not([tabindex='-1'])") : null;
+    activateFocusTrap(profileModalEl, { initialFocus: firstFormControl });
 }
 
 function hideProfileModal() {
     if (!profileModalEl) return;
     profileModalEl.style.display = 'none';
+    deactivateFocusTrap(profileModalEl);
     if (profileErrorEl) profileErrorEl.textContent = '';
 }
 
@@ -1955,19 +2040,31 @@ function showStartMenu() {
     gameRunning = false;
     gamePaused = true;
     hideAllOverlays();
-    if (startMenuEl) startMenuEl.style.display = 'flex';
+    if (startMenuEl) {
+        startMenuEl.style.display = 'flex';
+    }
     updateUI();
     updateHubUI();
+    if (startMenuEl) {
+        const initialFocus = findFirstContentControl(startMenuEl);
+        activateFocusTrap(startMenuEl, { initialFocus });
+    }
 }
 
 function showHub() {
     gameRunning = false;
     gamePaused = true;
     hideAllOverlays();
-    if (hubEl) hubEl.style.display = 'flex';
+    if (hubEl) {
+        hubEl.style.display = 'flex';
+    }
     updateUI();
     updateHubUI();
     loadAndDisplayLeaderboard();
+    if (hubEl) {
+        const initialFocus = findFirstContentControl(hubEl);
+        activateFocusTrap(hubEl, { initialFocus });
+    }
 }
 
 function startGame(isNewSession = true) {
@@ -2061,10 +2158,16 @@ function openShop() {
     gameRunning = false;
     gamePaused = true;
     hideAllOverlays();
-    if (shopEl) shopEl.style.display = 'flex';
+    if (shopEl) {
+        shopEl.style.display = 'flex';
+    }
     renderShopOptions();
     updateUI();
     updateHubUI();
+    if (shopEl) {
+        const initialFocus = findFirstContentControl(shopEl);
+        activateFocusTrap(shopEl, { initialFocus });
+    }
 }
 
 function rollUpgrade(tier) {
@@ -3151,12 +3254,18 @@ function pickRarity(weights) {
 function showStatAllocation() {
     gamePaused = true;
     hideAllOverlays();
-    if (statAllocationEl) statAllocationEl.style.display = 'flex';
+    if (statAllocationEl) {
+        statAllocationEl.style.display = 'flex';
+    }
 
     if (statLevelOverlayEl) statLevelOverlayEl.textContent = playerData.level;
     if (statPointsEl) statPointsEl.textContent = playerData.specializationPoints;
 
     renderSkillTree();
+    if (statAllocationEl) {
+        const initialFocus = findFirstContentControl(statAllocationEl);
+        activateFocusTrap(statAllocationEl, { initialFocus });
+    }
 }
 
 // --- DAILY LOGIN AND QUEST SYSTEM ---
