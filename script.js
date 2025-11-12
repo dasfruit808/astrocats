@@ -128,6 +128,7 @@ const DEFAULT_STATUS_TIP_TEXT = statusTipEl ? statusTipEl.textContent : '';
 
 const FOCUSABLE_SELECTOR = "a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type='hidden']), select:not([disabled]), [tabindex]:not([tabindex='-1'])";
 const focusTrapStates = new Map();
+let hasInitialized = false;
 
 function bindButtonClick(element, handler, { preventDefault = true } = {}) {
     const target = typeof element === 'string' ? document.getElementById(element) : element;
@@ -2919,6 +2920,38 @@ function showAnnounce(el, text) {
 
 // --- LEADERBOARD & STORAGE ---
 
+function sanitizeLeaderboardEntry(entry) {
+    if (typeof window !== 'undefined' && window.LeaderboardAPI?.sanitizeEntry) {
+        try {
+            return window.LeaderboardAPI.sanitizeEntry(entry);
+        } catch (error) {
+            console.warn('Failed to sanitize leaderboard entry via API helper:', error);
+        }
+    }
+
+    if (!entry || typeof entry !== 'object') {
+        return null;
+    }
+
+    const publicKey = typeof entry.publicKey === 'string' && entry.publicKey.trim()
+        ? entry.publicKey.trim()
+        : 'Unknown Player';
+
+    const normalizeNumber = (value) => {
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) {
+            return 0;
+        }
+        return Math.max(0, Math.floor(parsed));
+    };
+
+    const level = normalizeNumber(entry.level);
+    const bestScore = normalizeNumber(entry.bestScore);
+    const stats = entry.stats && typeof entry.stats === 'object' ? { ...entry.stats } : {};
+
+    return { publicKey, level, bestScore, stats };
+}
+
 const LEADERBOARD_STORAGE_KEY = 'astro_invaders_leaderboard';
 const STORAGE_WARNING_MESSAGE = 'Progress may not be saved: storage unavailable.';
 
@@ -2944,7 +2977,12 @@ function readLeaderboardSafely() {
         const raw = localStorage.getItem(LEADERBOARD_STORAGE_KEY);
         if (!raw) return [];
         const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? [...parsed] : [];
+        if (!Array.isArray(parsed)) {
+            return [];
+        }
+        return parsed
+            .map(sanitizeLeaderboardEntry)
+            .filter(Boolean);
     } catch (error) {
         console.warn('Failed to read leaderboard from local storage.', error);
         if (error && (error.name === 'SecurityError' || error.name === 'QuotaExceededError')) {
@@ -2962,7 +3000,10 @@ function writeLeaderboardSafely(entries) {
     }
 
     try {
-        localStorage.setItem(LEADERBOARD_STORAGE_KEY, JSON.stringify(entries));
+        const sanitized = Array.isArray(entries)
+            ? entries.map(sanitizeLeaderboardEntry).filter(Boolean)
+            : [];
+        localStorage.setItem(LEADERBOARD_STORAGE_KEY, JSON.stringify(sanitized));
         hideStorageWarning();
         return true;
     } catch (error) {
@@ -2973,16 +3014,20 @@ function writeLeaderboardSafely(entries) {
 }
 
 function saveLocalLeaderboard(currentData) {
-    const leaderboard = readLeaderboardSafely().filter(entry => entry.publicKey !== walletPublicKey);
-
-    const newEntry = {
+    const sanitizedEntry = sanitizeLeaderboardEntry({
         publicKey: walletPublicKey,
         level: currentData.level,
         bestScore: currentData.bestScore,
         stats: currentData.stats
-    };
+    });
 
-    leaderboard.push(newEntry);
+    if (!sanitizedEntry) {
+        return;
+    }
+
+    const leaderboard = readLeaderboardSafely().filter(entry => entry.publicKey !== sanitizedEntry.publicKey);
+
+    leaderboard.push(sanitizedEntry);
     leaderboard.sort((a, b) => {
         if (b.level !== a.level) { return b.level - a.level; }
         return b.bestScore - a.bestScore;
@@ -2990,63 +3035,121 @@ function saveLocalLeaderboard(currentData) {
 
     const trimmedLeaderboard = leaderboard.slice(0, 10);
     writeLeaderboardSafely(trimmedLeaderboard);
+
+    if (typeof window !== 'undefined' && window.LeaderboardAPI?.postEntry) {
+        window.LeaderboardAPI.postEntry(sanitizedEntry).catch((error) => {
+            console.warn('Failed to submit leaderboard entry to API:', error);
+        });
+    }
 }
 
 async function loadAndDisplayLeaderboard() {
     if (!leaderboardEl) return;
 
-    const leaderboard = readLeaderboardSafely();
-
     leaderboardEl.innerHTML = '';
+    const loadingMessage = document.createElement('p');
+    loadingMessage.textContent = 'Loading leaderboard...';
+    leaderboardEl.appendChild(loadingMessage);
 
-    leaderboard.sort((a, b) => {
-        if (b.level !== a.level) { return b.level - a.level; }
-        return (b.bestScore || 0) - (a.bestScore || 0);
-    });
+    try {
+        const entryMap = new Map();
 
-    if (!leaderboard.length) {
-        const emptyMessage = document.createElement('p');
-        emptyMessage.textContent = 'No leaderboard data yet.';
-        leaderboardEl.appendChild(emptyMessage);
-        return;
-    }
+        const registerEntry = (entry) => {
+            const sanitized = sanitizeLeaderboardEntry(entry);
+            if (!sanitized) {
+                return;
+            }
 
-    const headerEl = document.createElement('div');
-    headerEl.className = 'leaderboard-header';
-    headerEl.innerHTML = `
-        <span class="leaderboard-rank">Rank</span>
-        <span class="leaderboard-wallet">Wallet</span>
-        <span class="leaderboard-level">Level</span>
-        <span class="leaderboard-score">Best Score</span>
-    `;
-    leaderboardEl.appendChild(headerEl);
+            const hasStableKey = sanitized.publicKey && sanitized.publicKey !== 'Unknown Player';
+            const key = hasStableKey
+                ? sanitized.publicKey
+                : `${sanitized.publicKey}-${sanitized.bestScore}-${sanitized.level}`;
 
-    const listEl = document.createElement('ol');
-    listEl.className = 'leaderboard-list';
+            const existing = entryMap.get(key);
+            if (!existing
+                || sanitized.bestScore > existing.bestScore
+                || (sanitized.bestScore === existing.bestScore && sanitized.level > existing.level)) {
+                entryMap.set(key, sanitized);
+            }
+        };
 
-    leaderboard.slice(0, 10).forEach((entry, index) => {
-        const rowEl = document.createElement('li');
-        rowEl.className = 'leaderboard-row';
+        readLeaderboardSafely().forEach(registerEntry);
 
-        const publicKey = entry.publicKey || 'Unknown Player';
-        const snippet = publicKey.length > 8
-            ? `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`
-            : publicKey;
+        if (typeof window !== 'undefined' && window.LeaderboardAPI?.flushQueue) {
+            try {
+                await window.LeaderboardAPI.flushQueue();
+            } catch (error) {
+                console.warn('Failed to flush queued leaderboard entries:', error);
+            }
+        }
 
-        const levelText = typeof entry.level === 'number' ? entry.level : 0;
-        const scoreText = typeof entry.bestScore === 'number' ? entry.bestScore : 0;
+        if (typeof window !== 'undefined' && window.LeaderboardAPI?.fetchTopEntries) {
+            try {
+                const remoteEntries = await window.LeaderboardAPI.fetchTopEntries();
+                remoteEntries.forEach(registerEntry);
+            } catch (error) {
+                console.warn('Failed to load remote leaderboard entries:', error);
+            }
+        }
 
-        rowEl.innerHTML = `
-            <span class="leaderboard-rank">#${index + 1}</span>
-            <span class="leaderboard-wallet">${snippet}</span>
-            <span class="leaderboard-level">Lv.${levelText}</span>
-            <span class="leaderboard-score">${scoreText}</span>
+        const leaderboard = Array.from(entryMap.values());
+        leaderboard.sort((a, b) => {
+            if (b.level !== a.level) { return b.level - a.level; }
+            return b.bestScore - a.bestScore;
+        });
+
+        leaderboardEl.innerHTML = '';
+
+        if (!leaderboard.length) {
+            const emptyMessage = document.createElement('p');
+            emptyMessage.textContent = 'No leaderboard data yet.';
+            leaderboardEl.appendChild(emptyMessage);
+            return;
+        }
+
+        const headerEl = document.createElement('div');
+        headerEl.className = 'leaderboard-header';
+        headerEl.innerHTML = `
+            <span class="leaderboard-rank">Rank</span>
+            <span class="leaderboard-wallet">Wallet</span>
+            <span class="leaderboard-level">Level</span>
+            <span class="leaderboard-score">Best Score</span>
         `;
+        leaderboardEl.appendChild(headerEl);
 
-        listEl.appendChild(rowEl);
-    });
+        const listEl = document.createElement('ol');
+        listEl.className = 'leaderboard-list';
 
-    leaderboardEl.appendChild(listEl);
+        const fragment = document.createDocumentFragment();
+
+        leaderboard.slice(0, 10).forEach((entry, index) => {
+            const rowEl = document.createElement('li');
+            rowEl.className = 'leaderboard-row';
+
+            const publicKey = entry.publicKey || 'Unknown Player';
+            const snippet = publicKey.length > 10
+                ? `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`
+                : publicKey;
+
+            rowEl.innerHTML = `
+                <span class="leaderboard-rank">#${index + 1}</span>
+                <span class="leaderboard-wallet">${snippet}</span>
+                <span class="leaderboard-level">Lv.${entry.level}</span>
+                <span class="leaderboard-score">${entry.bestScore}</span>
+            `;
+
+            fragment.appendChild(rowEl);
+        });
+
+        listEl.appendChild(fragment);
+        leaderboardEl.appendChild(listEl);
+    } catch (error) {
+        console.error('Failed to render leaderboard:', error);
+        leaderboardEl.innerHTML = '';
+        const errorMessage = document.createElement('p');
+        errorMessage.textContent = 'Unable to load leaderboard right now.';
+        leaderboardEl.appendChild(errorMessage);
+    }
 }
 
 function loadExternalScript(src) {
@@ -4787,12 +4890,33 @@ window.addEventListener('blur', handleWindowBlur);
 window.addEventListener('focus', () => resumeGameFromFocusLoss({ auto: true }));
 window.addEventListener('blur', resetKeyState);
 
-window.onload = function() {
+function initializeApp() {
+    if (hasInitialized) {
+        return;
+    }
+
+    if (!canvas) {
+        console.error('Unable to initialize Astro Invaders: canvas element not found.');
+        return;
+    }
+
+    hasInitialized = true;
+
     initializeVisualAssets();
-    initWebGL();
+    const webglReady = initWebGL();
+    if (!webglReady && !ctx) {
+        ctx = canvas.getContext('2d');
+    }
     initializeSpriteSystem();
     initializeUIEvents();
     showStartMenu();
+    loadAndDisplayLeaderboard();
 
     gameLoop();
-};
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApp, { once: true });
+} else {
+    initializeApp();
+}
