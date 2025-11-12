@@ -1536,8 +1536,36 @@ function fireShot(chargeLevel = 0) {
     emitParticles(player.x, player.y, isBeam ? 12 : 4, false, chargeLevel > 0);
 }
 
+function isElementVisible(element) {
+    if (!element) return false;
+    if (typeof window !== 'undefined' && typeof window.getComputedStyle === 'function') {
+        return window.getComputedStyle(element).display !== 'none';
+    }
+    return element.style ? element.style.display !== 'none' : false;
+}
+
 function handleKeyDown(event) {
     const { code } = event;
+
+    if (code === 'Escape') {
+        const overlayHandlers = [
+            { element: profileModalEl, handler: hideProfileModal },
+            { element: shopEl, handler: skipShop },
+            { element: hubEl, handler: showStartMenu },
+            { element: startMenuEl, handler: hideAllOverlays }
+        ];
+
+        for (const { element, handler } of overlayHandlers) {
+            if (isElementVisible(element)) {
+                event.preventDefault();
+                handler();
+                return;
+            }
+        }
+
+        return;
+    }
+
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(code)) {
         event.preventDefault();
     }
