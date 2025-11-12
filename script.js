@@ -2752,6 +2752,9 @@ function handleDocumentVisibilityChange() {
         pauseGameForFocusLoss('hidden');
     } else {
         resumeGameFromFocusLoss({ auto: true });
+        if (isElementVisible(hubEl)) {
+            loadAndDisplayLeaderboard({ force: true });
+        }
     }
 }
 
@@ -2833,7 +2836,7 @@ function showHub() {
     }
     updateUI();
     updateHubUI();
-    loadAndDisplayLeaderboard();
+    loadAndDisplayLeaderboard({ force: true });
     if (hubEl) {
         const initialFocus = findFirstContentControl(hubEl);
         activateFocusTrap(hubEl, { initialFocus });
@@ -3367,6 +3370,16 @@ function writeLeaderboardSafely(entries) {
     }
 }
 
+const LEADERBOARD_FETCH_COOLDOWN_MS = 5000;
+let leaderboardLoadPromise = null;
+let leaderboardChangeToken = 0;
+let lastLeaderboardFetchToken = -1;
+let lastLeaderboardFetchTime = 0;
+
+function markLeaderboardDirty() {
+    leaderboardChangeToken += 1;
+}
+
 function saveLocalLeaderboard(currentData) {
     const sanitizedEntry = sanitizeLeaderboardEntry({
         publicKey: walletPublicKey,
@@ -3379,7 +3392,10 @@ function saveLocalLeaderboard(currentData) {
         return;
     }
 
-    const leaderboard = readLeaderboardSafely().filter(entry => entry.publicKey !== sanitizedEntry.publicKey);
+    const currentLeaderboard = readLeaderboardSafely();
+    const previousTopEntries = JSON.stringify(currentLeaderboard.slice(0, 10));
+
+    const leaderboard = currentLeaderboard.filter(entry => entry.publicKey !== sanitizedEntry.publicKey);
 
     leaderboard.push(sanitizedEntry);
     leaderboard.sort((a, b) => {
@@ -3388,7 +3404,16 @@ function saveLocalLeaderboard(currentData) {
     });
 
     const trimmedLeaderboard = leaderboard.slice(0, 10);
-    writeLeaderboardSafely(trimmedLeaderboard);
+    const nextTopEntries = JSON.stringify(trimmedLeaderboard);
+
+    const leaderboardChanged = previousTopEntries !== nextTopEntries;
+
+    if (leaderboardChanged) {
+        const saved = writeLeaderboardSafely(trimmedLeaderboard);
+        if (saved) {
+            markLeaderboardDirty();
+        }
+    }
 
     if (typeof window !== 'undefined' && window.LeaderboardAPI?.postEntry) {
         window.LeaderboardAPI.postEntry(sanitizedEntry).catch((error) => {
@@ -3397,127 +3422,140 @@ function saveLocalLeaderboard(currentData) {
     }
 }
 
-async function loadAndDisplayLeaderboard() {
+async function loadAndDisplayLeaderboard({ force = false } = {}) {
     if (!leaderboardEl) return;
+
+    const now = Date.now();
+    const hasScoreChanges = leaderboardChangeToken !== lastLeaderboardFetchToken;
+    const cooldownElapsed = now - lastLeaderboardFetchTime >= LEADERBOARD_FETCH_COOLDOWN_MS;
+
+    if (!hasScoreChanges && !force) {
+        return leaderboardLoadPromise || Promise.resolve();
+    }
+
+    if (!hasScoreChanges && force && !cooldownElapsed) {
+        return leaderboardLoadPromise || Promise.resolve();
+    }
+
+    if (leaderboardLoadPromise) {
+        return leaderboardLoadPromise;
+    }
 
     leaderboardEl.innerHTML = '';
     const loadingMessage = document.createElement('p');
     loadingMessage.textContent = 'Loading leaderboard...';
     leaderboardEl.appendChild(loadingMessage);
 
-    try {
-        const entryMap = new Map();
+    const tokenAtStart = leaderboardChangeToken;
 
-        const registerEntry = (entry) => {
-            const sanitized = sanitizeLeaderboardEntry(entry);
-            if (!sanitized) {
+    leaderboardLoadPromise = (async () => {
+        try {
+            const entryMap = new Map();
+
+            const registerEntry = (entry) => {
+                const sanitized = sanitizeLeaderboardEntry(entry);
+                if (!sanitized) {
+                    return;
+                }
+
+                const hasStableKey = sanitized.publicKey && sanitized.publicKey !== 'Unknown Player';
+                const key = hasStableKey
+                    ? sanitized.publicKey
+                    : `${sanitized.publicKey}-${sanitized.bestScore}-${sanitized.level}`;
+
+                const existing = entryMap.get(key);
+                if (!existing
+                    || sanitized.bestScore > existing.bestScore
+                    || (sanitized.bestScore === existing.bestScore && sanitized.level > existing.level)) {
+                    entryMap.set(key, sanitized);
+                }
+            };
+
+            readLeaderboardSafely().forEach(registerEntry);
+
+            if (typeof window !== 'undefined' && window.LeaderboardAPI?.flushQueue) {
+                try {
+                    await window.LeaderboardAPI.flushQueue();
+                } catch (error) {
+                    console.warn('Failed to flush queued leaderboard entries:', error);
+                }
+            }
+
+            if (typeof window !== 'undefined' && window.LeaderboardAPI?.fetchTopEntries) {
+                try {
+                    const remoteEntries = await window.LeaderboardAPI.fetchTopEntries();
+                    remoteEntries.forEach(registerEntry);
+                } catch (error) {
+                    console.warn('Failed to load remote leaderboard entries:', error);
+                }
+            }
+
+            const leaderboard = Array.from(entryMap.values());
+            leaderboard.sort((a, b) => {
+                if (b.level !== a.level) { return b.level - a.level; }
+                return b.bestScore - a.bestScore;
+            });
+
+            leaderboardEl.innerHTML = '';
+
+            if (!leaderboard.length) {
+                const emptyMessage = document.createElement('p');
+                emptyMessage.textContent = 'No leaderboard data yet.';
+                leaderboardEl.appendChild(emptyMessage);
                 return;
             }
 
-            const hasStableKey = sanitized.publicKey && sanitized.publicKey !== 'Unknown Player';
-            const key = hasStableKey
-                ? sanitized.publicKey
-                : `${sanitized.publicKey}-${sanitized.bestScore}-${sanitized.level}`;
+            const headerEl = document.createElement('div');
+            headerEl.className = 'leaderboard-header';
+            headerEl.innerHTML = `
+                <span class="leaderboard-rank">Rank</span>
+                <span class="leaderboard-wallet">Wallet</span>
+                <span class="leaderboard-level">Level</span>
+                <span class="leaderboard-score">Best Score</span>
+            `;
+            leaderboardEl.appendChild(headerEl);
 
-            const existing = entryMap.get(key);
-            if (!existing
-                || sanitized.bestScore > existing.bestScore
-                || (sanitized.bestScore === existing.bestScore && sanitized.level > existing.level)) {
-                entryMap.set(key, sanitized);
-            }
-        };
+            const listEl = document.createElement('ol');
+            listEl.className = 'leaderboard-list';
 
-        readLeaderboardSafely().forEach(registerEntry);
+            const fragment = document.createDocumentFragment();
 
-        if (typeof window !== 'undefined' && window.LeaderboardAPI?.flushQueue) {
-            try {
-                await window.LeaderboardAPI.flushQueue();
-            } catch (error) {
-                console.warn('Failed to flush queued leaderboard entries:', error);
-            }
+            leaderboard.slice(0, 10).forEach((entry, index) => {
+                const rowEl = document.createElement('li');
+                rowEl.className = 'leaderboard-row';
+
+                const publicKey = entry.publicKey || 'Unknown Player';
+                const snippet = publicKey.length > 10
+                    ? `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`
+                    : publicKey;
+
+                rowEl.innerHTML = `
+                    <span class="leaderboard-rank">#${index + 1}</span>
+                    <span class="leaderboard-wallet">${snippet}</span>
+                    <span class="leaderboard-level">Lv.${entry.level}</span>
+                    <span class="leaderboard-score">${entry.bestScore}</span>
+                `;
+
+                fragment.appendChild(rowEl);
+            });
+
+            listEl.appendChild(fragment);
+            leaderboardEl.appendChild(listEl);
+
+            lastLeaderboardFetchToken = tokenAtStart;
+            lastLeaderboardFetchTime = Date.now();
+        } catch (error) {
+            console.error('Failed to render leaderboard:', error);
+            leaderboardEl.innerHTML = '';
+            const errorMessage = document.createElement('p');
+            errorMessage.textContent = 'Unable to load leaderboard right now.';
+            leaderboardEl.appendChild(errorMessage);
+        } finally {
+            leaderboardLoadPromise = null;
         }
+    })();
 
-        if (typeof window !== 'undefined' && window.LeaderboardAPI?.fetchTopEntries) {
-            try {
-                const remoteEntries = await window.LeaderboardAPI.fetchTopEntries();
-                remoteEntries.forEach(registerEntry);
-            } catch (error) {
-                console.warn('Failed to load remote leaderboard entries:', error);
-            }
-        }
-
-        const leaderboard = Array.from(entryMap.values());
-        leaderboard.sort((a, b) => {
-            if (b.level !== a.level) { return b.level - a.level; }
-            return b.bestScore - a.bestScore;
-        });
-
-        leaderboardEl.innerHTML = '';
-
-        if (!leaderboard.length) {
-            const emptyMessage = document.createElement('p');
-            emptyMessage.textContent = 'No leaderboard data yet.';
-            leaderboardEl.appendChild(emptyMessage);
-            return;
-        }
-
-        const headerEl = document.createElement('div');
-        headerEl.className = 'leaderboard-header';
-        headerEl.innerHTML = `
-            <span class="leaderboard-rank">Rank</span>
-            <span class="leaderboard-wallet">Wallet</span>
-            <span class="leaderboard-level">Level</span>
-            <span class="leaderboard-score">Best Score</span>
-        `;
-        leaderboardEl.appendChild(headerEl);
-
-        const listEl = document.createElement('ol');
-        listEl.className = 'leaderboard-list';
-
-        const fragment = document.createDocumentFragment();
-
-        leaderboard.slice(0, 10).forEach((entry, index) => {
-            const rowEl = document.createElement('li');
-            rowEl.className = 'leaderboard-row';
-
-            const rankEl = document.createElement('span');
-            rankEl.className = 'leaderboard-rank';
-            rankEl.textContent = `#${index + 1}`;
-
-            const publicKey = entry.publicKey || 'Unknown Player';
-            const snippet = publicKey.length > 10
-                ? `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`
-                : publicKey;
-
-            const walletEl = document.createElement('span');
-            walletEl.className = 'leaderboard-wallet';
-            walletEl.textContent = snippet;
-
-            const levelEl = document.createElement('span');
-            levelEl.className = 'leaderboard-level';
-            levelEl.textContent = `Lv.${entry.level}`;
-
-            const scoreEl = document.createElement('span');
-            scoreEl.className = 'leaderboard-score';
-            scoreEl.textContent = `${entry.bestScore}`;
-
-            rowEl.appendChild(rankEl);
-            rowEl.appendChild(walletEl);
-            rowEl.appendChild(levelEl);
-            rowEl.appendChild(scoreEl);
-
-            fragment.appendChild(rowEl);
-        });
-
-        listEl.appendChild(fragment);
-        leaderboardEl.appendChild(listEl);
-    } catch (error) {
-        console.error('Failed to render leaderboard:', error);
-        leaderboardEl.innerHTML = '';
-        const errorMessage = document.createElement('p');
-        errorMessage.textContent = 'Unable to load leaderboard right now.';
-        leaderboardEl.appendChild(errorMessage);
-    }
+    return leaderboardLoadPromise;
 }
 
 function loadExternalScript(src) {
