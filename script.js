@@ -1672,8 +1672,36 @@ function fireShot(chargeLevel = 0) {
     emitParticles(player.x, player.y, isBeam ? 12 : 4, false, chargeLevel > 0);
 }
 
+function isElementVisible(element) {
+    if (!element) return false;
+    if (typeof window !== 'undefined' && typeof window.getComputedStyle === 'function') {
+        return window.getComputedStyle(element).display !== 'none';
+    }
+    return element.style ? element.style.display !== 'none' : false;
+}
+
 function handleKeyDown(event) {
     const { code } = event;
+
+    if (code === 'Escape') {
+        const overlayHandlers = [
+            { element: profileModalEl, handler: hideProfileModal },
+            { element: shopEl, handler: skipShop },
+            { element: hubEl, handler: showStartMenu },
+            { element: startMenuEl, handler: hideAllOverlays }
+        ];
+
+        for (const { element, handler } of overlayHandlers) {
+            if (isElementVisible(element)) {
+                event.preventDefault();
+                handler();
+                return;
+            }
+        }
+
+        return;
+    }
+
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(code)) {
         event.preventDefault();
     }
@@ -3338,7 +3366,6 @@ async function connectWallet() {
 
         if (walletStatusEl) walletStatusEl.textContent = `Connected: ${walletPublicKey.slice(0, 8)}...`;
         if (connectBtn) connectBtn.textContent = 'Disconnect';
-        if (connectBtn) connectBtn.onclick = disconnectWallet;
 
         if (typeof solanaWeb3 === 'undefined' || typeof Metaplex === 'undefined') {
             console.error('Solana Web3 libraries failed to load.');
@@ -3375,7 +3402,6 @@ async function disconnectWallet() {
     if (walletStatusEl) walletStatusEl.textContent = 'Not Connected';
     if (nftStatusEl) nftStatusEl.textContent = 'Not Detected';
     if (connectBtn) connectBtn.textContent = 'Connect Phantom Wallet';
-    if (connectBtn) connectBtn.onclick = connectWallet;
 
     playerData = createBasePlayerData();
     initializeSpriteSystem();
