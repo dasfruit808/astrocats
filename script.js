@@ -3862,6 +3862,8 @@ function savePlayerData() {
                 updateGuestStatTooltip();
             }
             hideStorageWarning();
+            saveLocalLeaderboard(playerData);
+            loadAndDisplayLeaderboard();
         } catch (err) {
             guestStorageAvailable = false;
             console.error('Failed to save guest player data:', err);
