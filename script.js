@@ -54,6 +54,7 @@ const joystick = document.getElementById('joystick');
 const knob = document.getElementById('knob');
 const startMenuEl = document.getElementById('start-menu');
 const hubEl = document.getElementById('hub');
+const storageWarningEl = document.getElementById('storage-warning');
 const shopEl = document.getElementById('shop');
 const shopCreditsEl = document.getElementById('shop-credits');
 const shopOptionsEl = document.getElementById('shop-options');
@@ -2723,10 +2724,61 @@ function showAnnounce(el, text) {
 
 // --- LEADERBOARD & STORAGE ---
 
-function saveLocalLeaderboard(currentData) {
-    let leaderboard = JSON.parse(localStorage.getItem('astro_invaders_leaderboard') || '[]');
+const LEADERBOARD_STORAGE_KEY = 'astro_invaders_leaderboard';
+const STORAGE_WARNING_MESSAGE = 'Progress may not be saved: storage unavailable.';
 
-    leaderboard = leaderboard.filter(entry => entry.publicKey !== walletPublicKey);
+function showStorageWarning(message = STORAGE_WARNING_MESSAGE) {
+    if (!storageWarningEl) return;
+    storageWarningEl.textContent = message;
+    storageWarningEl.hidden = false;
+}
+
+function hideStorageWarning() {
+    if (!storageWarningEl) return;
+    storageWarningEl.hidden = true;
+}
+
+function readLeaderboardSafely() {
+    if (typeof localStorage === 'undefined') {
+        console.warn('Local storage is not available; leaderboard cannot be loaded.');
+        showStorageWarning();
+        return [];
+    }
+
+    try {
+        const raw = localStorage.getItem(LEADERBOARD_STORAGE_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? [...parsed] : [];
+    } catch (error) {
+        console.warn('Failed to read leaderboard from local storage.', error);
+        if (error && (error.name === 'SecurityError' || error.name === 'QuotaExceededError')) {
+            showStorageWarning();
+        }
+        return [];
+    }
+}
+
+function writeLeaderboardSafely(entries) {
+    if (typeof localStorage === 'undefined') {
+        console.warn('Local storage is not available; leaderboard cannot be saved.');
+        showStorageWarning();
+        return false;
+    }
+
+    try {
+        localStorage.setItem(LEADERBOARD_STORAGE_KEY, JSON.stringify(entries));
+        hideStorageWarning();
+        return true;
+    } catch (error) {
+        console.warn('Failed to write leaderboard to local storage.', error);
+        showStorageWarning();
+        return false;
+    }
+}
+
+function saveLocalLeaderboard(currentData) {
+    const leaderboard = readLeaderboardSafely().filter(entry => entry.publicKey !== walletPublicKey);
 
     const newEntry = {
         publicKey: walletPublicKey,
@@ -2741,57 +2793,14 @@ function saveLocalLeaderboard(currentData) {
         return b.bestScore - a.bestScore;
     });
 
-    leaderboard = leaderboard.slice(0, 10);
-    localStorage.setItem('astro_invaders_leaderboard', JSON.stringify(leaderboard));
-
-    if (window.LeaderboardAPI && typeof window.LeaderboardAPI.postEntry === 'function') {
-        window.LeaderboardAPI.postEntry(newEntry);
-    }
+    const trimmedLeaderboard = leaderboard.slice(0, 10);
+    writeLeaderboardSafely(trimmedLeaderboard);
 }
 
 async function loadAndDisplayLeaderboard() {
     if (!leaderboardEl) return;
 
-    leaderboardEl.innerHTML = '';
-
-    const loadingMessage = document.createElement('p');
-    loadingMessage.textContent = 'Loading leaderboard...';
-    leaderboardEl.appendChild(loadingMessage);
-
-    let leaderboard = [];
-    let remoteLoaded = false;
-
-    if (window.LeaderboardAPI && typeof window.LeaderboardAPI.fetchTopEntries === 'function') {
-        try {
-            if (typeof window.LeaderboardAPI.flushQueue === 'function') {
-                await window.LeaderboardAPI.flushQueue();
-            }
-
-            const remote = await window.LeaderboardAPI.fetchTopEntries();
-            if (Array.isArray(remote) && remote.length) {
-                leaderboard = [...remote];
-                remoteLoaded = true;
-            }
-        } catch (error) {
-            console.warn('Remote leaderboard unavailable, falling back to local cache:', error);
-        }
-    }
-
-    if (!remoteLoaded) {
-        try {
-            const stored = JSON.parse(localStorage.getItem('astro_invaders_leaderboard') || '[]');
-            leaderboard = Array.isArray(stored) ? [...stored] : [];
-        } catch (error) {
-            console.error('Failed to load local leaderboard data:', error);
-            leaderboard = [];
-        }
-    } else {
-        try {
-            localStorage.setItem('astro_invaders_leaderboard', JSON.stringify(leaderboard));
-        } catch (error) {
-            console.warn('Unable to cache remote leaderboard locally:', error);
-        }
-    }
+    const leaderboard = readLeaderboardSafely();
 
     leaderboardEl.innerHTML = '';
 
