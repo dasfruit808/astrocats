@@ -308,6 +308,8 @@ function findFirstContentControl(container) {
 const PLAYER_BASE_SIZE = 96;
 const PLAYER_MIN_SIZE = 64;
 const PLAYER_MAX_SIZE = 132;
+const PLAYFIELD_PADDING_X = 20;
+const PLAYFIELD_PADDING_Y = 36;
 const ENEMY_BASE_SIZE = 88;
 const ENEMY_MIN_SIZE = 56;
 const ENEMY_MAX_SIZE = 128;
@@ -356,6 +358,24 @@ function computeSpriteDimensions(img, baseSize, minSize, maxSize) {
     }
 
     return { width, height };
+}
+
+function clampWithinPadding(position, size, maxSize, padding) {
+    const safePadding = Math.max(0, padding);
+    const min = safePadding;
+    const max = maxSize - size - safePadding;
+
+    if (max <= min) {
+        const fallbackMax = Math.max(0, maxSize - size);
+        return Math.max(0, Math.min(fallbackMax, position));
+    }
+
+    return Math.max(min, Math.min(max, position));
+}
+
+function clampPlayerToPlayfield() {
+    player.x = clampWithinPadding(player.x, player.width, gameCanvas.width, PLAYFIELD_PADDING_X);
+    player.y = clampWithinPadding(player.y, player.height, gameCanvas.height, PLAYFIELD_PADDING_Y);
 }
 
 function whenImageReady(image, callback) {
@@ -423,8 +443,8 @@ function updatePlayerSpriteMetrics(img) {
     const centerY = player.y + player.height / 2;
     player.width = dims.width;
     player.height = dims.height;
-    player.x = Math.max(0, Math.min(centerX - player.width / 2, gameCanvas.width - player.width));
-    player.y = Math.max(0, Math.min(centerY - player.height / 2, gameCanvas.height - player.height));
+    player.x = clampWithinPadding(centerX - player.width / 2, player.width, gameCanvas.width, PLAYFIELD_PADDING_X);
+    player.y = clampWithinPadding(centerY - player.height / 2, player.height, gameCanvas.height, PLAYFIELD_PADDING_Y);
 }
 
 function updateEnemySpriteMetrics(img, applyToExisting = false) {
@@ -438,7 +458,7 @@ function updateEnemySpriteMetrics(img, applyToExisting = false) {
             enemy.width = dims.width;
             enemy.height = dims.height;
             enemy.x = Math.max(0, Math.min(centerX - enemy.width / 2, gameCanvas.width - enemy.width));
-            enemy.y = Math.max(0, Math.min(centerY - enemy.height / 2, gameCanvas.height - enemy.height));
+            enemy.y = clampWithinPadding(centerY - enemy.height / 2, enemy.height, gameCanvas.height, PLAYFIELD_PADDING_Y);
         });
     }
 }
@@ -527,6 +547,8 @@ let rapidFire = false; let shieldActive = false; let spreadActive = false;
 let homingActive = false; let pierceActive = false; let ultraDashActive = false;
 let enemySpawnTimer = 0;
 let bossActive = false; let boss = null; let dashActive = false; let dashDirection = null;
+let dashEndTime = 0; let dashDurationMs = 0; let dashVector = { x: 1, y: 0 };
+let lastMovementInput = { x: 1, y: 0 };
 let flightTimeSeconds = 0;
 let difficultyFactor = 1;
 
@@ -1533,6 +1555,10 @@ function initializeSpriteSystem() {
 let currentShopOptions = [];
 
 const DASH_WINDOW = 300; const DASH_DURATION = 500;
+const DASH_SPEED_MULTIPLIER = 2.6;
+const DASH_CONTROL_BLEND = 0.6;
+const DASH_EASING_POWER = 0.5;
+const DASH_ACCELERATION_MULTIPLIER = 2.2;
 
 const player = {
     x: Math.round(BASE_CANVAS_WIDTH * 0.08),
@@ -1567,6 +1593,7 @@ const player = {
 };
 
 applyStatEffects();
+clampPlayerToPlayfield();
 
 function prepareProjectile(proj) {
     if (!proj || typeof proj !== 'object') return;
@@ -1688,6 +1715,9 @@ function resetKeyState() {
     isCharging = false;
     chargeStartTime = 0;
     dashDirection = null;
+    dashActive = false;
+    dashEndTime = 0;
+    dashDurationMs = 0;
 }
 
 function findNearestEnemy() {
@@ -1740,10 +1770,19 @@ function triggerDash(directionKey) {
     dashActive = true;
     dashCooldown = now + finalCooldown;
     dashDirection = directionKey;
-    setTimeout(() => {
-        dashActive = false;
-        dashDirection = null;
-    }, Math.max(150, Math.min(DASH_DURATION, finalCooldown / 3)));
+
+    const keyVector = DASH_VECTORS[directionKey];
+    let vector = keyVector || lastMovementInput;
+    const magnitude = Math.hypot(vector?.x || 0, vector?.y || 0);
+    if (!vector || magnitude === 0) {
+        vector = lastMovementInput.x !== 0 || lastMovementInput.y !== 0 ? lastMovementInput : { x: 1, y: 0 };
+    }
+    const normalizedMag = Math.hypot(vector.x, vector.y) || 1;
+    dashVector = { x: vector.x / normalizedMag, y: vector.y / normalizedMag };
+    lastMovementInput = { ...dashVector };
+
+    dashDurationMs = Math.max(150, Math.min(DASH_DURATION, finalCooldown / 3));
+    dashEndTime = now + dashDurationMs;
 
     emitParticles(player.x, player.y, 6, true);
 }
@@ -2287,6 +2326,7 @@ function startGame(isNewSession = true) {
 
     player.x = Math.round(BASE_CANVAS_WIDTH * 0.08);
     player.y = gameCanvas.height / 2 - player.height / 2;
+    clampPlayerToPlayfield();
 
     if (typeof playerData.credits === 'number') {
         credits = playerData.credits;
@@ -3650,7 +3690,7 @@ function updateEnemies() {
             enemy.divePhase = (enemy.divePhase || 0) + deltaTime * 3;
             enemy.y += Math.sin(enemy.divePhase) * enemy.diveStrength * deltaTime;
         }
-        enemy.y = Math.max(0, Math.min(gameCanvas.height - enemy.height, enemy.y));
+        enemy.y = clampWithinPadding(enemy.y, enemy.height, gameCanvas.height, PLAYFIELD_PADDING_Y);
         if (enemy.x < -enemy.width) { enemies.splice(i, 1); continue; }
 
         let tailHit = false;
@@ -3789,6 +3829,13 @@ function updateEnemies() {
 function updatePlayer() {
     if (gamePaused || hitStopDuration > 0) return;
 
+    const now = Date.now();
+    if (dashActive && now >= dashEndTime) {
+        dashActive = false;
+        dashDirection = null;
+        dashDurationMs = 0;
+    }
+
     let inputX = 0;
     let inputY = 0;
 
@@ -3814,21 +3861,29 @@ function updatePlayer() {
         inputY /= magnitude;
     }
 
-    const dashMultiplier = dashActive ? 3 : 1;
-    if (dashActive && dashDirection && Math.abs(inputX) < 0.01 && Math.abs(inputY) < 0.01) {
-        const vector = DASH_VECTORS[dashDirection];
-        if (vector) {
-            inputX = vector.x;
-            inputY = vector.y;
-        }
+    if (magnitude > 0.01) {
+        lastMovementInput = { x: inputX, y: inputY };
+    }
+
+    if (dashActive && Math.abs(inputX) < 0.01 && Math.abs(inputY) < 0.01) {
+        inputX = dashVector.x;
+        inputY = dashVector.y;
     }
     const playerSpeed = getCurrentPlayerSpeed();
-    const targetDX = inputX * playerSpeed * dashMultiplier;
-    const targetDY = inputY * playerSpeed * dashMultiplier;
+    const targetDX = inputX * playerSpeed;
+    const targetDY = inputY * playerSpeed;
 
     if (dashActive) {
-        player.dx = targetDX;
-        player.dy = targetDY;
+        const dashTimeRemaining = Math.max(0, dashEndTime - now);
+        const dashRatio = dashDurationMs > 0 ? Math.max(0, Math.min(1, dashTimeRemaining / dashDurationMs)) : 0;
+        const dashSpeedScale = 1 + (DASH_SPEED_MULTIPLIER - 1) * Math.pow(dashRatio, DASH_EASING_POWER);
+        const dashDX = dashVector.x * playerSpeed * dashSpeedScale;
+        const dashDY = dashVector.y * playerSpeed * dashSpeedScale;
+        const blendedDX = dashDX * (1 - DASH_CONTROL_BLEND) + targetDX * DASH_CONTROL_BLEND;
+        const blendedDY = dashDY * (1 - DASH_CONTROL_BLEND) + targetDY * DASH_CONTROL_BLEND;
+        const accelFactor = Math.min(1, deltaMultiplier * ((PLAYER_ACCELERATION * DASH_ACCELERATION_MULTIPLIER) / TARGET_FPS));
+        player.dx += (blendedDX - player.dx) * accelFactor;
+        player.dy += (blendedDY - player.dy) * accelFactor;
     } else {
         const accelFactor = Math.min(1, deltaMultiplier * (PLAYER_ACCELERATION / TARGET_FPS));
         player.dx += (targetDX - player.dx) * accelFactor;
@@ -3845,8 +3900,7 @@ function updatePlayer() {
 
     player.x += player.dx * deltaMultiplier;
     player.y += player.dy * deltaMultiplier;
-    player.x = Math.max(0, Math.min(gameCanvas.width - player.width, player.x));
-    player.y = Math.max(0, Math.min(gameCanvas.height - player.height, player.y));
+    clampPlayerToPlayfield();
 
     if ((Math.abs(player.dx) > 0.01 || Math.abs(player.dy) > 0.01) && gameRunning) {
         emitParticles(player.x, player.y, 2, dashActive);
@@ -3901,11 +3955,14 @@ function spawnEnemy() {
         enemySpawnTimer = 0;
         const template = buildEnemyTemplate();
 
-        const verticalPadding = Math.max(40, enemySpriteDimensions.height * 0.5);
-        const minY = Math.max(0, verticalPadding * 0.5);
-        const maxY = Math.max(minY, gameCanvas.height - enemySpriteDimensions.height - verticalPadding * 0.5);
+        let minY = PLAYFIELD_PADDING_Y;
+        let maxY = gameCanvas.height - enemySpriteDimensions.height - PLAYFIELD_PADDING_Y;
+        if (maxY <= minY) {
+            minY = 0;
+            maxY = Math.max(0, gameCanvas.height - enemySpriteDimensions.height);
+        }
         const spawnRange = Math.max(0, maxY - minY);
-        const spawnY = minY + (spawnRange > 0 ? Math.random() * spawnRange : 0);
+        const spawnY = spawnRange > 0 ? minY + Math.random() * spawnRange : minY;
 
         enemies.push({
             x: gameCanvas.width,
@@ -3940,7 +3997,7 @@ function updateBossAI(now, deltaStep) {
     const moveY = typeof boss.dy === 'number' ? boss.dy : 0;
     boss.x += moveX * (deltaStep || 1);
     boss.y += moveY * (deltaStep || 1);
-    boss.y = Math.max(0, Math.min(gameCanvas.height - boss.height, boss.y));
+    boss.y = clampWithinPadding(boss.y, boss.height, gameCanvas.height, PLAYFIELD_PADDING_Y);
 }
 
 // --- RENDERING & WEBGL FUNCTIONS ---
