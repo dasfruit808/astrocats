@@ -581,7 +581,8 @@ let focusResumeHandled = false;
 let focusPausePreviousStatus = DEFAULT_STATUS_VALUE_TEXT;
 let focusPausePreviousTip = DEFAULT_STATUS_TIP_TEXT;
 const focusResumeEffects = [];
-let score = 0; let credits = 0; let level = 1; let lives = 3; let pendingLifeDamage = 0;
+const MAX_LIVES = 3;
+let score = 0; let credits = 0; let level = 1; let lives = MAX_LIVES; let pendingLifeDamage = 0;
 let playerImg = null; let enemyImg = null; let assetsLoaded = false;
 const projectileImageCache = {};
 const powerupImageCache = {};
@@ -632,15 +633,15 @@ const starField = Array.from({ length: STAR_COUNT }, () => ({
 }));
 
 // LEVELING CONSTANTS
-const BASE_XP_TO_LEVEL = 100;
-const XP_MULTIPLIER = 1.15;
+const BASE_XP_TO_LEVEL = 150;
+const XP_MULTIPLIER = 1.2;
 const MAX_PLAYER_LEVEL = 50;
 
 const XP_CURVE_SEGMENTS = [
-    { minLevel: 1, maxLevel: 10, base: BASE_XP_TO_LEVEL, growth: 1.2, bonus: 0 },
-    { minLevel: 11, maxLevel: 25, base: BASE_XP_TO_LEVEL * 5, growth: 1.18, bonus: 250 },
-    { minLevel: 26, maxLevel: 40, base: BASE_XP_TO_LEVEL * 11, growth: 1.22, bonus: 750 },
-    { minLevel: 41, maxLevel: MAX_PLAYER_LEVEL, base: BASE_XP_TO_LEVEL * 18, growth: 1.3, bonus: 1500 }
+    { minLevel: 1, maxLevel: 10, base: BASE_XP_TO_LEVEL, growth: 1.3, bonus: 0 },
+    { minLevel: 11, maxLevel: 25, base: BASE_XP_TO_LEVEL * 6, growth: 1.25, bonus: 400 },
+    { minLevel: 26, maxLevel: 40, base: BASE_XP_TO_LEVEL * 13, growth: 1.3, bonus: 1000 },
+    { minLevel: 41, maxLevel: MAX_PLAYER_LEVEL, base: BASE_XP_TO_LEVEL * 20, growth: 1.38, bonus: 2000 }
 ];
 
 const LEVEL_BASELINE_STATS = { strength: 3, speed: 2, vitality: 3, focus: 1 };
@@ -2494,7 +2495,7 @@ function startGame(isNewSession = true) {
     boss = null;
     dashActive = false;
 
-    lives = 3;
+    lives = MAX_LIVES;
     score = 0;
     level = 1;
     pendingLifeDamage = 0;
@@ -2851,37 +2852,39 @@ function applyPowerup(type) {
 
     switch (type) {
         case 'speed':
-            registerSpeedModifier(1.5, 5000, 'powerup_speed');
+            registerSpeedModifier(1.35, 4000, 'powerup_speed');
             break;
         case 'rapid':
             rapidFire = true;
-            timeoutHandle = setTimeout(() => { rapidFire = false; }, 10000);
+            timeoutHandle = setTimeout(() => { rapidFire = false; }, 7000);
             break;
         case 'shield':
-            const shieldDuration = 5000 + (player.vitalityRating * 1000) + (player.specialPerks?.shieldDurationBonus || 0);
+            const shieldDuration = 4000 + (player.vitalityRating * 800) + (player.specialPerks?.shieldDurationBonus || 0);
             shieldActive = true;
             timeoutHandle = setTimeout(() => { shieldActive = false; }, shieldDuration);
             break;
         case 'life':
-            lives++;
-            uiCache.lives = null;
-            if (livesEl) livesEl.textContent = `Lives: ${lives}`;
+            if (lives < MAX_LIVES) {
+                lives = Math.min(MAX_LIVES, lives + 1);
+                uiCache.lives = null;
+                if (livesEl) livesEl.textContent = `Lives: ${lives}`;
+            }
             break;
         case 'spread':
             spreadActive = true;
-            timeoutHandle = setTimeout(() => { spreadActive = false; }, 8000);
+            timeoutHandle = setTimeout(() => { spreadActive = false; }, 6000);
             break;
         case 'homing':
             homingActive = true;
-            timeoutHandle = setTimeout(() => { homingActive = false; }, 6000);
+            timeoutHandle = setTimeout(() => { homingActive = false; }, 4500);
             break;
         case 'pierce':
             pierceActive = true;
-            timeoutHandle = setTimeout(() => { pierceActive = false; }, 10000);
+            timeoutHandle = setTimeout(() => { pierceActive = false; }, 7000);
             break;
         case 'ultra_dash':
             ultraDashActive = true;
-            timeoutHandle = setTimeout(() => { ultraDashActive = false; }, 30000);
+            timeoutHandle = setTimeout(() => { ultraDashActive = false; }, 20000);
             break;
     }
 
@@ -4269,7 +4272,10 @@ function updateEnemies() {
                     uiCache.score = null;
 
                     // XP GAIN
-                    const xpReward = 5 + level * 2 + (enemy.variant === 'boss' ? 50 : 0);
+                    const baseXP = 3 + level * 1.5;
+                    const difficultyBonus = Math.max(1, Math.floor(difficultyFactor));
+                    const bossBonus = enemy.variant === 'boss' ? 40 : 0;
+                    const xpReward = Math.round(baseXP + difficultyBonus + bossBonus);
                     gainXP(xpReward, { source: enemy.variant === 'boss' ? 'boss' : 'combat', difficulty: difficultyFactor });
                     
                     const killTime = Date.now();
