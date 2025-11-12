@@ -79,6 +79,7 @@ const statLevelHubEl = document.getElementById('stat-level-hub');
 const statLevelOverlayEl = document.getElementById('stat-level-overlay');
 const statPointsEl = document.getElementById('stat-points');
 const statOptionsEl = document.getElementById('stat-options');
+const openStatAllocationBtn = document.getElementById('open-stat-allocation');
 const statusClockEl = document.getElementById('status-clock');
 const openProfileBtn = document.getElementById('open-profile-modal');
 const profileModalEl = document.getElementById('profile-modal');
@@ -167,6 +168,7 @@ function initializeUIEvents() {
     bindButtonClick(taskbarOpenHubBtn, showHub);
     bindButtonClick(taskbarOpenShopBtn, openShop);
 
+    bindButtonClick(openStatAllocationBtn, showStatAllocation);
     bindButtonClick(statCloseBtn, showHub);
     bindButtonClick(statReturnHubBtn, showHub);
 }
@@ -1905,6 +1907,16 @@ function handleKeyDown(event) {
         return;
     }
 
+    if (code === 'KeyK') {
+        event.preventDefault();
+        if (isElementVisible(statAllocationEl)) {
+            showHub();
+        } else if (walletPublicKey && (isElementVisible(hubEl) || !gameRunning)) {
+            showStatAllocation();
+        }
+        return;
+    }
+
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(code)) {
         event.preventDefault();
     }
@@ -2133,6 +2145,17 @@ function updateHubUI() {
     if (pilotTitleStatEl) pilotTitleStatEl.textContent = titleText;
     if (pilotNameStatsPanelEl) pilotNameStatsPanelEl.textContent = nameText;
     if (pilotTitleStatsPanelEl) pilotTitleStatsPanelEl.textContent = titleText;
+
+    if (openStatAllocationBtn) {
+        const numericPoints = Number(playerData.specializationPoints);
+        const pointsAvailable = Number.isFinite(numericPoints) ? Math.max(0, numericPoints) : 0;
+        const label = pointsAvailable > 0
+            ? `Allocate Stat Points (${pointsAvailable})`
+            : 'View Specialization Tree';
+        openStatAllocationBtn.textContent = label;
+        openStatAllocationBtn.classList.toggle('stat-button-ready', pointsAvailable > 0);
+        openStatAllocationBtn.disabled = !walletPublicKey;
+    }
 
     if (!walletPublicKey) return;
     if (walletAddressEl) walletAddressEl.textContent = walletPublicKey.slice(0, 8) + '...';
@@ -4243,6 +4266,7 @@ window.purchaseUpgrade = purchaseUpgrade;
 window.purchaseSprite = purchaseSprite;
 window.claimQuestReward = claimQuestReward;
 window.hideAllOverlays = hideAllOverlays;
+window.showStatAllocation = showStatAllocation;
 
 // --- CRITICAL FIX: Ensure Initialization Runs After DOM Load ---
 window.addEventListener('keydown', handleKeyDown);

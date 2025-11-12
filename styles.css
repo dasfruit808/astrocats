@@ -458,6 +458,28 @@ button:disabled {
     gap: 10px;
 }
 
+#open-stat-allocation.stat-button-ready {
+    background: linear-gradient(180deg, #fff3c1 0%, #f5d57d 100%);
+    border-color: #cfa340;
+    color: #4b3200;
+    box-shadow: 0 0 0 2px rgba(255, 222, 135, 0.55), inset 1px 1px 0 rgba(255, 255, 255, 0.85), inset -1px -1px 0 rgba(87, 58, 0, 0.35);
+    animation: stat-button-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes stat-button-pulse {
+    0% {
+        transform: translateY(0);
+        box-shadow: 0 0 0 0 rgba(255, 222, 135, 0.4), inset 1px 1px 0 rgba(255, 255, 255, 0.85), inset -1px -1px 0 rgba(87, 58, 0, 0.35);
+    }
+    50% {
+        box-shadow: 0 0 0 4px rgba(255, 222, 135, 0.2), inset 1px 1px 0 rgba(255, 255, 255, 0.85), inset -1px -1px 0 rgba(87, 58, 0, 0.35);
+    }
+    100% {
+        transform: translateY(-1px);
+        box-shadow: 0 0 0 2px rgba(255, 222, 135, 0.4), inset 1px 1px 0 rgba(255, 255, 255, 0.85), inset -1px -1px 0 rgba(87, 58, 0, 0.35);
+    }
+}
+
 .hub-controls button {
     flex: 1 1 auto;
     justify-self: stretch;
