@@ -40,8 +40,11 @@
                 <div>Use ← → ↑ ↓ (or WASD) to Move | Double-Tap to Dash (2s CD)</div>
                 <div>SPACE to Shoot (Hold for Charge)</div>
             </div>
-            <div class="joystick" id="joystick">
-                <div class="joystick-knob" id="knob"></div>
+            <div id="touch-controls" aria-hidden="true">
+                <div class="joystick" id="joystick">
+                    <div class="joystick-knob" id="knob"></div>
+                </div>
+                <button type="button" id="fire-button" class="touch-fire-button" aria-label="Fire">Fire</button>
             </div>
             <div id="start-menu" class="overlay">
                 <div class="menu-panel xp-window xp-modal">
