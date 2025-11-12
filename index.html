@@ -241,6 +241,20 @@
                     </div>
                 </div>
             </div>
+            <div id="focus-pause-overlay" class="overlay focus-pause-overlay" role="alertdialog" aria-modal="true" aria-labelledby="focus-pause-title">
+                <div class="menu-panel xp-window xp-modal">
+                    <div class="xp-titlebar">
+                        <div class="xp-title-group">
+                            <span class="xp-title-icon">⏸️</span>
+                            <span class="xp-app-name" id="focus-pause-title">Paused · Focus Lost</span>
+                        </div>
+                    </div>
+                    <div class="xp-window-content">
+                        <p id="focus-pause-message">The game paused because the window lost focus. Resume when you're ready.</p>
+                        <button id="focus-pause-resume" type="button">Resume Game</button>
+                    </div>
+                </div>
+            </div>
             <div id="wave-announce" class="announce">Wave Starting...</div>
             <div id="boss-announce" class="announce">Boss Incoming!</div>
         </div>

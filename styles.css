@@ -319,6 +319,25 @@ button:disabled {
     overflow-y: auto;
 }
 
+.focus-pause-overlay {
+    align-items: center;
+}
+
+.focus-pause-overlay .xp-window-content {
+    align-items: center;
+    text-align: center;
+}
+
+#focus-pause-message {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+.focus-pause-overlay .xp-window-content button {
+    min-width: 180px;
+}
+
 .xp-window-content h2 {
     margin: 0;
     font-size: 20px;

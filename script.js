@@ -117,6 +117,14 @@ const taskbarOpenHubBtn = document.getElementById('taskbar-open-hub');
 const taskbarOpenShopBtn = document.getElementById('taskbar-open-shop');
 const statCloseBtn = document.getElementById('stat-close');
 const statReturnHubBtn = document.getElementById('stat-return-hub');
+const focusPauseOverlayEl = document.getElementById('focus-pause-overlay');
+const focusPauseTitleEl = document.getElementById('focus-pause-title');
+const focusPauseMessageEl = document.getElementById('focus-pause-message');
+const focusPauseResumeBtn = document.getElementById('focus-pause-resume');
+const statusValueEl = document.querySelector('.xp-status-value');
+const statusTipEl = document.querySelector('.xp-status-tip');
+const DEFAULT_STATUS_VALUE_TEXT = statusValueEl ? statusValueEl.textContent : '';
+const DEFAULT_STATUS_TIP_TEXT = statusTipEl ? statusTipEl.textContent : '';
 
 const FOCUSABLE_SELECTOR = "a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type='hidden']), select:not([disabled]), [tabindex]:not([tabindex='-1'])";
 const focusTrapStates = new Map();
@@ -134,6 +142,7 @@ function bindButtonClick(element, handler, { preventDefault = true } = {}) {
 }
 
 function hideOverlaysAndResumeGame() {
+    resumeGameFromFocusLoss({ triggeredByUser: true });
     hideAllOverlays();
     if (gameRunning) {
         gamePaused = false;
@@ -172,6 +181,7 @@ function initializeUIEvents() {
     bindButtonClick(openStatAllocationBtn, showStatAllocation);
     bindButtonClick(statCloseBtn, showHub);
     bindButtonClick(statReturnHubBtn, showHub);
+    bindButtonClick(focusPauseResumeBtn, () => resumeGameFromFocusLoss({ triggeredByUser: true }));
 }
 
 function isFocusableElement(element) {
@@ -540,7 +550,17 @@ let playerData = createBasePlayerData();
 const ASTRO_CAT_COLLECTION_MINT = 'AstroCatMintAddress';
 
 // Game state & Constants
-let gameRunning = false; let gamePaused = true; 
+let gameRunning = false; let gamePaused = true;
+const FOCUS_LOSS_STATUS_TEXT = 'Paused · Window inactive';
+const FOCUS_LOSS_TIP_TEXT = 'Click Resume or refocus to continue the mission.';
+let focusPauseActive = false;
+let focusPauseShouldAutoResume = false;
+let focusPauseWasRunning = false;
+let focusPauseAllowResume = false;
+let focusResumeHandled = false;
+let focusPausePreviousStatus = DEFAULT_STATUS_VALUE_TEXT;
+let focusPausePreviousTip = DEFAULT_STATUS_TIP_TEXT;
+const focusResumeEffects = [];
 let score = 0; let credits = 0; let level = 1; let lives = 3; let pendingLifeDamage = 0;
 let playerImg = null; let enemyImg = null; let assetsLoaded = false;
 const projectileImageCache = {};
@@ -2190,12 +2210,28 @@ function updateHubUI() {
 // --------------------------------------------------------------------
 
 function hideAllOverlays() {
-    [startMenuEl, hubEl, shopEl, statAllocationEl, profileModalEl].forEach(el => {
-        if (el) {
-            el.style.display = 'none';
+    const focusOverlayWasVisible = !!(focusPauseOverlayEl && focusPauseOverlayEl.style.display !== 'none');
+    [startMenuEl, hubEl, shopEl, statAllocationEl, profileModalEl, focusPauseOverlayEl].forEach(el => {
+        if (!el) return;
+        el.style.display = 'none';
+        if (el === focusPauseOverlayEl) {
+            deactivateFocusTrap(el, { restoreFocus: false });
+        } else {
             deactivateFocusTrap(el);
         }
     });
+    if (focusOverlayWasVisible) {
+        focusPauseActive = false;
+        focusPauseShouldAutoResume = false;
+        focusPauseWasRunning = false;
+        focusPauseAllowResume = false;
+        focusResumeEffects.length = 0;
+        focusResumeHandled = false;
+        focusPausePreviousStatus = DEFAULT_STATUS_VALUE_TEXT;
+        focusPausePreviousTip = DEFAULT_STATUS_TIP_TEXT;
+        if (statusValueEl) statusValueEl.textContent = DEFAULT_STATUS_VALUE_TEXT;
+        if (statusTipEl) statusTipEl.textContent = DEFAULT_STATUS_TIP_TEXT;
+    }
     if (profileErrorEl) profileErrorEl.textContent = '';
 }
 
@@ -2215,6 +2251,129 @@ function showProfileModal() {
     profileModalEl.style.display = 'block';
     const firstFormControl = profileForm ? profileForm.querySelector("input, select, textarea, button, [tabindex]:not([tabindex='-1'])") : null;
     activateFocusTrap(profileModalEl, { initialFocus: firstFormControl });
+}
+
+// Queue callbacks (audio replays, particle effects, etc.) so that they execute
+// a single time when the game regains focus.
+function queueFocusResumeEffect(effect) {
+    if (typeof effect !== 'function') return;
+    if (!focusPauseActive || focusResumeHandled) {
+        try {
+            effect();
+        } catch (error) {
+            console.error('Failed to process immediate focus resume effect', error);
+        }
+        return;
+    }
+    focusResumeEffects.push(effect);
+}
+
+function runFocusResumeEffects() {
+    if (!focusResumeEffects.length) return;
+    const pending = focusResumeEffects.splice(0, focusResumeEffects.length);
+    pending.forEach(effect => {
+        try {
+            effect();
+        } catch (error) {
+            console.error('Failed to process focus resume effect', error);
+        }
+    });
+}
+
+function pauseGameForFocusLoss(reason = 'blur') {
+    if (!gameRunning && !focusPauseActive) return;
+
+    const wasRunning = gameRunning && !gamePaused;
+    if (!wasRunning && !focusPauseActive) return;
+
+    if (focusPauseActive) {
+        focusPauseShouldAutoResume = focusPauseShouldAutoResume || wasRunning;
+        return;
+    }
+
+    focusPauseActive = true;
+    focusPauseShouldAutoResume = wasRunning;
+    focusPauseWasRunning = wasRunning;
+    focusResumeHandled = false;
+    focusPauseAllowResume = false;
+    focusResumeEffects.length = 0;
+
+    focusPausePreviousStatus = statusValueEl ? statusValueEl.textContent : DEFAULT_STATUS_VALUE_TEXT;
+    focusPausePreviousTip = statusTipEl ? statusTipEl.textContent : DEFAULT_STATUS_TIP_TEXT;
+
+    if (wasRunning) {
+        gamePaused = true;
+    }
+
+    if (statusValueEl) statusValueEl.textContent = FOCUS_LOSS_STATUS_TEXT;
+    if (statusTipEl) statusTipEl.textContent = FOCUS_LOSS_TIP_TEXT;
+
+    if (focusPauseTitleEl) {
+        focusPauseTitleEl.textContent = reason === 'hidden' ? 'Paused · Tab Hidden' : 'Paused · Focus Lost';
+    }
+
+    if (focusPauseMessageEl) {
+        const message = reason === 'hidden'
+            ? 'The game paused because this tab is hidden or running in the background.'
+            : 'The game paused because the window lost focus.';
+        focusPauseMessageEl.textContent = `${message} Resume when you\'re ready.`;
+    }
+
+    if (focusPauseOverlayEl) {
+        focusPauseOverlayEl.style.display = 'flex';
+        const initialFocus = findFirstContentControl(focusPauseOverlayEl) || focusPauseOverlayEl;
+        activateFocusTrap(focusPauseOverlayEl, { initialFocus, fallbackToModal: true });
+    }
+
+    queueFocusResumeEffect(() => {
+        if (statusValueEl) statusValueEl.textContent = focusPausePreviousStatus || DEFAULT_STATUS_VALUE_TEXT;
+        if (statusTipEl) statusTipEl.textContent = focusPausePreviousTip || DEFAULT_STATUS_TIP_TEXT;
+    });
+
+    queueFocusResumeEffect(() => {
+        if (focusPauseOverlayEl) {
+            focusPauseOverlayEl.style.display = 'none';
+            deactivateFocusTrap(focusPauseOverlayEl, { restoreFocus: false });
+        }
+    });
+
+    queueFocusResumeEffect(() => {
+        if (focusPauseAllowResume && focusPauseWasRunning && gameRunning) {
+            gamePaused = false;
+        }
+    });
+}
+
+function resumeGameFromFocusLoss({ auto = false, triggeredByUser = false } = {}) {
+    if (!focusPauseActive) return;
+    if (focusResumeHandled) return;
+    if (auto && !focusPauseShouldAutoResume) return;
+
+    focusResumeHandled = true;
+    focusPauseAllowResume = triggeredByUser || focusPauseShouldAutoResume;
+
+    runFocusResumeEffects();
+
+    focusPauseActive = false;
+    focusPauseShouldAutoResume = false;
+    focusPauseWasRunning = false;
+    focusPauseAllowResume = false;
+    focusPausePreviousStatus = DEFAULT_STATUS_VALUE_TEXT;
+    focusPausePreviousTip = DEFAULT_STATUS_TIP_TEXT;
+    focusResumeEffects.length = 0;
+}
+
+function handleDocumentVisibilityChange() {
+    if (document.hidden) {
+        pauseGameForFocusLoss('hidden');
+    } else {
+        resumeGameFromFocusLoss({ auto: true });
+    }
+}
+
+function handleWindowBlur() {
+    if (document.hidden) return;
+    pauseGameForFocusLoss('blur');
 }
 
 function hideProfileModal() {
@@ -4384,6 +4543,8 @@ window.purchaseSprite = purchaseSprite;
 window.claimQuestReward = claimQuestReward;
 window.hideAllOverlays = hideAllOverlays;
 window.showStatAllocation = showStatAllocation;
+window.resumeGameFromFocusLoss = resumeGameFromFocusLoss;
+window.queueFocusResumeEffect = queueFocusResumeEffect;
 
 function handlePhantomAvailability() {
     if (window.phantom?.solana) {
@@ -4401,6 +4562,9 @@ if (window.phantom?.solana) {
 // --- CRITICAL FIX: Ensure Initialization Runs After DOM Load ---
 window.addEventListener('keydown', handleKeyDown);
 window.addEventListener('keyup', handleKeyUp);
+document.addEventListener('visibilitychange', handleDocumentVisibilityChange);
+window.addEventListener('blur', handleWindowBlur);
+window.addEventListener('focus', () => resumeGameFromFocusLoss({ auto: true }));
 window.addEventListener('blur', resetKeyState);
 
 window.onload = function() {
