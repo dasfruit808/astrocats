@@ -389,6 +389,8 @@ const UPGRADE_DETAILS = {
 
 const CORE_STATS = ['attack', 'defense', 'agility', 'luck'];
 
+const SPECIALIZATION_FEATURE_ENABLED = false;
+
 const skillTree = {
     attack: {
         label: 'Attack Specialization',
@@ -649,6 +651,7 @@ function prerequisitesMet(node) {
 }
 
 function canUnlockNode(node) {
+    if (!SPECIALIZATION_FEATURE_ENABLED) return false;
     if (!node || isNodeUnlocked(node.id)) return false;
     const cost = node.cost ?? 1;
     const hasPoints = typeof playerData?.specializationPoints === 'number' && playerData.specializationPoints >= cost;
@@ -656,6 +659,7 @@ function canUnlockNode(node) {
 }
 
 function unlockSpecializationNode(nodeId) {
+    if (!SPECIALIZATION_FEATURE_ENABLED) return;
     const node = skillNodeIndex[nodeId];
     if (!node || !canUnlockNode(node)) return;
 
@@ -807,6 +811,14 @@ function renderSkillTree() {
     });
 
     statOptionsEl.appendChild(summaryWrapper);
+
+    if (!SPECIALIZATION_FEATURE_ENABLED) {
+        const placeholder = document.createElement('p');
+        placeholder.className = 'skill-placeholder';
+        placeholder.textContent = 'Specializations are currently unavailable. Keep playing to level up while we finish training the academy instructors.';
+        statOptionsEl.appendChild(placeholder);
+        return;
+    }
 
     Object.entries(skillTree).forEach(([branchKey, branch]) => {
         const branchEl = document.createElement('div');

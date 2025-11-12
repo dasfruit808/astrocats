@@ -707,6 +707,18 @@ button:disabled {
     color: #1b2940;
 }
 
+.skill-placeholder {
+    margin-top: 18px;
+    padding: 16px;
+    background: rgba(12, 39, 96, 0.08);
+    border: 1px dashed rgba(12, 39, 96, 0.35);
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #10213f;
+    text-align: center;
+}
+
 .skill-branch {
     margin-bottom: 18px;
     padding: 12px;
