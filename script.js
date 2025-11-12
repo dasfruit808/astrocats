@@ -137,6 +137,7 @@ let fireButtonEventsBound = false;
 let joystickPointerId = null;
 let joystickInputType = null;
 let pointerCapabilityQuery = null;
+let guestStorageAvailable = false;
 
 function bindButtonClick(element, handler, { preventDefault = true } = {}) {
     const target = typeof element === 'string' ? document.getElementById(element) : element;
