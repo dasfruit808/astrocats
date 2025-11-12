@@ -450,10 +450,10 @@ function createBasePlayerData() {
         restedXP: 0,
         specializationPoints: 0,
         stats: {
-            attack: 0,
-            defense: 0,
-            agility: 0,
-            luck: 0
+            strength: 0,
+            speed: 0,
+            vitality: 0,
+            focus: 0
         },
         unlockedNodes: [],
         daily: {
@@ -533,15 +533,15 @@ const XP_CURVE_SEGMENTS = [
     { minLevel: 41, maxLevel: MAX_PLAYER_LEVEL, base: BASE_XP_TO_LEVEL * 18, growth: 1.3, bonus: 1500 }
 ];
 
-const LEVEL_BASELINE_STATS = { attack: 2, defense: 2, agility: 2, luck: 1 };
+const LEVEL_BASELINE_STATS = { strength: 3, speed: 2, vitality: 3, focus: 1 };
 const LEVEL_STAT_TIERS = [
-    { maxLevel: 10, perLevel: { attack: 0.7, defense: 0.6, agility: 0.6, luck: 0.4 } },
-    { maxLevel: 25, perLevel: { attack: 0.9, defense: 0.8, agility: 0.75, luck: 0.5 } },
-    { maxLevel: 40, perLevel: { attack: 1.1, defense: 1.0, agility: 0.9, luck: 0.65 } },
-    { maxLevel: Infinity, perLevel: { attack: 1.3, defense: 1.2, agility: 1.05, luck: 0.8 } }
+    { maxLevel: 10, perLevel: { strength: 0.8, speed: 0.6, vitality: 0.9, focus: 0.45 } },
+    { maxLevel: 25, perLevel: { strength: 1.05, speed: 0.85, vitality: 1.1, focus: 0.6 } },
+    { maxLevel: 40, perLevel: { strength: 1.3, speed: 1.05, vitality: 1.35, focus: 0.75 } },
+    { maxLevel: Infinity, perLevel: { strength: 1.55, speed: 1.25, vitality: 1.55, focus: 0.9 } }
 ];
 
-const STAT_SOFT_CAPS = { attack: 42, defense: 40, agility: 38, luck: 34 };
+const STAT_SOFT_CAPS = { strength: 52, speed: 46, vitality: 58, focus: 42 };
 
 const RESTED_XP_RATE_PER_DAY = 0.6;
 const RESTED_XP_CAP_MULTIPLIER = 5;
@@ -625,52 +625,53 @@ const UPGRADE_DETAILS = {
     ultra_dash: { name: 'Ultra Dash', description: 'Reduce dash cooldown dramatically for rapid repositioning.' }
 };
 
-const CORE_STATS = ['attack', 'defense', 'agility', 'luck'];
+const CORE_STATS = ['strength', 'speed', 'vitality', 'focus'];
 
 const skillTree = {
-    attack: {
-        label: 'Attack Specialization',
-        description: 'Empower your plasma cannons with increased damage and projectile control.',
+    strength: {
+        label: 'Strength Specialization',
+        description: 'Channel raw reactor power to amplify offensive output and crushing barrages.',
         mastery: {
-            id: 'attack_mastery',
-            name: 'Artillery Commander',
-            description: 'Unlock every Attack node to overcharge your arsenal.',
+            id: 'strength_mastery',
+            name: 'Starbreaker Commander',
+            description: 'Unlock every Strength node to unleash unstoppable ordnance.',
             bonuses: {
-                stats: { attack: 1 },
-                perks: { damageMultiplier: 0.1, critMultiplierBonus: 0.2, extraPierce: 1 }
+                stats: { strength: 1 },
+                perks: { damageMultiplier: 0.12, critMultiplierBonus: 0.25, extraPierce: 1 }
             }
         },
         nodes: [
             {
-                id: 'attack_core',
-                name: 'Sharpened Shots',
-                description: '+1 Attack. Unlocks the offensive path.',
+                id: 'strength_core',
+                name: 'Power Calibrators',
+                description: '+1 Strength. Unlocks the heavy ordnance path.',
                 cost: 1,
                 prerequisites: [],
                 bonuses: {
-                    stats: { attack: 1 }
+                    stats: { strength: 1 },
+                    perks: { damageMultiplier: 0.08 }
                 },
                 children: [
                     {
-                        id: 'attack_overdrive',
-                        name: 'Overdrive Lenses',
-                        description: '+1 Attack and +10% weapon damage.',
+                        id: 'strength_overdrive',
+                        name: 'Siege Overdrive',
+                        description: '+1 Strength and +12% weapon damage with bonus pierce.',
                         cost: 1,
-                        prerequisites: ['attack_core'],
+                        prerequisites: ['strength_core'],
                         bonuses: {
-                            stats: { attack: 1 },
-                            perks: { damageMultiplier: 0.1 }
+                            stats: { strength: 1 },
+                            perks: { damageMultiplier: 0.12, extraPierce: 1 }
                         },
                         children: [
                             {
-                                id: 'attack_plasma_forge',
-                                name: 'Plasma Forge',
-                                description: '+1 Attack, projectiles grow by 20% and gain +1 pierce.',
+                                id: 'strength_plasma_forge',
+                                name: 'Plasma Colossus',
+                                description: '+1 Strength, projectiles grow by 25% and gain +1 pierce.',
                                 cost: 1,
-                                prerequisites: ['attack_overdrive'],
+                                prerequisites: ['strength_overdrive'],
                                 bonuses: {
-                                    stats: { attack: 1 },
-                                    perks: { projectileSize: 0.2, extraPierce: 1, damageMultiplier: 0.15, critMultiplierBonus: 0.3 }
+                                    stats: { strength: 1 },
+                                    perks: { projectileSize: 0.25, extraPierce: 1, damageMultiplier: 0.18, critMultiplierBonus: 0.35 }
                                 },
                                 children: []
                             }
@@ -680,50 +681,50 @@ const skillTree = {
             }
         ]
     },
-    defense: {
-        label: 'Defense Specialization',
-        description: 'Fortify shields and survivability for the longest sorties.',
+    vitality: {
+        label: 'Vitality Specialization',
+        description: 'Fortify hull plating, shields, and emergency systems for long sorties.',
         mastery: {
-            id: 'defense_mastery',
-            name: 'Bulwark Architect',
-            description: 'Complete the Defense tree to unlock elite shielding protocols.',
+            id: 'vitality_mastery',
+            name: 'Celestial Bulwark',
+            description: 'Complete the Vitality tree to unlock elite safeguarding protocols.',
             bonuses: {
-                stats: { defense: 1 },
-                perks: { damageReduction: 0.1, shieldDurationBonus: 600 }
+                stats: { vitality: 1 },
+                perks: { damageReduction: 0.12, shieldDurationBonus: 800, guardChance: 0.15 }
             }
         },
         nodes: [
             {
-                id: 'defense_core',
-                name: 'Reinforced Plating',
-                description: '+1 Defense. Grants sturdier base shielding.',
+                id: 'vitality_core',
+                name: 'Reinforced Bioframe',
+                description: '+1 Vitality. Grants sturdier base shielding.',
                 cost: 1,
                 prerequisites: [],
                 bonuses: {
-                    stats: { defense: 1 },
-                    perks: { shieldDurationBonus: 250, damageReduction: 0.03 }
+                    stats: { vitality: 1 },
+                    perks: { shieldDurationBonus: 300, damageReduction: 0.04 }
                 },
                 children: [
                     {
-                        id: 'defense_barrier',
-                        name: 'Adaptive Barrier',
-                        description: '+1 Defense and shields last 0.5s longer.',
+                        id: 'vitality_bastion',
+                        name: 'Adaptive Bastion',
+                        description: '+1 Vitality and shields last 0.6s longer with guard chance.',
                         cost: 1,
-                        prerequisites: ['defense_core'],
+                        prerequisites: ['vitality_core'],
                         bonuses: {
-                            stats: { defense: 1 },
-                            perks: { shieldDurationBonus: 500, damageReduction: 0.05 }
+                            stats: { vitality: 1 },
+                            perks: { shieldDurationBonus: 600, damageReduction: 0.07, guardChance: 0.1 }
                         },
                         children: [
                             {
-                                id: 'defense_guardian',
-                                name: 'Guardian Protocol',
-                                description: '+1 Defense and 20% chance to negate a hit.',
+                                id: 'vitality_guardian',
+                                name: 'Guardian Ward',
+                                description: '+1 Vitality and 18% chance to negate a hit.',
                                 cost: 1,
-                                prerequisites: ['defense_barrier'],
+                                prerequisites: ['vitality_bastion'],
                                 bonuses: {
-                                    stats: { defense: 1 },
-                                    perks: { guardChance: 0.2, damageReduction: 0.07 }
+                                    stats: { vitality: 1 },
+                                    perks: { guardChance: 0.18, damageReduction: 0.1, shieldDurationBonus: 900 }
                                 },
                                 children: []
                             }
@@ -733,50 +734,50 @@ const skillTree = {
             }
         ]
     },
-    agility: {
-        label: 'Agility Specialization',
+    speed: {
+        label: 'Speed Specialization',
         description: 'Increase mobility, fire cadence, and dash responsiveness.',
         mastery: {
-            id: 'agility_mastery',
+            id: 'speed_mastery',
             name: 'Slipstream Virtuoso',
-            description: 'Unlock every Agility node to master evasive maneuvers.',
+            description: 'Unlock every Speed node to master evasive maneuvers.',
             bonuses: {
-                stats: { agility: 1 },
-                perks: { movementSpeed: 0.08, fireRateBonus: 0.05, evasionBonus: 0.08, dashCooldownMultiplier: -0.15 }
+                stats: { speed: 1 },
+                perks: { movementSpeed: 0.12, fireRateBonus: 0.08, evasionBonus: 0.1, dashCooldownMultiplier: -0.2 }
             }
         },
         nodes: [
             {
-                id: 'agility_core',
+                id: 'speed_core',
                 name: 'Thruster Tuning',
-                description: '+1 Agility and +10% dash cooldown recovery.',
+                description: '+1 Speed and +12% dash cooldown recovery.',
                 cost: 1,
                 prerequisites: [],
                 bonuses: {
-                    stats: { agility: 1 },
-                    perks: { dashCooldownMultiplier: -0.1, evasionBonus: 0.02 }
+                    stats: { speed: 1 },
+                    perks: { dashCooldownMultiplier: -0.12, evasionBonus: 0.02, movementSpeed: 0.05 }
                 },
                 children: [
                     {
-                        id: 'agility_afterburn',
-                        name: 'Afterburn Surge',
-                        description: '+1 Agility, +5% movement speed, +10% fire rate.',
+                        id: 'speed_afterburn',
+                        name: 'Afterburn Channels',
+                        description: '+1 Speed, +7% fire rate, and faster dashes.',
                         cost: 1,
-                        prerequisites: ['agility_core'],
+                        prerequisites: ['speed_core'],
                         bonuses: {
-                            stats: { agility: 1 },
-                            perks: { movementSpeed: 0.05, fireRateBonus: 0.1, evasionBonus: 0.03 }
+                            stats: { speed: 1 },
+                            perks: { fireRateBonus: 0.07, dashCooldownMultiplier: -0.18, movementSpeed: 0.07 }
                         },
                         children: [
                             {
-                                id: 'agility_quantum',
+                                id: 'speed_slipstream',
                                 name: 'Quantum Slipstream',
-                                description: '+1 Agility and dash cooldown reduced by an additional 20%.',
+                                description: '+1 Speed, +10% fire rate, and +15% dash recovery.',
                                 cost: 1,
-                                prerequisites: ['agility_afterburn'],
+                                prerequisites: ['speed_afterburn'],
                                 bonuses: {
-                                    stats: { agility: 1 },
-                                    perks: { dashCooldownMultiplier: -0.2, evasionBonus: 0.05 }
+                                    stats: { speed: 1 },
+                                    perks: { fireRateBonus: 0.1, dashCooldownMultiplier: -0.25, movementSpeed: 0.12, evasionBonus: 0.05 }
                                 },
                                 children: []
                             }
@@ -786,50 +787,50 @@ const skillTree = {
             }
         ]
     },
-    luck: {
-        label: 'Luck Specialization',
-        description: 'Enhance crits and drop odds for more rewards.',
+    focus: {
+        label: 'Focus Specialization',
+        description: 'Maximize crits, loot drops, and cosmic prosperity.',
         mastery: {
-            id: 'luck_mastery',
+            id: 'focus_mastery',
             name: 'Fate Weaver',
-            description: 'Unlock all Luck nodes to bend probability itself.',
+            description: 'Master Focus to bend probability to your will.',
             bonuses: {
-                stats: { luck: 1 },
-                perks: { critChanceBonus: 0.05, dropChanceBonus: 0.1, xpBonus: 0.05, creditBonus: 0.05 }
+                stats: { focus: 1 },
+                perks: { critChanceBonus: 0.06, xpBonus: 0.08, creditBonus: 0.08, dropChanceBonus: 0.08 }
             }
         },
         nodes: [
             {
-                id: 'luck_core',
-                name: "Fortune's Favor",
-                description: '+1 Luck and +2% crit chance.',
+                id: 'focus_core',
+                name: 'Lucky Glyphs',
+                description: '+1 Focus and +3% critical chance.',
                 cost: 1,
                 prerequisites: [],
                 bonuses: {
-                    stats: { luck: 1 },
-                    perks: { critChanceBonus: 0.02 }
+                    stats: { focus: 1 },
+                    perks: { critChanceBonus: 0.03, dropChanceBonus: 0.03 }
                 },
                 children: [
                     {
-                        id: 'luck_hawkeye',
-                        name: 'Hawkeye Optics',
-                        description: '+1 Luck, +0.25 crit multiplier, +5% drop rate.',
+                        id: 'focus_hawkeye',
+                        name: 'Hawkeye Sensors',
+                        description: '+1 Focus and +4% crit chance.',
                         cost: 1,
-                        prerequisites: ['luck_core'],
+                        prerequisites: ['focus_core'],
                         bonuses: {
-                            stats: { luck: 1 },
-                            perks: { critMultiplierBonus: 0.25, dropChanceBonus: 0.05, creditBonus: 0.05 }
+                            stats: { focus: 1 },
+                            perks: { critChanceBonus: 0.04, xpBonus: 0.03, creditBonus: 0.03 }
                         },
                         children: [
                             {
-                                id: 'luck_destiny',
+                                id: 'focus_destiny',
                                 name: 'Destiny Engine',
-                                description: '+1 Luck and +5% universal reward luck.',
+                                description: '+1 Focus with improved rewards and crits.',
                                 cost: 1,
-                                prerequisites: ['luck_hawkeye'],
+                                prerequisites: ['focus_hawkeye'],
                                 bonuses: {
-                                    stats: { luck: 1 },
-                                    perks: { critChanceBonus: 0.03, dropChanceBonus: 0.05, xpBonus: 0.05 }
+                                    stats: { focus: 1 },
+                                    perks: { critChanceBonus: 0.05, dropChanceBonus: 0.04, xpBonus: 0.05, creditBonus: 0.05 }
                                 },
                                 children: []
                             }
@@ -839,6 +840,32 @@ const skillTree = {
             }
         ]
     }
+};
+
+const LEGACY_STAT_KEY_MAP = {
+    attack: 'strength',
+    defense: 'vitality',
+    agility: 'speed',
+    luck: 'focus'
+};
+
+const LEGACY_NODE_ID_MAP = {
+    attack_mastery: 'strength_mastery',
+    attack_core: 'strength_core',
+    attack_overdrive: 'strength_overdrive',
+    attack_plasma_forge: 'strength_plasma_forge',
+    defense_mastery: 'vitality_mastery',
+    defense_core: 'vitality_core',
+    defense_barrier: 'vitality_bastion',
+    defense_guardian: 'vitality_guardian',
+    agility_mastery: 'speed_mastery',
+    agility_core: 'speed_core',
+    agility_afterburn: 'speed_afterburn',
+    agility_quantum: 'speed_slipstream',
+    luck_mastery: 'focus_mastery',
+    luck_core: 'focus_core',
+    luck_hawkeye: 'focus_hawkeye',
+    luck_destiny: 'focus_destiny'
 };
 
 const skillNodeIndex = {};
@@ -875,10 +902,10 @@ let cachedMasteries = {};
 let cachedLevelBaseStats = CORE_STATS.reduce((acc, key) => ({ ...acc, [key]: LEVEL_BASELINE_STATS[key] || 0 }), {});
 
 const STAT_DISPLAY_NAMES = {
-    attack: 'Attack (Damage/Bullet Size)',
-    defense: 'Defense (Shield Time/Durability)',
-    agility: 'Agility (Movement Speed)',
-    luck: 'Luck (Crit Chance/Drops)'
+    strength: 'Strength (Damage & Projectile Power)',
+    speed: 'Speed (Movement & Dash)',
+    vitality: 'Vitality (Shields & Sustain)',
+    focus: 'Focus (Crits & Rewards)'
 };
 
 function getBaseStatsForLevel(level) {
@@ -1455,7 +1482,7 @@ const player = {
     baseSpeed: 8,
     dx: 0,
     dy: 0,
-    damageMultiplier: 1, defenseRating: 0, luckRating: 0, critChance: 0, critMultiplier: 2.0,
+    damageMultiplier: 1, vitalityRating: 0, focusRating: 0, critChance: 0, critMultiplier: 2.0,
     maxHP: 120,
     currentHP: 120,
     damageReduction: 0,
@@ -1503,8 +1530,8 @@ function prepareProjectile(proj) {
     if (!proj.isBeam && !proj.scaledForAttack) {
         const stats = getTotalStats();
         const perks = player.specialPerks || {};
-        const attackStat = stats.attack ?? 0;
-        const widthScale = 1 + attackStat * 0.1 + (perks.projectileSize || 0);
+        const strengthStat = stats.strength ?? 0;
+        const widthScale = 1 + strengthStat * 0.1 + (perks.projectileSize || 0);
         proj.width = proj.baseWidth * widthScale;
         proj.height = proj.baseHeight;
         proj.scaledForAttack = true;
@@ -1638,8 +1665,8 @@ function triggerDash(directionKey) {
     const now = Date.now();
     const stats = getTotalStats();
     const perks = player.specialPerks || {};
-    const agilityCooldownReduction = (stats.agility || 0) * 50;
-    const baseDuration = Math.max(500, DASH_COOLDOWN_DURATION - agilityCooldownReduction);
+    const speedCooldownReduction = (stats.speed || 0) * 55;
+    const baseDuration = Math.max(450, DASH_COOLDOWN_DURATION - speedCooldownReduction);
     const perkAdjusted = baseDuration * (perks.dashCooldownFactor || 1);
     const finalCooldown = ultraDashActive ? perkAdjusted / 2 : perkAdjusted;
     if (dashActive || dashCooldown > now || gamePaused) return;
@@ -1684,18 +1711,18 @@ function fireShot(chargeLevel = 0) {
     const now = Date.now();
     const stats = getTotalStats();
     const perks = player.specialPerks || {};
-    const agilityBonus = (stats.agility || 0) * 15;
+    const speedBonus = (stats.speed || 0) * 18;
     const baseInterval = rapidFire ? RAPID_SHOT_INTERVAL : BASE_SHOT_INTERVAL;
     const fireRateFactor = Math.max(0.3, 1 - (perks.fireRateBonus || 0));
-    const finalInterval = Math.max(80, (baseInterval - agilityBonus) * fireRateFactor);
+    const finalInterval = Math.max(70, (baseInterval - speedBonus) * fireRateFactor);
 
     if (chargeLevel === 0 && now - lastShotTime < finalInterval) {
         return;
     }
     lastShotTime = now;
 
-    const attackStat = stats.attack || 0;
-    const baseDamage = 1 + attackStat;
+    const strengthStat = stats.strength || 0;
+    const baseDamage = 1 + strengthStat;
     const damageMultiplier = 1 + chargeLevel * 2;
     const projectileDamage = baseDamage * damageMultiplier * (player.damageMultiplier || 1);
     const projectileSpeed = 12 + chargeLevel * 6;
@@ -2378,8 +2405,8 @@ function updateDashCooldown() {
     const now = Date.now();
     const stats = getTotalStats();
     const perks = player.specialPerks || {};
-    const agilityCooldownReduction = (stats.agility || 0) * 50;
-    const baseDuration = Math.max(500, DASH_COOLDOWN_DURATION - agilityCooldownReduction);
+    const speedCooldownReduction = (stats.speed || 0) * 55;
+    const baseDuration = Math.max(450, DASH_COOLDOWN_DURATION - speedCooldownReduction);
     const perkAdjusted = baseDuration * (perks.dashCooldownFactor || 1);
     const finalDashDuration = ultraDashActive ? perkAdjusted / 2 : perkAdjusted;
 
@@ -2491,7 +2518,7 @@ function applyPowerup(type) {
             timeoutHandle = setTimeout(() => { rapidFire = false; }, 10000);
             break;
         case 'shield':
-            const shieldDuration = 5000 + (player.defenseRating * 1000) + (player.specialPerks?.shieldDurationBonus || 0);
+            const shieldDuration = 5000 + (player.vitalityRating * 1000) + (player.specialPerks?.shieldDurationBonus || 0);
             shieldActive = true;
             timeoutHandle = setTimeout(() => { shieldActive = false; }, shieldDuration);
             break;
@@ -2891,7 +2918,18 @@ async function loadPlayerData() {
 
     if (loadedData) {
         playerData = { ...base, ...loadedData };
-        playerData.stats = { ...base.stats, ...(loadedData.stats || {}) };
+
+        const incomingStats = loadedData.stats && typeof loadedData.stats === 'object'
+            ? loadedData.stats
+            : {};
+        const normalizedStats = { ...base.stats };
+        Object.entries(incomingStats).forEach(([key, value]) => {
+            const mappedKey = LEGACY_STAT_KEY_MAP[key] || key;
+            if (!CORE_STATS.includes(mappedKey)) return;
+            if (typeof value !== 'number' || Number.isNaN(value)) return;
+            normalizedStats[mappedKey] = value;
+        });
+        playerData.stats = normalizedStats;
 
         if (typeof loadedData.specializationPoints === 'number') {
             playerData.specializationPoints = loadedData.specializationPoints;
@@ -2910,10 +2948,13 @@ async function loadPlayerData() {
             delete playerData.version;
         }
 
-        const unlocked = Array.isArray(loadedData.unlockedNodes)
-            ? loadedData.unlockedNodes.filter(id => skillNodeIndex[id])
+        const rawUnlocked = Array.isArray(loadedData.unlockedNodes)
+            ? loadedData.unlockedNodes
             : [];
-        playerData.unlockedNodes = Array.from(new Set(unlocked));
+        const normalizedUnlocked = rawUnlocked
+            .map(id => LEGACY_NODE_ID_MAP[id] || id)
+            .filter(id => skillNodeIndex[id]);
+        playerData.unlockedNodes = Array.from(new Set(normalizedUnlocked));
 
         const dailyFallback = base.daily;
         playerData.daily = { ...dailyFallback, ...(loadedData.daily || {}) };
@@ -2948,60 +2989,60 @@ function getXPForNextLevel(currentLevel) {
 function applyStatEffects() {
     const { totals, perks, masteries } = recomputeSpecializationTotals();
 
-    const agilityStat = totals.agility || 0;
-    const attackStat = totals.attack || 0;
-    const defenseStat = totals.defense || 0;
-    const luckStat = totals.luck || 0;
+    const speedStat = totals.speed || 0;
+    const strengthStat = totals.strength || 0;
+    const vitalityStat = totals.vitality || 0;
+    const focusStat = totals.focus || 0;
 
-    const movementModifier = (perks.movementSpeed || 0) + (masteries.agility ? 0.08 : 0);
-    const baseSpeed = 6.5 + (agilityStat * 0.6);
+    const movementModifier = (perks.movementSpeed || 0) + (masteries.speed ? 0.12 : 0);
+    const baseSpeed = 6.5 + (speedStat * 0.65);
     player.baseSpeed = baseSpeed * (1 + movementModifier);
     getCurrentPlayerSpeed();
 
     const damageMultiplierBonus = 1 + (perks.damageMultiplier || 0);
-    const masteryDamageBonus = masteries.attack ? 1.08 : 1;
-    player.damageMultiplier = (1 + (attackStat * 0.18)) * damageMultiplierBonus * masteryDamageBonus;
+    const masteryDamageBonus = masteries.strength ? 1.12 : 1;
+    player.damageMultiplier = (1 + (strengthStat * 0.2)) * damageMultiplierBonus * masteryDamageBonus;
 
-    player.defenseRating = defenseStat;
-    player.luckRating = luckStat;
+    player.vitalityRating = vitalityStat;
+    player.focusRating = focusStat;
 
-    const baseCritChance = Math.min(0.5, luckStat * 0.01);
-    const masteryCritChance = masteries.luck ? 0.05 : 0;
-    player.critChance = Math.min(0.7, baseCritChance + (perks.critChanceBonus || 0) + masteryCritChance);
+    const baseCritChance = Math.min(0.55, focusStat * 0.012);
+    const masteryCritChance = masteries.focus ? 0.06 : 0;
+    player.critChance = Math.min(0.75, baseCritChance + (perks.critChanceBonus || 0) + masteryCritChance);
 
-    const baseCritMultiplier = 2.0 + (attackStat * 0.03);
-    const masteryCritMultiplier = masteries.attack ? 0.2 : 0;
+    const baseCritMultiplier = 2.0 + (strengthStat * 0.035);
+    const masteryCritMultiplier = masteries.strength ? 0.25 : 0;
     player.critMultiplier = baseCritMultiplier + (perks.critMultiplierBonus || 0) + masteryCritMultiplier;
 
-    const baseDamageReduction = Math.min(0.65, defenseStat * 0.015);
-    const masteryDamageReduction = masteries.defense ? 0.05 : 0;
+    const baseDamageReduction = Math.min(0.7, vitalityStat * 0.017);
+    const masteryDamageReduction = masteries.vitality ? 0.08 : 0;
     const totalDamageReduction = Math.min(0.85, baseDamageReduction + (perks.damageReduction || 0) + masteryDamageReduction);
 
-    const baseGuardChance = Math.min(0.3, defenseStat * 0.01);
-    const masteryGuardBonus = masteries.defense ? 0.1 : 0;
+    const baseGuardChance = Math.min(0.35, vitalityStat * 0.012);
+    const masteryGuardBonus = masteries.vitality ? 0.15 : 0;
     const guardChance = Math.min(0.95, baseGuardChance + (perks.guardChance || 0) + masteryGuardBonus);
 
-    const dashCooldownModifier = (perks.dashCooldownMultiplier || 0) + (masteries.agility ? -0.15 : 0);
-    const fireRateBonus = Math.max(0, (perks.fireRateBonus || 0) + (masteries.agility ? 0.05 : 0));
-    const projectileSize = (perks.projectileSize || 0) + (masteries.attack ? 0.05 : 0);
-    const extraPierce = Math.max(0, Math.round((perks.extraPierce || 0) + (masteries.attack ? 1 : 0)));
+    const dashCooldownModifier = (perks.dashCooldownMultiplier || 0) + (masteries.speed ? -0.2 : 0);
+    const fireRateBonus = Math.max(0, (perks.fireRateBonus || 0) + (masteries.speed ? 0.08 : 0));
+    const projectileSize = (perks.projectileSize || 0) + (masteries.strength ? 0.08 : 0);
+    const extraPierce = Math.max(0, Math.round((perks.extraPierce || 0) + (masteries.strength ? 1 : 0)));
 
-    const baseShieldDuration = defenseStat * 60;
-    const masteryShieldBonus = masteries.defense ? 400 : 0;
+    const baseShieldDuration = vitalityStat * 70;
+    const masteryShieldBonus = masteries.vitality ? 500 : 0;
     const shieldDurationBonus = Math.max(0, (perks.shieldDurationBonus || 0) + baseShieldDuration + masteryShieldBonus);
 
-    const dropChanceBonus = Math.max(0, (perks.dropChanceBonus || 0) + (masteries.luck ? 0.05 : 0));
-    const evasionBase = Math.min(0.3, agilityStat * 0.004);
-    const evasionMastery = masteries.agility ? 0.08 : 0;
+    const dropChanceBonus = Math.max(0, (perks.dropChanceBonus || 0) + (masteries.focus ? 0.08 : 0));
+    const evasionBase = Math.min(0.35, speedStat * 0.005);
+    const evasionMastery = masteries.speed ? 0.1 : 0;
     const evasionChance = Math.min(0.5, evasionBase + (perks.evasionBonus || 0) + evasionMastery);
 
-    const baseXpMultiplier = Math.min(0.6, luckStat * 0.004);
-    const xpBonusPerks = Math.max(0, (perks.xpBonus || 0) + (masteries.luck ? 0.05 : 0));
-    const baseCreditMultiplier = Math.min(0.45, luckStat * 0.003);
-    const creditBonusPerks = Math.max(0, (perks.creditBonus || 0) + (masteries.luck ? 0.05 : 0));
+    const baseXpMultiplier = Math.min(0.7, focusStat * 0.005);
+    const xpBonusPerks = Math.max(0, (perks.xpBonus || 0) + (masteries.focus ? 0.08 : 0));
+    const baseCreditMultiplier = Math.min(0.5, focusStat * 0.004);
+    const creditBonusPerks = Math.max(0, (perks.creditBonus || 0) + (masteries.focus ? 0.08 : 0));
 
-    const baseMaxHP = 120 + (playerData.level * 14);
-    player.maxHP = Math.floor(baseMaxHP + defenseStat * 12 + (masteries.defense ? 40 : 0));
+    const baseMaxHP = 140 + (playerData.level * 16);
+    player.maxHP = Math.floor(baseMaxHP + vitalityStat * 15 + (masteries.vitality ? 50 : 0));
     if (typeof player.currentHP !== 'number' || Number.isNaN(player.currentHP)) {
         player.currentHP = player.maxHP;
     } else {
@@ -3638,7 +3679,7 @@ function updateEnemies() {
                         showAnnounce(waveAnnounceEl, 'Boss Defeated!');
                         
                     } else {
-                        const dropChance = Math.min(0.95, 0.2 + (player.luckRating * 0.01) + (player.specialPerks?.dropChanceBonus || 0));
+                        const dropChance = Math.min(0.95, 0.2 + (player.focusRating * 0.01) + (player.specialPerks?.dropChanceBonus || 0));
                         if (Math.random() < dropChance) {
                             const puTypes = ['speed', 'rapid', 'shield', 'life', 'spread', 'homing', 'pierce'];
                             const puType = puTypes[Math.floor(Math.random() * puTypes.length)];
