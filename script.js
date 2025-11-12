@@ -492,6 +492,26 @@ let walletProvider = null;
 let hasAstroCatNFT = false;
 let solanaConnection = null;
 
+const SOLANA_RPC_ENDPOINTS = [
+    'https://api.mainnet-beta.solana.com',
+    'https://rpc.ankr.com/solana',
+    'https://solana-mainnet.public.blastapi.io',
+    'https://solana-api.projectserum.com'
+].filter(Boolean);
+
+const SOLANA_WEB3_SOURCES = [
+    'https://unpkg.com/@solana/web3.js@1.95.3/lib/index.iife.min.js',
+    'https://cdn.jsdelivr.net/npm/@solana/web3.js@1.95.3/lib/index.iife.min.js'
+];
+
+const METAPLEX_JS_SOURCES = [
+    'https://unpkg.com/@metaplex-foundation/js@0.20.1/dist/js/index.js',
+    'https://cdn.jsdelivr.net/npm/@metaplex-foundation/js@0.20.1/dist/js/index.js'
+];
+
+let solanaEndpointIndex = 0;
+let solanaLibraryLoadPromise = null;
+
 const PROGRESS_MEMO_PREFIX = 'ASTRO_INVADERS_PROGRESS:';
 const MEMO_PROGRAM_ID = 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr';
 const MEMO_MAX_BYTES = 566;
@@ -3022,16 +3042,164 @@ async function loadAndDisplayLeaderboard() {
     leaderboardEl.appendChild(listEl);
 }
 
+function loadExternalScript(src) {
+    return new Promise((resolve, reject) => {
+        if (!src) {
+            reject(new Error('Missing script source.'));
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = false;
+        script.crossOrigin = 'anonymous';
+
+        const cleanup = () => {
+            script.removeEventListener('load', handleLoad);
+            script.removeEventListener('error', handleError);
+        };
+
+        const handleLoad = () => {
+            cleanup();
+            resolve();
+        };
+
+        const handleError = (event) => {
+            cleanup();
+            const isErrorEvent = typeof ErrorEvent !== 'undefined' && event instanceof ErrorEvent;
+            if (script.parentNode) {
+                script.parentNode.removeChild(script);
+            }
+            reject(isErrorEvent ? event.error || event : event);
+        };
+
+        script.addEventListener('load', handleLoad);
+        script.addEventListener('error', handleError);
+        document.head.appendChild(script);
+    });
+}
+
+async function ensureSolanaLibrariesLoaded() {
+    if (typeof solanaWeb3 !== 'undefined' && typeof Metaplex !== 'undefined') {
+        return true;
+    }
+
+    if (!solanaLibraryLoadPromise) {
+        solanaLibraryLoadPromise = (async () => {
+            const ensureLibrary = async (sources, validator) => {
+                if (validator()) return true;
+
+                for (const src of sources) {
+                    try {
+                        await loadExternalScript(src);
+                        if (validator()) {
+                            return true;
+                        }
+                    } catch (err) {
+                        console.warn(`Failed to load external script: ${src}`, err);
+                    }
+                }
+
+                return validator();
+            };
+
+            if (typeof solanaWeb3 === 'undefined') {
+                await ensureLibrary(SOLANA_WEB3_SOURCES, () => typeof solanaWeb3 !== 'undefined');
+            }
+
+            if (typeof Metaplex === 'undefined') {
+                await ensureLibrary(METAPLEX_JS_SOURCES, () => typeof Metaplex !== 'undefined');
+            }
+
+            return typeof solanaWeb3 !== 'undefined' && typeof Metaplex !== 'undefined';
+        })();
+    }
+
+    try {
+        const loaded = await solanaLibraryLoadPromise;
+        solanaLibraryLoadPromise = null;
+        return loaded;
+    } catch (err) {
+        console.error('Unexpected error while loading Solana libraries:', err);
+        solanaLibraryLoadPromise = null;
+        return false;
+    }
+}
+
+function getCurrentSolanaEndpoint() {
+    if (SOLANA_RPC_ENDPOINTS.length > 0) {
+        return SOLANA_RPC_ENDPOINTS[solanaEndpointIndex % SOLANA_RPC_ENDPOINTS.length];
+    }
+
+    if (typeof solanaWeb3 !== 'undefined' && typeof solanaWeb3.clusterApiUrl === 'function') {
+        return solanaWeb3.clusterApiUrl('mainnet-beta');
+    }
+
+    return null;
+}
+
+function advanceSolanaEndpoint(reason) {
+    if (SOLANA_RPC_ENDPOINTS.length === 0) {
+        return;
+    }
+
+    const failedEndpoint = getCurrentSolanaEndpoint();
+    if (failedEndpoint) {
+        console.warn(`Solana RPC endpoint failed (${failedEndpoint}).`, reason);
+    }
+
+    solanaEndpointIndex = (solanaEndpointIndex + 1) % SOLANA_RPC_ENDPOINTS.length;
+    solanaConnection = null;
+
+    if (SOLANA_RPC_ENDPOINTS.length > 1) {
+        const nextEndpoint = getCurrentSolanaEndpoint();
+        if (nextEndpoint && nextEndpoint !== failedEndpoint) {
+            console.info(`Switching to fallback Solana RPC endpoint: ${nextEndpoint}`);
+        }
+    }
+}
+
+function handleSolanaRpcError(err) {
+    if (!err) return;
+
+    const responseStatus = err && typeof err === 'object' && typeof err.response === 'object'
+        && typeof err.response?.status === 'number'
+        ? err.response.status
+        : null;
+    const status = typeof err.status === 'number' ? err.status : responseStatus;
+    const code = typeof err.code === 'number' ? err.code : status;
+    const message = typeof err.message === 'string' ? err.message : String(err);
+
+    const forbidden = code === 403
+        || message.includes('403')
+        || message.toLowerCase().includes('forbidden');
+    const networkIssue = message.includes('Failed to fetch') || message.includes('NetworkError');
+
+    if (forbidden || networkIssue) {
+        advanceSolanaEndpoint(err);
+    }
+}
+
 function getSolanaConnection() {
     if (typeof solanaWeb3 === 'undefined') return null;
 
     if (!solanaConnection) {
-        try {
-            solanaConnection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'), 'confirmed');
-        } catch (err) {
-            console.error('Failed to initialize Solana connection:', err);
-            solanaConnection = null;
-            return null;
+        const attempted = new Set();
+
+        while (!solanaConnection) {
+            const endpoint = getCurrentSolanaEndpoint();
+            if (!endpoint || attempted.has(endpoint)) {
+                break;
+            }
+
+            attempted.add(endpoint);
+
+            try {
+                solanaConnection = new solanaWeb3.Connection(endpoint, 'confirmed');
+            } catch (err) {
+                console.error('Failed to initialize Solana connection:', err);
+                advanceSolanaEndpoint(err);
+            }
         }
     }
 
@@ -3089,7 +3257,13 @@ function encodeSnapshotForChain(snapshot) {
 }
 
 async function syncProgressToChain(snapshot) {
-    if (!snapshot || typeof solanaWeb3 === 'undefined') return false;
+    if (!snapshot) return false;
+
+    const librariesReady = await ensureSolanaLibrariesLoaded();
+    if (!librariesReady) {
+        console.error('Solana libraries unavailable; cannot sync progress on-chain.');
+        return false;
+    }
 
     if (!walletPublicKey || !walletProvider) {
         console.warn('Wallet not connected; cannot sync progress on-chain.');
@@ -3140,6 +3314,7 @@ async function syncProgressToChain(snapshot) {
         return true;
     } catch (err) {
         console.error('Failed to sync progress on-chain:', err);
+        handleSolanaRpcError(err);
         return false;
     }
 }
@@ -3186,53 +3361,64 @@ function queueOnChainSync(snapshot) {
 }
 
 async function fetchLatestOnChainSnapshot(publicKey) {
-    if (typeof solanaWeb3 === 'undefined') return null;
+    const librariesReady = await ensureSolanaLibrariesLoaded();
+    if (!librariesReady) return null;
 
-    const connection = getSolanaConnection();
-    if (!connection) return null;
+    const maxAttempts = Math.max(1, SOLANA_RPC_ENDPOINTS.length || 1);
 
-    try {
-        const ownerKey = new solanaWeb3.PublicKey(publicKey);
-        const signatures = await connection.getSignaturesForAddress(ownerKey, { limit: 25 });
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        const connection = getSolanaConnection();
+        if (!connection) break;
 
-        for (const signatureInfo of signatures) {
-            try {
-                const parsedTx = await connection.getParsedTransaction(signatureInfo.signature, {
-                    maxSupportedTransactionVersion: 0,
-                    commitment: 'confirmed'
-                });
+        try {
+            const ownerKey = new solanaWeb3.PublicKey(publicKey);
+            const signatures = await connection.getSignaturesForAddress(ownerKey, { limit: 25 });
 
-                if (!parsedTx) continue;
+            for (const signatureInfo of signatures) {
+                try {
+                    const parsedTx = await connection.getParsedTransaction(signatureInfo.signature, {
+                        maxSupportedTransactionVersion: 0,
+                        commitment: 'confirmed'
+                    });
 
-                const instructions = parsedTx.transaction?.message?.instructions || [];
-                for (const instruction of instructions) {
-                    const programId = typeof instruction.programId === 'string'
-                        ? instruction.programId
-                        : instruction.programId?.toString?.();
-                    const programMatch = instruction.program === 'spl-memo'
-                        || programId === MEMO_PROGRAM_ID;
+                    if (!parsedTx) continue;
 
-                    if (!programMatch) continue;
+                    const instructions = parsedTx.transaction?.message?.instructions || [];
+                    for (const instruction of instructions) {
+                        const programId = typeof instruction.programId === 'string'
+                            ? instruction.programId
+                            : instruction.programId?.toString?.();
+                        const programMatch = instruction.program === 'spl-memo'
+                            || programId === MEMO_PROGRAM_ID;
 
-                    const memoText = typeof instruction.parsed === 'string'
-                        ? instruction.parsed
-                        : (instruction.parsed && typeof instruction.parsed === 'object' ? instruction.parsed.text : null);
+                        if (!programMatch) continue;
 
-                    if (!memoText || !memoText.startsWith(PROGRESS_MEMO_PREFIX)) continue;
+                        const memoText = typeof instruction.parsed === 'string'
+                            ? instruction.parsed
+                            : (instruction.parsed && typeof instruction.parsed === 'object' ? instruction.parsed.text : null);
 
-                    const payload = memoText.slice(PROGRESS_MEMO_PREFIX.length);
-                    try {
-                        return JSON.parse(payload);
-                    } catch (parseErr) {
-                        console.warn('Failed to parse on-chain progress payload:', parseErr);
+                        if (!memoText || !memoText.startsWith(PROGRESS_MEMO_PREFIX)) continue;
+
+                        const payload = memoText.slice(PROGRESS_MEMO_PREFIX.length);
+                        try {
+                            return JSON.parse(payload);
+                        } catch (parseErr) {
+                            console.warn('Failed to parse on-chain progress payload:', parseErr);
+                        }
                     }
+                } catch (txErr) {
+                    console.error('Error reading on-chain progress transaction:', txErr);
+                    handleSolanaRpcError(txErr);
                 }
-            } catch (txErr) {
-                console.error('Error reading on-chain progress transaction:', txErr);
             }
+        } catch (err) {
+            console.error('Failed to fetch on-chain progress for wallet:', err);
+            handleSolanaRpcError(err);
         }
-    } catch (err) {
-        console.error('Failed to fetch on-chain progress for wallet:', err);
+
+        if (solanaConnection) {
+            break;
+        }
     }
 
     return null;
@@ -3910,7 +4096,8 @@ async function connectWallet() {
         if (walletStatusEl) walletStatusEl.textContent = `Connected: ${walletPublicKey.slice(0, 8)}...`;
         if (connectBtn) connectBtn.textContent = 'Disconnect';
 
-        if (typeof solanaWeb3 === 'undefined' || typeof Metaplex === 'undefined') {
+        const librariesReady = await ensureSolanaLibrariesLoaded();
+        if (!librariesReady) {
             console.error('Solana Web3 libraries failed to load.');
             if (nftStatusEl) nftStatusEl.textContent = 'NFT Status: Check Failed (No Libraries)';
         } else { await checkNFT(walletPublicKey); }
@@ -3953,28 +4140,42 @@ async function disconnectWallet() {
 }
 
 async function checkNFT(publicKey) {
-    try {
-        if (typeof solanaWeb3 === 'undefined' || typeof Metaplex === 'undefined') { if (nftStatusEl) nftStatusEl.textContent = 'NFT Check Failed (Libraries Missing)'; return; }
+    const librariesReady = await ensureSolanaLibrariesLoaded();
+    if (!librariesReady) { if (nftStatusEl) nftStatusEl.textContent = 'NFT Check Failed (Libraries Missing)'; return; }
 
+    const maxAttempts = Math.max(1, SOLANA_RPC_ENDPOINTS.length || 1);
+
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
         const connection = getSolanaConnection();
-        if (!connection) { if (nftStatusEl) nftStatusEl.textContent = 'NFT Check Failed (No Connection)'; return; }
-        const metaplex = Metaplex.make(connection);
-        const nfts = await metaplex.nfts().findAllByOwner({ owner: new solanaWeb3.PublicKey(publicKey) }).run();
-        hasAstroCatNFT = nfts.some(nft => nft.collection?.key.toString() === ASTRO_CAT_COLLECTION_MINT);
-        if (nftStatusEl) nftStatusEl.textContent = `NFT Status: ${hasAstroCatNFT ? 'Detected! Persistent Account' : 'Not Detected (Volatile Session)'}`;
-        
-        if (playBtn) playBtn.disabled = false; 
-        
-        if (hasAstroCatNFT && !playerData.gamesPlayed) {
-            playerData = createBasePlayerData();
-            initializeSpriteSystem();
-            savePlayerData();
+        if (!connection) break;
+
+        try {
+            const metaplex = Metaplex.make(connection);
+            const nfts = await metaplex.nfts().findAllByOwner({ owner: new solanaWeb3.PublicKey(publicKey) }).run();
+            hasAstroCatNFT = nfts.some(nft => nft.collection?.key.toString() === ASTRO_CAT_COLLECTION_MINT);
+            if (nftStatusEl) nftStatusEl.textContent = `NFT Status: ${hasAstroCatNFT ? 'Detected! Persistent Account' : 'Not Detected (Volatile Session)'}`;
+
+            if (playBtn) playBtn.disabled = false;
+
+            if (hasAstroCatNFT && !playerData.gamesPlayed) {
+                playerData = createBasePlayerData();
+                initializeSpriteSystem();
+                savePlayerData();
+            }
+            return;
+        } catch (err) {
+            console.error('NFT check error:', err);
+            handleSolanaRpcError(err);
         }
-    } catch (err) {
-        console.error('NFT check error:', err);
-        if (nftStatusEl) nftStatusEl.textContent = 'NFT Check Failed'; 
-        if (playBtn) playBtn.disabled = false; 
+
+        if (solanaConnection) {
+            break;
+        }
     }
+
+    hasAstroCatNFT = false;
+    if (nftStatusEl) nftStatusEl.textContent = 'NFT Check Failed';
+    if (playBtn) playBtn.disabled = false;
 }
 
 // --- GAME LOOP FUNCTIONS (These call the logic functions above) ---
