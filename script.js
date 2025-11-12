@@ -2276,6 +2276,9 @@ function showStartMenu() {
         const initialFocus = findFirstContentControl(startMenuEl);
         activateFocusTrap(startMenuEl, { initialFocus });
     }
+    if (playBtn && playBtn.dataset.walletLocked === 'true') {
+        playBtn.disabled = false;
+    }
 }
 
 function showHub() {
@@ -2794,12 +2797,17 @@ function saveLocalLeaderboard(currentData) {
     writeLeaderboardSafely(trimmedLeaderboard);
 }
 
-function loadAndDisplayLeaderboard() {
+async function loadAndDisplayLeaderboard() {
     if (!leaderboardEl) return;
 
     const leaderboard = readLeaderboardSafely();
 
     leaderboardEl.innerHTML = '';
+
+    leaderboard.sort((a, b) => {
+        if (b.level !== a.level) { return b.level - a.level; }
+        return (b.bestScore || 0) - (a.bestScore || 0);
+    });
 
     if (!leaderboard.length) {
         const emptyMessage = document.createElement('p');
@@ -2807,11 +2815,6 @@ function loadAndDisplayLeaderboard() {
         leaderboardEl.appendChild(emptyMessage);
         return;
     }
-
-    leaderboard.sort((a, b) => {
-        if (b.level !== a.level) { return b.level - a.level; }
-        return (b.bestScore || 0) - (a.bestScore || 0);
-    });
 
     const headerEl = document.createElement('div');
     headerEl.className = 'leaderboard-header';
@@ -3657,10 +3660,73 @@ function claimQuestReward(questId) {
 
 // --- WALLET AND WEB3 FUNCTIONS ---
 
+const PHANTOM_GUIDE_CARD_ID = 'phantom-guide-card';
+
+function openPhantomInstallGuide() {
+    if (walletStatusEl) {
+        walletStatusEl.textContent = 'Phantom Wallet not detected. Use the Player Hub guide to install it.';
+    }
+
+    if (playBtn) {
+        playBtn.dataset.walletLocked = 'true';
+        playBtn.disabled = true;
+    }
+
+    if (hubEl) {
+        const hubContent = hubEl.querySelector('.xp-window-content');
+        if (hubContent) {
+            let guideCard = document.getElementById(PHANTOM_GUIDE_CARD_ID);
+            if (!guideCard) {
+                guideCard = document.createElement('div');
+                guideCard.id = PHANTOM_GUIDE_CARD_ID;
+                guideCard.className = 'xp-card phantom-guide-card';
+                guideCard.setAttribute('role', 'alert');
+                guideCard.setAttribute('tabindex', '-1');
+                guideCard.innerHTML = `
+                    <h3>Phantom Wallet Required</h3>
+                    <p>Install the <a href="https://phantom.app/download" target="_blank" rel="noopener noreferrer">Phantom Wallet</a> browser extension to sync your Astrocat progress and access on-chain rewards.</p>
+                    <p>After installation, refresh this cabinet or press <strong>Connect Phantom Wallet</strong> again to link your pilot.</p>
+                `;
+                hubContent.prepend(guideCard);
+            } else {
+                guideCard.style.display = '';
+            }
+
+            requestAnimationFrame(() => {
+                const focusTarget = guideCard.querySelector('a') || guideCard;
+                if (focusTarget && typeof focusTarget.focus === 'function') {
+                    focusTarget.focus();
+                }
+            });
+        }
+    }
+
+    showHub();
+}
+
+function clearPhantomInstallGuide({ resetStatus = false } = {}) {
+    const guideCard = document.getElementById(PHANTOM_GUIDE_CARD_ID);
+    if (guideCard) {
+        guideCard.remove();
+    }
+
+    if (playBtn && playBtn.dataset.walletLocked === 'true') {
+        playBtn.disabled = false;
+        delete playBtn.dataset.walletLocked;
+    }
+
+    if (resetStatus && walletStatusEl && !walletPublicKey) {
+        walletStatusEl.textContent = 'Phantom Wallet detected. Connect to sync your progress.';
+    }
+}
+
 async function connectWallet() {
     const provider = window.phantom?.solana;
 
-    if (!provider) { alert('Phantom Wallet not found. Please install it.'); return; }
+    if (!provider) { openPhantomInstallGuide(); return; }
+
+    clearPhantomInstallGuide({ resetStatus: true });
+    if (walletStatusEl) walletStatusEl.textContent = 'Connecting to Phantom...';
 
     try {
         const resp = await provider.connect();
@@ -4318,6 +4384,19 @@ window.purchaseSprite = purchaseSprite;
 window.claimQuestReward = claimQuestReward;
 window.hideAllOverlays = hideAllOverlays;
 window.showStatAllocation = showStatAllocation;
+
+function handlePhantomAvailability() {
+    if (window.phantom?.solana) {
+        clearPhantomInstallGuide({ resetStatus: true });
+    }
+}
+
+window.addEventListener('phantom#initialized', handlePhantomAvailability);
+window.addEventListener('solana#initialized', handlePhantomAvailability);
+
+if (window.phantom?.solana) {
+    handlePhantomAvailability();
+}
 
 // --- CRITICAL FIX: Ensure Initialization Runs After DOM Load ---
 window.addEventListener('keydown', handleKeyDown);
