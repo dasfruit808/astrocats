@@ -1082,45 +1082,82 @@ const skillTree = {
             {
                 id: 'strength_core',
                 name: 'Power Calibrators',
-                description: '+1 Strength and +6% weapon damage to prime heavy ordnance.',
+                description: '+1 Strength and +5% weapon damage to prime heavy ordnance.',
                 cost: 1,
                 prerequisites: [],
                 bonuses: {
                     stats: { strength: 1 },
-                    perks: { damageMultiplier: 0.06 }
+                    perks: { damageMultiplier: 0.05 }
                 },
                 children: [
                     {
                         id: 'strength_payload',
                         name: 'Payload Magnifiers',
-                        description: '+1 Strength, +8% damage, and +10% projectile size.',
-                        cost: 1,
+                        description: '+1 Strength, +7% damage, and +5% projectile size.',
+                        cost: 2,
                         prerequisites: ['strength_core'],
                         bonuses: {
                             stats: { strength: 1 },
-                            perks: { damageMultiplier: 0.08, projectileSize: 0.1 }
+                            perks: { damageMultiplier: 0.07, projectileSize: 0.05 }
                         },
                         children: [
                             {
-                                id: 'strength_overdrive',
-                                name: 'Siege Overdrive',
-                                description: '+1 Strength, +10% weapon damage, and +1 pierce.',
-                                cost: 1,
+                                id: 'strength_barrage',
+                                name: 'Barrage Syncs',
+                                description: '+1 Strength, +5% damage, and +4% fire rate for concentrated volleys.',
+                                cost: 2,
                                 prerequisites: ['strength_payload'],
                                 bonuses: {
                                     stats: { strength: 1 },
-                                    perks: { damageMultiplier: 0.1, extraPierce: 1 }
+                                    perks: { damageMultiplier: 0.05, fireRateBonus: 0.04 }
+                                },
+                                children: []
+                            },
+                            {
+                                id: 'strength_overdrive',
+                                name: 'Siege Overdrive',
+                                description: '+1 Strength, +8% weapon damage, and +1 pierce.',
+                                cost: 2,
+                                prerequisites: ['strength_payload'],
+                                bonuses: {
+                                    stats: { strength: 1 },
+                                    perks: { damageMultiplier: 0.08, extraPierce: 1 }
                                 },
                                 children: [
                                     {
-                                        id: 'strength_plasma_forge',
-                                        name: 'Plasma Colossus',
-                                        description: '+1 Strength, +12% damage, +1 pierce, and +15% projectile size.',
-                                        cost: 1,
+                                        id: 'strength_armory',
+                                        name: 'Orbital Armory',
+                                        description: '+1 Strength, +10% damage, +10% projectile size, and +0.15x crit multiplier.',
+                                        cost: 3,
                                         prerequisites: ['strength_overdrive'],
                                         bonuses: {
                                             stats: { strength: 1 },
-                                            perks: { projectileSize: 0.15, extraPierce: 1, damageMultiplier: 0.12, critMultiplierBonus: 0.2 }
+                                            perks: { damageMultiplier: 0.1, projectileSize: 0.1, critMultiplierBonus: 0.15 }
+                                        },
+                                        children: [
+                                            {
+                                                id: 'strength_plasma_forge',
+                                                name: 'Plasma Colossus',
+                                                description: '+1 Strength, +12% damage, +1 pierce, +15% projectile size, and +0.2x crit multiplier.',
+                                                cost: 3,
+                                                prerequisites: ['strength_armory'],
+                                                bonuses: {
+                                                    stats: { strength: 1 },
+                                                    perks: { projectileSize: 0.15, extraPierce: 1, damageMultiplier: 0.12, critMultiplierBonus: 0.2 }
+                                                },
+                                                children: []
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        id: 'strength_warpath',
+                                        name: 'Warpath Algorithms',
+                                        description: '+1 Strength, +7% damage, +3% crit chance, and +1 pierce for elite barrages.',
+                                        cost: 3,
+                                        prerequisites: ['strength_overdrive'],
+                                        bonuses: {
+                                            stats: { strength: 1 },
+                                            perks: { damageMultiplier: 0.07, critChanceBonus: 0.03, extraPierce: 1 }
                                         },
                                         children: []
                                     }
@@ -1148,49 +1185,87 @@ const skillTree = {
             {
                 id: 'vitality_core',
                 name: 'Reinforced Bioframe',
-                description: '+1 Vitality with +300ms shield uptime and 3% mitigation.',
+                description: '+1 Vitality with +250ms shield uptime and 2% mitigation.',
                 cost: 1,
                 prerequisites: [],
                 bonuses: {
                     stats: { vitality: 1 },
-                    perks: { shieldDurationBonus: 300, damageReduction: 0.03 }
+                    perks: { shieldDurationBonus: 250, damageReduction: 0.02 }
                 },
                 children: [
                     {
                         id: 'vitality_relay',
                         name: 'Stability Relays',
-                        description: '+1 Vitality, +400ms shields, and 5% mitigation.',
-                        cost: 1,
+                        description: '+1 Vitality, +350ms shields, 4% mitigation, and 4% guard chance.',
+                        cost: 2,
                         prerequisites: ['vitality_core'],
                         bonuses: {
                             stats: { vitality: 1 },
-                            perks: { shieldDurationBonus: 400, damageReduction: 0.05 }
+                            perks: { shieldDurationBonus: 350, damageReduction: 0.04, guardChance: 0.04 }
                         },
                         children: [
                             {
                                 id: 'vitality_bastion',
                                 name: 'Adaptive Bastion',
-                                description: '+1 Vitality, +500ms shields, 6% mitigation, and 8% guard.',
-                                cost: 1,
+                                description: '+1 Vitality, +450ms shields, 5% mitigation, and 6% guard.',
+                                cost: 2,
                                 prerequisites: ['vitality_relay'],
                                 bonuses: {
                                     stats: { vitality: 1 },
-                                    perks: { shieldDurationBonus: 500, damageReduction: 0.06, guardChance: 0.08 }
+                                    perks: { shieldDurationBonus: 450, damageReduction: 0.05, guardChance: 0.06 }
                                 },
                                 children: [
                                     {
-                                        id: 'vitality_guardian',
-                                        name: 'Guardian Ward',
-                                        description: '+1 Vitality, +600ms shields, 7% mitigation, and 12% guard.',
-                                        cost: 1,
+                                        id: 'vitality_phalanx',
+                                        name: 'Phalanx Projectors',
+                                        description: '+1 Vitality, +500ms shields, 6% mitigation, 8% guard, and 2% evasion.',
+                                        cost: 2,
                                         prerequisites: ['vitality_bastion'],
                                         bonuses: {
                                             stats: { vitality: 1 },
-                                            perks: { guardChance: 0.12, damageReduction: 0.07, shieldDurationBonus: 600 }
+                                            perks: { shieldDurationBonus: 500, damageReduction: 0.06, guardChance: 0.08, evasionBonus: 0.02 }
                                         },
-                                        children: []
+                                        children: [
+                                            {
+                                                id: 'vitality_safeguard',
+                                                name: 'Safeguard Nexus',
+                                                description: '+1 Vitality, +550ms shields, 7% mitigation, 10% guard, and 2% evasion.',
+                                                cost: 3,
+                                                prerequisites: ['vitality_phalanx'],
+                                                bonuses: {
+                                                    stats: { vitality: 1 },
+                                                    perks: { shieldDurationBonus: 550, damageReduction: 0.07, guardChance: 0.1, evasionBonus: 0.02 }
+                                                },
+                                                children: [
+                                                    {
+                                                        id: 'vitality_guardian',
+                                                        name: 'Guardian Ward',
+                                                        description: '+1 Vitality, +650ms shields, 8% mitigation, 12% guard, and 3% evasion.',
+                                                        cost: 3,
+                                                        prerequisites: ['vitality_safeguard'],
+                                                        bonuses: {
+                                                            stats: { vitality: 1 },
+                                                            perks: { guardChance: 0.12, damageReduction: 0.08, shieldDurationBonus: 650, evasionBonus: 0.03 }
+                                                        },
+                                                        children: []
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
+                            },
+                            {
+                                id: 'vitality_reinforce',
+                                name: 'Bulwark Reinforcements',
+                                description: '+1 Vitality, +380ms shields, 4% mitigation, and 5% guard to steady the line.',
+                                cost: 2,
+                                prerequisites: ['vitality_relay'],
+                                bonuses: {
+                                    stats: { vitality: 1 },
+                                    perks: { shieldDurationBonus: 380, damageReduction: 0.04, guardChance: 0.05 }
+                                },
+                                children: []
                             }
                         ]
                     }
@@ -1214,47 +1289,85 @@ const skillTree = {
             {
                 id: 'speed_core',
                 name: 'Thruster Tuning',
-                description: '+1 Speed with +10% dash recovery, +4% movement, and +2% evasion.',
+                description: '+1 Speed with +8% dash recovery, +4% movement, and +2% evasion.',
                 cost: 1,
                 prerequisites: [],
                 bonuses: {
                     stats: { speed: 1 },
-                    perks: { dashCooldownMultiplier: -0.1, evasionBonus: 0.02, movementSpeed: 0.04 }
+                    perks: { dashCooldownMultiplier: -0.08, evasionBonus: 0.02, movementSpeed: 0.04 }
                 },
                 children: [
                     {
                         id: 'speed_vector',
                         name: 'Vector Thrusters',
-                        description: '+1 Speed, +12% dash recovery, +6% movement, +4% fire rate.',
-                        cost: 1,
+                        description: '+1 Speed, +10% dash recovery, +5% movement, and +3% fire rate.',
+                        cost: 2,
                         prerequisites: ['speed_core'],
                         bonuses: {
                             stats: { speed: 1 },
-                            perks: { dashCooldownMultiplier: -0.12, movementSpeed: 0.06, fireRateBonus: 0.04 }
+                            perks: { dashCooldownMultiplier: -0.1, movementSpeed: 0.05, fireRateBonus: 0.03 }
                         },
                         children: [
                             {
-                                id: 'speed_afterburn',
-                                name: 'Afterburn Channels',
-                                description: '+1 Speed, +14% dash recovery, +8% movement, +6% fire rate.',
-                                cost: 1,
+                                id: 'speed_flux_array',
+                                name: 'Flux Arrays',
+                                description: '+1 Speed, +11% dash recovery, +6% movement, +4% fire rate, and +2% drop chance.',
+                                cost: 2,
                                 prerequisites: ['speed_vector'],
                                 bonuses: {
                                     stats: { speed: 1 },
-                                    perks: { fireRateBonus: 0.06, dashCooldownMultiplier: -0.14, movementSpeed: 0.08 }
+                                    perks: { dashCooldownMultiplier: -0.11, movementSpeed: 0.06, fireRateBonus: 0.04, dropChanceBonus: 0.02 }
                                 },
                                 children: [
                                     {
-                                        id: 'speed_slipstream',
-                                        name: 'Quantum Slipstream',
-                                        description: '+1 Speed, +19% dash recovery, +10% movement, +9% fire rate, +5% evasion.',
-                                        cost: 1,
+                                        id: 'speed_precision',
+                                        name: 'Precision Circuits',
+                                        description: '+1 Speed, +13% dash recovery, +7% movement, +6% fire rate, and +2% crit chance.',
+                                        cost: 3,
+                                        prerequisites: ['speed_flux_array'],
+                                        bonuses: {
+                                            stats: { speed: 1 },
+                                            perks: { dashCooldownMultiplier: -0.13, movementSpeed: 0.07, fireRateBonus: 0.06, critChanceBonus: 0.02 }
+                                        },
+                                        children: []
+                                    }
+                                ]
+                            },
+                            {
+                                id: 'speed_afterburn',
+                                name: 'Afterburn Channels',
+                                description: '+1 Speed, +12% dash recovery, +7% movement, and +5% fire rate.',
+                                cost: 2,
+                                prerequisites: ['speed_vector'],
+                                bonuses: {
+                                    stats: { speed: 1 },
+                                    perks: { fireRateBonus: 0.05, dashCooldownMultiplier: -0.12, movementSpeed: 0.07, evasionBonus: 0.03 }
+                                },
+                                children: [
+                                    {
+                                        id: 'speed_hyperflux',
+                                        name: 'Hyperflux Drives',
+                                        description: '+1 Speed, +15% dash recovery, +8% movement, +6% fire rate, and +4% evasion.',
+                                        cost: 3,
                                         prerequisites: ['speed_afterburn'],
                                         bonuses: {
                                             stats: { speed: 1 },
-                                            perks: { fireRateBonus: 0.09, dashCooldownMultiplier: -0.19, movementSpeed: 0.1, evasionBonus: 0.05 }
+                                            perks: { fireRateBonus: 0.06, dashCooldownMultiplier: -0.15, movementSpeed: 0.08, evasionBonus: 0.04 }
                                         },
-                                        children: []
+                                        children: [
+                                            {
+                                                id: 'speed_slipstream',
+                                                name: 'Quantum Slipstream',
+                                                description: '+1 Speed, +18% dash recovery, +10% movement, +8% fire rate, and +5% evasion.',
+                                                cost: 3,
+                                                prerequisites: ['speed_hyperflux'],
+                                                bonuses: {
+                                                    stats: { speed: 1 },
+                                                    perks: { fireRateBonus: 0.08, dashCooldownMultiplier: -0.18, movementSpeed: 0.1, evasionBonus: 0.05 }
+                                                },
+                                                children: []
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -1280,49 +1393,87 @@ const skillTree = {
             {
                 id: 'focus_core',
                 name: 'Lucky Glyphs',
-                description: '+1 Focus, +2.5% crit chance, and +3% drop rate.',
+                description: '+1 Focus, +2% crit chance, and +2% drop rate.',
                 cost: 1,
                 prerequisites: [],
                 bonuses: {
                     stats: { focus: 1 },
-                    perks: { critChanceBonus: 0.025, dropChanceBonus: 0.03 }
+                    perks: { critChanceBonus: 0.02, dropChanceBonus: 0.02 }
                 },
                 children: [
                     {
                         id: 'focus_resonance',
                         name: 'Resonance Arrays',
-                        description: '+1 Focus, +3% crit chance, and +2% XP/Credit gain.',
-                        cost: 1,
+                        description: '+1 Focus, +2.5% crit chance, and +2% XP/Credit gain.',
+                        cost: 2,
                         prerequisites: ['focus_core'],
                         bonuses: {
                             stats: { focus: 1 },
-                            perks: { critChanceBonus: 0.03, xpBonus: 0.02, creditBonus: 0.02 }
+                            perks: { critChanceBonus: 0.025, xpBonus: 0.02, creditBonus: 0.02 }
                         },
                         children: [
                             {
-                                id: 'focus_hawkeye',
-                                name: 'Hawkeye Sensors',
-                                description: '+1 Focus, +3.5% crit, +3% XP/Credit gain.',
-                                cost: 1,
+                                id: 'focus_clairvoyance',
+                                name: 'Clairvoyance Lattice',
+                                description: '+1 Focus, +3% crit, +3% drop rate, and +3% XP gain.',
+                                cost: 2,
                                 prerequisites: ['focus_resonance'],
                                 bonuses: {
                                     stats: { focus: 1 },
-                                    perks: { critChanceBonus: 0.035, xpBonus: 0.03, creditBonus: 0.03 }
+                                    perks: { critChanceBonus: 0.03, dropChanceBonus: 0.03, xpBonus: 0.03 }
                                 },
                                 children: [
                                     {
-                                        id: 'focus_destiny',
-                                        name: 'Destiny Engine',
-                                        description: '+1 Focus, +4.5% crit, +4% XP/Credit, +4% drop rate.',
-                                        cost: 1,
-                                        prerequisites: ['focus_hawkeye'],
+                                        id: 'focus_hawkeye',
+                                        name: 'Hawkeye Sensors',
+                                        description: '+1 Focus, +3.5% crit, +3% XP/Credit gain, and +2% drop rate.',
+                                        cost: 2,
+                                        prerequisites: ['focus_clairvoyance'],
                                         bonuses: {
                                             stats: { focus: 1 },
-                                            perks: { critChanceBonus: 0.045, dropChanceBonus: 0.04, xpBonus: 0.04, creditBonus: 0.04 }
+                                            perks: { critChanceBonus: 0.035, xpBonus: 0.03, creditBonus: 0.03, dropChanceBonus: 0.02 }
                                         },
-                                        children: []
+                                        children: [
+                                            {
+                                                id: 'focus_diviner',
+                                                name: 'Diviner Array',
+                                                description: '+1 Focus, +4% crit, +4% XP/Credit, and +3% drop rate.',
+                                                cost: 3,
+                                                prerequisites: ['focus_hawkeye'],
+                                                bonuses: {
+                                                    stats: { focus: 1 },
+                                                    perks: { critChanceBonus: 0.04, xpBonus: 0.04, creditBonus: 0.04, dropChanceBonus: 0.03 }
+                                                },
+                                                children: [
+                                                    {
+                                                        id: 'focus_destiny',
+                                                        name: 'Destiny Engine',
+                                                        description: '+1 Focus, +4.5% crit, +5% XP/Credit, +4% drop rate, and +2% credit windfall.',
+                                                        cost: 3,
+                                                        prerequisites: ['focus_diviner'],
+                                                        bonuses: {
+                                                            stats: { focus: 1 },
+                                                            perks: { critChanceBonus: 0.045, dropChanceBonus: 0.04, xpBonus: 0.05, creditBonus: 0.05 }
+                                                        },
+                                                        children: []
+                                                    }
+                                                ]
+                                            }
+                                        ]
                                     }
                                 ]
+                            },
+                            {
+                                id: 'focus_windfall',
+                                name: 'Windfall Calculators',
+                                description: '+1 Focus, +2% XP gain, +4% credits, and +2% drop rate.',
+                                cost: 2,
+                                prerequisites: ['focus_resonance'],
+                                bonuses: {
+                                    stats: { focus: 1 },
+                                    perks: { xpBonus: 0.02, creditBonus: 0.04, dropChanceBonus: 0.02 }
+                                },
+                                children: []
                             }
                         ]
                     }
