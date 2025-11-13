@@ -1063,36 +1063,49 @@ const skillTree = {
             {
                 id: 'strength_core',
                 name: 'Power Calibrators',
-                description: '+1 Strength. Unlocks the heavy ordnance path.',
+                description: '+1 Strength and +6% weapon damage to prime heavy ordnance.',
                 cost: 1,
                 prerequisites: [],
                 bonuses: {
                     stats: { strength: 1 },
-                    perks: { damageMultiplier: 0.08 }
+                    perks: { damageMultiplier: 0.06 }
                 },
                 children: [
                     {
-                        id: 'strength_overdrive',
-                        name: 'Siege Overdrive',
-                        description: '+1 Strength and +12% weapon damage with bonus pierce.',
+                        id: 'strength_payload',
+                        name: 'Payload Magnifiers',
+                        description: '+1 Strength, +8% damage, and +10% projectile size.',
                         cost: 1,
                         prerequisites: ['strength_core'],
                         bonuses: {
                             stats: { strength: 1 },
-                            perks: { damageMultiplier: 0.12, extraPierce: 1 }
+                            perks: { damageMultiplier: 0.08, projectileSize: 0.1 }
                         },
                         children: [
                             {
-                                id: 'strength_plasma_forge',
-                                name: 'Plasma Colossus',
-                                description: '+1 Strength, projectiles grow by 25% and gain +1 pierce.',
+                                id: 'strength_overdrive',
+                                name: 'Siege Overdrive',
+                                description: '+1 Strength, +10% weapon damage, and +1 pierce.',
                                 cost: 1,
-                                prerequisites: ['strength_overdrive'],
+                                prerequisites: ['strength_payload'],
                                 bonuses: {
                                     stats: { strength: 1 },
-                                    perks: { projectileSize: 0.25, extraPierce: 1, damageMultiplier: 0.18, critMultiplierBonus: 0.35 }
+                                    perks: { damageMultiplier: 0.1, extraPierce: 1 }
                                 },
-                                children: []
+                                children: [
+                                    {
+                                        id: 'strength_plasma_forge',
+                                        name: 'Plasma Colossus',
+                                        description: '+1 Strength, +12% damage, +1 pierce, and +15% projectile size.',
+                                        cost: 1,
+                                        prerequisites: ['strength_overdrive'],
+                                        bonuses: {
+                                            stats: { strength: 1 },
+                                            perks: { projectileSize: 0.15, extraPierce: 1, damageMultiplier: 0.12, critMultiplierBonus: 0.2 }
+                                        },
+                                        children: []
+                                    }
+                                ]
                             }
                         ]
                     }
@@ -1116,36 +1129,49 @@ const skillTree = {
             {
                 id: 'vitality_core',
                 name: 'Reinforced Bioframe',
-                description: '+1 Vitality. Grants sturdier base shielding.',
+                description: '+1 Vitality with +300ms shield uptime and 3% mitigation.',
                 cost: 1,
                 prerequisites: [],
                 bonuses: {
                     stats: { vitality: 1 },
-                    perks: { shieldDurationBonus: 300, damageReduction: 0.04 }
+                    perks: { shieldDurationBonus: 300, damageReduction: 0.03 }
                 },
                 children: [
                     {
-                        id: 'vitality_bastion',
-                        name: 'Adaptive Bastion',
-                        description: '+1 Vitality and shields last 0.6s longer with guard chance.',
+                        id: 'vitality_relay',
+                        name: 'Stability Relays',
+                        description: '+1 Vitality, +400ms shields, and 5% mitigation.',
                         cost: 1,
                         prerequisites: ['vitality_core'],
                         bonuses: {
                             stats: { vitality: 1 },
-                            perks: { shieldDurationBonus: 600, damageReduction: 0.07, guardChance: 0.1 }
+                            perks: { shieldDurationBonus: 400, damageReduction: 0.05 }
                         },
                         children: [
                             {
-                                id: 'vitality_guardian',
-                                name: 'Guardian Ward',
-                                description: '+1 Vitality and 18% chance to negate a hit.',
+                                id: 'vitality_bastion',
+                                name: 'Adaptive Bastion',
+                                description: '+1 Vitality, +500ms shields, 6% mitigation, and 8% guard.',
                                 cost: 1,
-                                prerequisites: ['vitality_bastion'],
+                                prerequisites: ['vitality_relay'],
                                 bonuses: {
                                     stats: { vitality: 1 },
-                                    perks: { guardChance: 0.18, damageReduction: 0.1, shieldDurationBonus: 900 }
+                                    perks: { shieldDurationBonus: 500, damageReduction: 0.06, guardChance: 0.08 }
                                 },
-                                children: []
+                                children: [
+                                    {
+                                        id: 'vitality_guardian',
+                                        name: 'Guardian Ward',
+                                        description: '+1 Vitality, +600ms shields, 7% mitigation, and 12% guard.',
+                                        cost: 1,
+                                        prerequisites: ['vitality_bastion'],
+                                        bonuses: {
+                                            stats: { vitality: 1 },
+                                            perks: { guardChance: 0.12, damageReduction: 0.07, shieldDurationBonus: 600 }
+                                        },
+                                        children: []
+                                    }
+                                ]
                             }
                         ]
                     }
@@ -1169,36 +1195,49 @@ const skillTree = {
             {
                 id: 'speed_core',
                 name: 'Thruster Tuning',
-                description: '+1 Speed and +12% dash cooldown recovery.',
+                description: '+1 Speed with +10% dash recovery, +4% movement, and +2% evasion.',
                 cost: 1,
                 prerequisites: [],
                 bonuses: {
                     stats: { speed: 1 },
-                    perks: { dashCooldownMultiplier: -0.12, evasionBonus: 0.02, movementSpeed: 0.05 }
+                    perks: { dashCooldownMultiplier: -0.1, evasionBonus: 0.02, movementSpeed: 0.04 }
                 },
                 children: [
                     {
-                        id: 'speed_afterburn',
-                        name: 'Afterburn Channels',
-                        description: '+1 Speed, +7% fire rate, and faster dashes.',
+                        id: 'speed_vector',
+                        name: 'Vector Thrusters',
+                        description: '+1 Speed, +12% dash recovery, +6% movement, +4% fire rate.',
                         cost: 1,
                         prerequisites: ['speed_core'],
                         bonuses: {
                             stats: { speed: 1 },
-                            perks: { fireRateBonus: 0.07, dashCooldownMultiplier: -0.18, movementSpeed: 0.07 }
+                            perks: { dashCooldownMultiplier: -0.12, movementSpeed: 0.06, fireRateBonus: 0.04 }
                         },
                         children: [
                             {
-                                id: 'speed_slipstream',
-                                name: 'Quantum Slipstream',
-                                description: '+1 Speed, +10% fire rate, and +15% dash recovery.',
+                                id: 'speed_afterburn',
+                                name: 'Afterburn Channels',
+                                description: '+1 Speed, +14% dash recovery, +8% movement, +6% fire rate.',
                                 cost: 1,
-                                prerequisites: ['speed_afterburn'],
+                                prerequisites: ['speed_vector'],
                                 bonuses: {
                                     stats: { speed: 1 },
-                                    perks: { fireRateBonus: 0.1, dashCooldownMultiplier: -0.25, movementSpeed: 0.12, evasionBonus: 0.05 }
+                                    perks: { fireRateBonus: 0.06, dashCooldownMultiplier: -0.14, movementSpeed: 0.08 }
                                 },
-                                children: []
+                                children: [
+                                    {
+                                        id: 'speed_slipstream',
+                                        name: 'Quantum Slipstream',
+                                        description: '+1 Speed, +19% dash recovery, +10% movement, +9% fire rate, +5% evasion.',
+                                        cost: 1,
+                                        prerequisites: ['speed_afterburn'],
+                                        bonuses: {
+                                            stats: { speed: 1 },
+                                            perks: { fireRateBonus: 0.09, dashCooldownMultiplier: -0.19, movementSpeed: 0.1, evasionBonus: 0.05 }
+                                        },
+                                        children: []
+                                    }
+                                ]
                             }
                         ]
                     }
@@ -1222,36 +1261,49 @@ const skillTree = {
             {
                 id: 'focus_core',
                 name: 'Lucky Glyphs',
-                description: '+1 Focus and +3% critical chance.',
+                description: '+1 Focus, +2.5% crit chance, and +3% drop rate.',
                 cost: 1,
                 prerequisites: [],
                 bonuses: {
                     stats: { focus: 1 },
-                    perks: { critChanceBonus: 0.03, dropChanceBonus: 0.03 }
+                    perks: { critChanceBonus: 0.025, dropChanceBonus: 0.03 }
                 },
                 children: [
                     {
-                        id: 'focus_hawkeye',
-                        name: 'Hawkeye Sensors',
-                        description: '+1 Focus and +4% crit chance.',
+                        id: 'focus_resonance',
+                        name: 'Resonance Arrays',
+                        description: '+1 Focus, +3% crit chance, and +2% XP/Credit gain.',
                         cost: 1,
                         prerequisites: ['focus_core'],
                         bonuses: {
                             stats: { focus: 1 },
-                            perks: { critChanceBonus: 0.04, xpBonus: 0.03, creditBonus: 0.03 }
+                            perks: { critChanceBonus: 0.03, xpBonus: 0.02, creditBonus: 0.02 }
                         },
                         children: [
                             {
-                                id: 'focus_destiny',
-                                name: 'Destiny Engine',
-                                description: '+1 Focus with improved rewards and crits.',
+                                id: 'focus_hawkeye',
+                                name: 'Hawkeye Sensors',
+                                description: '+1 Focus, +3.5% crit, +3% XP/Credit gain.',
                                 cost: 1,
-                                prerequisites: ['focus_hawkeye'],
+                                prerequisites: ['focus_resonance'],
                                 bonuses: {
                                     stats: { focus: 1 },
-                                    perks: { critChanceBonus: 0.05, dropChanceBonus: 0.04, xpBonus: 0.05, creditBonus: 0.05 }
+                                    perks: { critChanceBonus: 0.035, xpBonus: 0.03, creditBonus: 0.03 }
                                 },
-                                children: []
+                                children: [
+                                    {
+                                        id: 'focus_destiny',
+                                        name: 'Destiny Engine',
+                                        description: '+1 Focus, +4.5% crit, +4% XP/Credit, +4% drop rate.',
+                                        cost: 1,
+                                        prerequisites: ['focus_hawkeye'],
+                                        bonuses: {
+                                            stats: { focus: 1 },
+                                            perks: { critChanceBonus: 0.045, dropChanceBonus: 0.04, xpBonus: 0.04, creditBonus: 0.04 }
+                                        },
+                                        children: []
+                                    }
+                                ]
                             }
                         ]
                     }
@@ -1326,6 +1378,119 @@ const STAT_DISPLAY_NAMES = {
     vitality: 'Vitality (Shields & Sustain)',
     focus: 'Focus (Crits & Rewards)'
 };
+
+const PERCENT_PERK_KEYS = new Set([
+    'damageMultiplier',
+    'fireRateBonus',
+    'movementSpeed',
+    'dashCooldownMultiplier',
+    'critChanceBonus',
+    'dropChanceBonus',
+    'damageReduction',
+    'evasionBonus',
+    'xpBonus',
+    'creditBonus',
+    'guardChance'
+]);
+
+const PERK_LABELS = {
+    damageMultiplier: 'Damage Bonus',
+    fireRateBonus: 'Fire Rate',
+    movementSpeed: 'Movement Speed',
+    dashCooldownMultiplier: 'Dash Cooldown',
+    critChanceBonus: 'Crit Chance',
+    dropChanceBonus: 'Drop Chance',
+    damageReduction: 'Damage Reduction',
+    evasionBonus: 'Evasion',
+    xpBonus: 'XP Gain',
+    creditBonus: 'Credit Gain',
+    guardChance: 'Guard Chance',
+    shieldDurationBonus: 'Shield Duration',
+    critMultiplierBonus: 'Crit Multiplier',
+    extraPierce: 'Pierce',
+    projectileSize: 'Projectile Size'
+};
+
+function formatStatValue(value) {
+    if (!Number.isFinite(value)) return '0';
+    const rounded = Math.round(value);
+    return Math.abs(value - rounded) < 0.01 ? String(rounded) : value.toFixed(1);
+}
+
+function getStatLabel(statKey) {
+    const label = STAT_DISPLAY_NAMES[statKey] || statKey;
+    return label.includes('(') ? label.split(' (')[0] : label;
+}
+
+function formatPerkValue(key, value) {
+    if (!Number.isFinite(value) || Math.abs(value) < 0.0001) {
+        return null;
+    }
+
+    if (key === 'shieldDurationBonus') {
+        const seconds = value / 1000;
+        if (Math.abs(seconds) >= 1) {
+            const formatted = seconds.toFixed(1).replace(/\.0$/, '');
+            return `${PERK_LABELS[key]} +${formatted}s`;
+        }
+        return `${PERK_LABELS[key]} +${Math.round(value)}ms`;
+    }
+
+    if (key === 'critMultiplierBonus') {
+        const formatted = value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+        return `${PERK_LABELS[key]} +${formatted}x`;
+    }
+
+    if (key === 'extraPierce') {
+        return `${PERK_LABELS[key]} +${formatStatValue(value)}`;
+    }
+
+    if (key === 'projectileSize') {
+        const percent = value * 100;
+        const precision = Math.abs(percent) < 10 ? 1 : 0;
+        return `${PERK_LABELS[key]} +${percent.toFixed(precision)}%`;
+    }
+
+    const label = PERK_LABELS[key] || key.replace(/([A-Z])/g, ' $1');
+    if (PERCENT_PERK_KEYS.has(key)) {
+        const percent = value * 100;
+        const precision = Math.abs(percent) < 10 ? 1 : 0;
+        const prefix = value >= 0 ? '+' : '';
+        return `${label} ${prefix}${percent.toFixed(precision)}%`;
+    }
+
+    const prefix = value >= 0 ? '+' : '';
+    return `${label} ${prefix}${formatStatValue(value)}`;
+}
+
+function summarizeStats(stats = {}) {
+    const results = [];
+    Object.entries(stats).forEach(([key, value]) => {
+        if (!CORE_STATS.includes(key)) return;
+        if (!Number.isFinite(value) || Math.abs(value) < 0.0001) return;
+        const prefix = value >= 0 ? '+' : '';
+        results.push(`${getStatLabel(key)} ${prefix}${formatStatValue(value)}`);
+    });
+    return results;
+}
+
+function summarizePerks(perks = {}) {
+    const results = [];
+    Object.entries(perks).forEach(([key, value]) => {
+        if (typeof value !== 'number') return;
+        const formatted = formatPerkValue(key, value);
+        if (formatted) {
+            results.push(formatted);
+        }
+    });
+    return results;
+}
+
+function summarizeBonuses(bonuses = {}) {
+    const stats = summarizeStats(bonuses.stats || {});
+    const perks = summarizePerks(bonuses.perks || {});
+    return [...stats, ...perks];
+}
 
 function getBaseStatsForLevel(level) {
     const safeLevel = Math.max(1, Math.floor(level || 1));
@@ -1479,67 +1644,64 @@ function unlockSpecializationNode(nodeId) {
     }
 
     applyStatEffects();
-
-    if (statPointsEl) statPointsEl.textContent = playerData.specializationPoints;
-    renderSkillTree();
+    refreshStatAllocationOverlay({ forceRender: true });
     updateUI();
     savePlayerData();
 }
 
 function formatNodeBonuses(node) {
-    const parts = [];
-    if (node.bonuses?.stats) {
-        Object.entries(node.bonuses.stats).forEach(([key, value]) => {
-            if (!CORE_STATS.includes(key)) return;
-            const label = STAT_DISPLAY_NAMES[key] || key;
-            const amount = value >= 0 ? `+${value}` : value;
-            parts.push(`${label}: ${amount}`);
+    if (!node?.bonuses) return '';
+    return summarizeBonuses(node.bonuses).join(' • ');
+}
+
+function aggregateBranchBonuses(branchKey) {
+    const stats = {};
+    const perks = {};
+    const nodeIds = branchNodeIds[branchKey] || [];
+
+    nodeIds.forEach(nodeId => {
+        const node = skillNodeIndex[nodeId];
+        if (!node) return;
+        if (node.bonuses?.stats) {
+            Object.entries(node.bonuses.stats).forEach(([stat, value]) => {
+                if (!CORE_STATS.includes(stat) || !Number.isFinite(value)) return;
+                stats[stat] = (stats[stat] || 0) + value;
+            });
+        }
+        if (node.bonuses?.perks) {
+            Object.entries(node.bonuses.perks).forEach(([key, value]) => {
+                if (typeof value !== 'number') return;
+                perks[key] = (perks[key] || 0) + value;
+            });
+        }
+    });
+
+    return { stats, perks };
+}
+
+function ensureUnlockedPrerequisites() {
+    if (!Array.isArray(playerData?.unlockedNodes)) return;
+    const unlockedSet = new Set(playerData.unlockedNodes.filter(id => skillNodeIndex[id]));
+    let changed = true;
+
+    while (changed) {
+        changed = false;
+        Array.from(unlockedSet).forEach(nodeId => {
+            const node = skillNodeIndex[nodeId];
+            if (!node || !Array.isArray(node.prerequisites)) return;
+            node.prerequisites.forEach(prereqId => {
+                if (!prereqId || !skillNodeIndex[prereqId]) return;
+                if (!unlockedSet.has(prereqId)) {
+                    unlockedSet.add(prereqId);
+                    changed = true;
+                }
+            });
         });
     }
-    if (node.bonuses?.perks) {
-        Object.entries(node.bonuses.perks).forEach(([key, value]) => {
-            if (typeof value !== 'number') return;
-            const percentKeys = new Set([
-                'damageMultiplier',
-                'fireRateBonus',
-                'movementSpeed',
-                'dashCooldownMultiplier',
-                'critChanceBonus',
-                'dropChanceBonus',
-                'damageReduction',
-                'evasionBonus',
-                'xpBonus',
-                'creditBonus'
-            ]);
-            const perkLabels = {
-                damageMultiplier: 'Damage Bonus',
-                fireRateBonus: 'Fire Rate',
-                movementSpeed: 'Movement Speed',
-                dashCooldownMultiplier: 'Dash Cooldown',
-                critChanceBonus: 'Crit Chance',
-                dropChanceBonus: 'Drop Chance',
-                damageReduction: 'Damage Reduction',
-                evasionBonus: 'Evasion',
-                xpBonus: 'XP Gain',
-                creditBonus: 'Credit Gain'
-            };
-            if (percentKeys.has(key)) {
-                const label = perkLabels[key] || key.replace(/([A-Z])/g, ' $1');
-                parts.push(`${label}: ${(value * 100).toFixed(0)}%`);
-            } else if (key === 'shieldDurationBonus') {
-                parts.push('Shield Duration +' + value + 'ms');
-            } else if (key === 'critMultiplierBonus') {
-                parts.push('Crit Multiplier +' + value.toFixed(2));
-            } else if (key === 'extraPierce') {
-                parts.push('Pierce +' + value);
-            } else if (key === 'projectileSize') {
-                parts.push('Projectile Size +' + Math.round(value * 100) + '%');
-            } else if (key === 'guardChance') {
-                parts.push('Guard Chance ' + Math.round(value * 100) + '%');
-            }
-        });
+
+    if (unlockedSet.size !== playerData.unlockedNodes.length) {
+        playerData.unlockedNodes = Array.from(unlockedSet);
     }
-    return parts.join(' • ');
 }
 
 function createSkillNodeElement(node, depth = 0) {
@@ -1616,16 +1778,10 @@ function renderSkillTree() {
     }
 
     statOptionsEl.innerHTML = '';
-    if (statPointsEl) statPointsEl.textContent = playerData.specializationPoints;
 
     const { totals, masteries, levelBase } = recomputeSpecializationTotals();
     const summaryWrapper = document.createElement('div');
     summaryWrapper.className = 'skill-summary';
-    const formatStat = value => {
-        if (!Number.isFinite(value)) return '0';
-        const rounded = Math.round(value);
-        return Math.abs(value - rounded) < 0.01 ? String(rounded) : value.toFixed(1);
-    };
 
     CORE_STATS.forEach(key => {
         const total = totals[key] || 0;
@@ -1634,11 +1790,11 @@ function renderSkillTree() {
         const specializationBonus = total - baseInvested - levelContribution;
         const statLine = document.createElement('div');
         statLine.className = 'skill-summary-line';
-        const breakdown = [`Invested ${formatStat(baseInvested)}`, `Level ${formatStat(levelContribution)}`];
+        const breakdown = [`Invested ${formatStatValue(baseInvested)}`, `Level ${formatStatValue(levelContribution)}`];
         if (Math.abs(specializationBonus) > 0.01) {
-            breakdown.push(`Tree ${formatStat(specializationBonus)}`);
+            breakdown.push(`Tree ${formatStatValue(specializationBonus)}`);
         }
-        statLine.textContent = `${STAT_DISPLAY_NAMES[key]}: ${formatStat(total)} (${breakdown.join(' + ')})`;
+        statLine.textContent = `${STAT_DISPLAY_NAMES[key]}: ${formatStatValue(total)} (${breakdown.join(' + ')})`;
         summaryWrapper.appendChild(statLine);
     });
 
@@ -1673,6 +1829,34 @@ function renderSkillTree() {
             branchEl.appendChild(desc);
         }
 
+        const branchTotals = aggregateBranchBonuses(branchKey);
+        const statSummaries = summarizeStats(branchTotals.stats);
+        const perkSummaries = summarizePerks(branchTotals.perks);
+        if (statSummaries.length || perkSummaries.length) {
+            const summaryList = document.createElement('ul');
+            summaryList.className = 'skill-branch-summary';
+
+            if (statSummaries.length) {
+                const item = document.createElement('li');
+                const strong = document.createElement('strong');
+                strong.textContent = 'Stats:';
+                item.appendChild(strong);
+                item.appendChild(document.createTextNode(` ${statSummaries.join(', ')}`));
+                summaryList.appendChild(item);
+            }
+
+            if (perkSummaries.length) {
+                const item = document.createElement('li');
+                const strong = document.createElement('strong');
+                strong.textContent = 'Perks:';
+                item.appendChild(strong);
+                item.appendChild(document.createTextNode(` ${perkSummaries.join(', ')}`));
+                summaryList.appendChild(item);
+            }
+
+            branchEl.appendChild(summaryList);
+        }
+
         const nodesContainer = document.createElement('div');
         nodesContainer.className = 'skill-node-container';
         (branch.nodes || []).forEach(node => {
@@ -1701,6 +1885,25 @@ function renderSkillTree() {
         hint.className = 'skill-hint';
         hint.textContent = 'Earn more specialization points by leveling up or completing quests to unlock additional nodes.';
         statOptionsEl.appendChild(hint);
+    }
+}
+
+function refreshStatAllocationOverlay({ forceRender = false } = {}) {
+    if (statLevelOverlayEl) {
+        statLevelOverlayEl.textContent = playerData.level;
+    }
+
+    const numericPoints = Number(playerData.specializationPoints);
+    const pointsAvailable = Number.isFinite(numericPoints) ? Math.max(0, Math.floor(numericPoints)) : 0;
+    if (statPointsEl) {
+        statPointsEl.textContent = pointsAvailable;
+    }
+
+    updateGuestStatTooltip(pointsAvailable);
+
+    const overlayVisible = Boolean(statAllocationEl && statAllocationEl.style.display !== 'none');
+    if (forceRender || overlayVisible) {
+        renderSkillTree();
     }
 }
 
@@ -2562,6 +2765,8 @@ function updateHubUI() {
         updateGuestStatTooltip(pointsAvailable);
     }
 
+    refreshStatAllocationOverlay();
+
     if (!walletPublicKey) return;
     if (walletAddressEl) walletAddressEl.textContent = walletPublicKey.slice(0, 8) + '...';
     if (gamesPlayedEl) gamesPlayedEl.textContent = playerData.gamesPlayed;
@@ -2570,8 +2775,6 @@ function updateHubUI() {
     if (bestScoreEl) bestScoreEl.textContent = playerData.bestScore;
     if (hubCreditsEl) hubCreditsEl.textContent = playerData.credits;
     if (statLevelHubEl) statLevelHubEl.textContent = playerData.level;
-    if (statLevelOverlayEl) statLevelOverlayEl.textContent = playerData.level;
-    if (statPointsEl) statPointsEl.textContent = playerData.specializationPoints;
     if (itemsEl) itemsEl.textContent = playerData.items.length ? playerData.items.join(', ') : 'None';
     ensureSpriteProgression();
     if (activeSpriteEl) activeSpriteEl.textContent = getSpriteDisplayName(playerData.activeSpriteId);
@@ -2583,10 +2786,6 @@ function updateHubUI() {
     updateUI();
     updateQuestsUI();
     loadAndDisplayLeaderboard();
-
-    if (statAllocationEl && statAllocationEl.style.display !== 'none') {
-        renderSkillTree();
-    }
 }
 
 // --------------------------------------------------------------------
@@ -4096,6 +4295,7 @@ async function loadPlayerData() {
             .map(id => LEGACY_NODE_ID_MAP[id] || id)
             .filter(id => skillNodeIndex[id]);
         playerData.unlockedNodes = Array.from(new Set(normalizedUnlocked));
+        ensureUnlockedPrerequisites();
 
         const dailyFallback = base.daily;
         playerData.daily = { ...dailyFallback, ...(loadedData.daily || {}) };
@@ -4272,10 +4472,7 @@ function gainXP(amount, options = {}) {
         applyStatEffects();
     }
 
-    if (statPointsEl) statPointsEl.textContent = playerData.specializationPoints;
-    if (statAllocationEl && statAllocationEl.style.display !== 'none') {
-        renderSkillTree();
-    }
+    refreshStatAllocationOverlay();
     updateUI();
     savePlayerData();
 
@@ -4515,10 +4712,7 @@ function showStatAllocation() {
         statAllocationEl.style.display = 'flex';
     }
 
-    if (statLevelOverlayEl) statLevelOverlayEl.textContent = playerData.level;
-    if (statPointsEl) statPointsEl.textContent = playerData.specializationPoints;
-
-    renderSkillTree();
+    refreshStatAllocationOverlay({ forceRender: true });
     if (statAllocationEl) {
         const initialFocus = findFirstContentControl(statAllocationEl);
         activateFocusTrap(statAllocationEl, { initialFocus });
@@ -4595,10 +4789,7 @@ function claimQuestReward(questId) {
         savePlayerData();
         updateUI();
         updateQuestsUI();
-        if (statPointsEl) statPointsEl.textContent = playerData.specializationPoints;
-        if (statAllocationEl && statAllocationEl.style.display !== 'none') {
-            renderSkillTree();
-        }
+        refreshStatAllocationOverlay();
         showHub();
     }
 }
