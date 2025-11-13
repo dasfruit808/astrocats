@@ -2839,7 +2839,10 @@ function populateProfileForm() {
 function showProfileModal() {
     if (!profileModalEl) return;
     populateProfileForm();
-    profileModalEl.style.display = 'block';
+    profileModalEl.style.display = 'flex';
+    profileModalEl.style.height = 'auto';
+    profileModalEl.style.maxHeight = 'none';
+    profileModalEl.style.overflow = 'visible';
     const firstFormControl = profileForm ? profileForm.querySelector("input, select, textarea, button, [tabindex]:not([tabindex='-1'])") : null;
     activateFocusTrap(profileModalEl, { initialFocus: firstFormControl });
 }
@@ -2973,6 +2976,9 @@ function handleWindowBlur() {
 function hideProfileModal() {
     if (!profileModalEl) return;
     profileModalEl.style.display = 'none';
+    profileModalEl.style.height = '';
+    profileModalEl.style.maxHeight = '';
+    profileModalEl.style.overflow = '';
     deactivateFocusTrap(profileModalEl);
     if (profileErrorEl) profileErrorEl.textContent = '';
 }
