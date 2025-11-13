@@ -4097,7 +4097,13 @@ async function loadPlayerData() {
     ensureSpriteProgression();
     setActiveSprite(playerData.activeSpriteId, { skipSave: true, skipUI: true });
     applyStatEffects();
+    if (typeof playerData.credits === 'number' && Number.isFinite(playerData.credits)) {
+        credits = playerData.credits;
+    }
+    checkDailyLogin();
     updateHubUI();
+
+    return playerData;
 }
 
 
@@ -5350,7 +5356,7 @@ window.addEventListener('blur', handleWindowBlur);
 window.addEventListener('focus', () => resumeGameFromFocusLoss({ auto: true }));
 window.addEventListener('blur', resetKeyState);
 
-function initializeApp() {
+async function initializeApp() {
     if (hasInitialized) {
         return;
     }
@@ -5371,6 +5377,13 @@ function initializeApp() {
     initializeUIEvents();
     configureTouchControls();
     monitorPointerCapabilityChanges();
+
+    try {
+        await loadPlayerData();
+    } catch (err) {
+        console.error('Failed to load player data during initialization:', err);
+    }
+
     showStartMenu();
     loadAndDisplayLeaderboard();
 
