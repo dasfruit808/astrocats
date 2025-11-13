@@ -60,13 +60,44 @@
                             <button type="button" class="xp-control xp-close" id="start-menu-close" title="Close">&#10005;</button>
                         </div>
                     </div>
-                    <div class="xp-window-content">
-                        <h2>Welcome Pilot</h2>
-                        <p class="xp-intro">Connect your wallet to sync progress or jump straight into the action.</p>
-                        <button id="connect-wallet">Connect Phantom Wallet</button>
-                        <p id="wallet-status">Not Connected</p>
-                        <p id="nft-status">NFT Status: Not Detected</p>
-                        <button id="play-btn">Play Game</button>
+                    <div class="xp-window-content start-menu-content">
+                        <div class="start-menu-intro">
+                            <h2>Welcome Pilot</h2>
+                            <p class="xp-intro">Connect your wallet to sync progress or jump straight into the action.</p>
+                            <div class="start-menu-primary">
+                                <button id="connect-wallet">Connect Phantom Wallet</button>
+                                <button id="play-btn">Play Game</button>
+                            </div>
+                            <div class="start-menu-status">
+                                <p id="wallet-status">Not Connected</p>
+                                <p id="nft-status">NFT Status: Not Detected</p>
+                            </div>
+                        </div>
+                        <div class="start-menu-shortcuts">
+                            <section class="start-menu-section" aria-labelledby="start-menu-hub-section">
+                                <div class="start-menu-section-header">
+                                    <h3 id="start-menu-hub-section">Player Hub Commands</h3>
+                                    <p>Access your pilot dossier and mission prep straight from Start.</p>
+                                </div>
+                                <div class="start-menu-section-buttons">
+                                    <button id="start-open-profile" type="button">Create / Edit Pilot</button>
+                                    <button id="start-open-stat" type="button">View Specialization Tree</button>
+                                    <button id="start-open-shop" type="button">Gacha Shop</button>
+                                    <button id="start-play-next" type="button">Play Next Round</button>
+                                    <button id="start-back-menu" type="button">Back to Menu</button>
+                                </div>
+                            </section>
+                            <section class="start-menu-section" aria-labelledby="start-menu-taskbar-section">
+                                <div class="start-menu-section-header">
+                                    <h3 id="start-menu-taskbar-section">Taskbar Shortcuts</h3>
+                                    <p>Jump to the same tools available on the taskbar.</p>
+                                </div>
+                                <div class="start-menu-section-buttons">
+                                    <button id="start-open-hub" type="button">Player Hub</button>
+                                    <button id="start-taskbar-shop" type="button">Gacha Shop</button>
+                                </div>
+                            </section>
+                        </div>
                     </div>
                 </div>
             </div>
