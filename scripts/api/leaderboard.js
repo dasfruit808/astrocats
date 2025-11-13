@@ -1,8 +1,40 @@
 (function (global) {
     const STORAGE_KEY = 'astro_invaders_leaderboard_queue';
-    const API_BASE_URL = '/api/leaderboard';
-    const TOP_ENDPOINT = `${API_BASE_URL}/top`;
-    const SUBMIT_ENDPOINT = API_BASE_URL;
+
+    function resolveApiBaseUrl() {
+        const configured = typeof global.ASTROCATS_LEADERBOARD_API_BASE_URL === 'string'
+            ? global.ASTROCATS_LEADERBOARD_API_BASE_URL.trim()
+            : '';
+
+        if (configured) {
+            return configured;
+        }
+
+        const location = global.location;
+        if (!location || typeof location !== 'object') {
+            return '';
+        }
+
+        const hostname = (location.hostname || '').toLowerCase();
+        const isLocalhost = hostname === 'localhost'
+            || hostname === '127.0.0.1'
+            || hostname === '0.0.0.0'
+            || hostname === '[::1]';
+
+        return isLocalhost ? '/api/leaderboard' : '';
+    }
+
+    function normalizeBaseUrl(url) {
+        if (typeof url !== 'string') return '';
+        const trimmed = url.trim();
+        if (!trimmed) return '';
+        return trimmed.replace(/\/$/, '');
+    }
+
+    const API_BASE_URL = normalizeBaseUrl(resolveApiBaseUrl());
+    const REMOTE_ENABLED = Boolean(API_BASE_URL);
+    const TOP_ENDPOINT = REMOTE_ENABLED ? `${API_BASE_URL}/top` : null;
+    const SUBMIT_ENDPOINT = REMOTE_ENABLED ? API_BASE_URL : null;
 
     function safeNumber(value, fallback = 0) {
         const num = Number(value);
@@ -55,6 +87,10 @@
     }
 
     async function flushQueue() {
+        if (!REMOTE_ENABLED) {
+            return;
+        }
+
         if (typeof fetch !== 'function') return;
         if (typeof navigator !== 'undefined' && navigator && 'onLine' in navigator && !navigator.onLine) {
             return;
@@ -88,6 +124,10 @@
         const sanitized = sanitizeEntry(entry);
         if (!sanitized) return { ok: false, error: 'invalid_entry' };
 
+        if (!REMOTE_ENABLED) {
+            return { ok: false, disabled: true };
+        }
+
         if (typeof fetch !== 'function') {
             enqueue(sanitized);
             return { ok: false, error: 'fetch_unavailable' };
@@ -119,6 +159,10 @@
     }
 
     async function fetchTopEntries() {
+        if (!REMOTE_ENABLED) {
+            return [];
+        }
+
         if (typeof fetch !== 'function') {
             throw new Error('fetch_unavailable');
         }
@@ -151,7 +195,11 @@
         postEntry,
         fetchTopEntries,
         flushQueue,
-        sanitizeEntry
+        sanitizeEntry,
+        config: {
+            remoteEnabled: REMOTE_ENABLED,
+            baseUrl: API_BASE_URL
+        }
     };
 
     global.LeaderboardAPI = api;
