@@ -118,6 +118,13 @@ const shopRollPremiumBtn = document.getElementById('shop-roll-premium');
 const taskbarStartBtn = document.getElementById('taskbar-start');
 const taskbarOpenHubBtn = document.getElementById('taskbar-open-hub');
 const taskbarOpenShopBtn = document.getElementById('taskbar-open-shop');
+const startOpenProfileBtn = document.getElementById('start-open-profile');
+const startOpenStatBtn = document.getElementById('start-open-stat');
+const startOpenShopBtn = document.getElementById('start-open-shop');
+const startPlayNextBtn = document.getElementById('start-play-next');
+const startBackMenuBtn = document.getElementById('start-back-menu');
+const startOpenHubBtn = document.getElementById('start-open-hub');
+const startTaskbarShopBtn = document.getElementById('start-taskbar-shop');
 const statCloseBtn = document.getElementById('stat-close');
 const statReturnHubBtn = document.getElementById('stat-return-hub');
 const focusPauseOverlayEl = document.getElementById('focus-pause-overlay');
@@ -188,6 +195,16 @@ function initializeUIEvents() {
     bindButtonClick(taskbarStartBtn, showStartMenu);
     bindButtonClick(taskbarOpenHubBtn, showHub);
     bindButtonClick(taskbarOpenShopBtn, openShop);
+    bindButtonClick(startOpenHubBtn, showHub);
+    bindButtonClick(startOpenShopBtn, openShop);
+    bindButtonClick(startTaskbarShopBtn, openShop);
+    bindButtonClick(startOpenStatBtn, showStatAllocation);
+    bindButtonClick(startPlayNextBtn, () => startGame(true));
+    bindButtonClick(startBackMenuBtn, showStartMenu);
+    bindButtonClick(startOpenProfileBtn, () => {
+        showHub();
+        showProfileModal();
+    });
 
     if (dailyQuestsEl && !dailyQuestsEl.dataset.listenerAttached) {
         dailyQuestsEl.addEventListener('click', (event) => {
