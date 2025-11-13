@@ -840,6 +840,22 @@ button:disabled {
     color: #2f3c56;
 }
 
+.skill-branch-summary {
+    margin: 0 0 10px 0;
+    padding-left: 18px;
+    color: #23345d;
+    font-size: 12px;
+    list-style: disc;
+}
+
+.skill-branch-summary li {
+    margin-bottom: 4px;
+}
+
+.skill-branch-summary li strong {
+    color: var(--xp-blue-dark);
+}
+
 .skill-node-container {
     display: flex;
     flex-direction: column;
