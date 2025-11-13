@@ -93,35 +93,62 @@
 
                         <div class="hub-overview">
                             <div class="pilot-card xp-card">
-                                <div class="pilot-identity">
-                                    <img id="pilot-avatar" src="https://placehold.co/80x80?text=Pilot" alt="Pilot avatar" loading="lazy" width="80" height="80" />
-                                    <div class="pilot-identity-text">
-                                        <span id="pilot-name-display">Rookie Pilot</span>
-                                        <span id="pilot-title-display">Cadet</span>
+                                <div class="pilot-card-header">
+                                    <div class="pilot-avatar-wrap">
+                                        <img id="pilot-avatar" src="https://placehold.co/80x80?text=Pilot" alt="Pilot avatar" loading="lazy" width="80" height="80" />
+                                    </div>
+                                    <div class="pilot-card-identity">
+                                        <span class="pilot-card-label">Registered Pilot</span>
+                                        <span class="pilot-name" id="pilot-name-display">Rookie Pilot</span>
+                                        <span class="pilot-title-badge" id="pilot-title-display">Cadet</span>
                                     </div>
                                 </div>
-                                <p id="pilot-bio-display" class="pilot-bio">Set your pilot bio to share your legend.</p>
+                                <div class="pilot-card-body">
+                                    <p id="pilot-bio-display" class="pilot-bio">Set your pilot bio to share your legend.</p>
+                                    <p class="pilot-card-helper">Update your dossier from the <strong>Create Pilot</strong> command.</p>
+                                </div>
                             </div>
 
                             <div class="hub-summary">
-                                <div class="summary-card xp-card">
-                                    <h3>Mission Snapshot</h3>
-                                    <div class="summary-grid">
-                                        <div class="summary-stat">
-                                            <span class="summary-label">Credits</span>
-                                            <span class="summary-value" id="hub-credits">0</span>
+                                <div class="mission-card xp-card">
+                                    <div class="mission-card-header">
+                                        <div>
+                                            <h3>Mission Snapshot</h3>
+                                            <p class="mission-card-subtitle">Operational intel for your next deployment.</p>
                                         </div>
-                                        <div class="summary-stat">
-                                            <span class="summary-label">Level</span>
-                                            <span class="summary-value" id="stat-level-hub">1</span>
+                                        <div class="mission-readiness" aria-live="polite">
+                                            <span class="mission-readiness-label">Credits Ready</span>
+                                            <span class="mission-readiness-value" id="hub-credits">0</span>
                                         </div>
-                                        <div class="summary-stat">
-                                            <span class="summary-label">Best Score</span>
-                                            <span class="summary-value" id="best-score">0</span>
+                                    </div>
+                                    <div class="mission-card-body">
+                                        <div class="mission-level-callout">
+                                            <span class="mission-level-label">Current Level</span>
+                                            <span class="mission-level-value" id="stat-level-hub">1</span>
+                                            <span class="mission-level-caption">Maintain sortie streaks to advance.</span>
                                         </div>
-                                        <div class="summary-stat">
-                                            <span class="summary-label">Active Sprite</span>
-                                            <span class="summary-value" id="active-sprite">Astro Pioneer</span>
+                                        <div class="mission-stats">
+                                            <div class="mission-stat">
+                                                <span class="mission-stat-icon" aria-hidden="true">🏅</span>
+                                                <div class="mission-stat-text">
+                                                    <span class="mission-stat-label">Best Score</span>
+                                                    <span class="mission-stat-value" id="best-score">0</span>
+                                                </div>
+                                            </div>
+                                            <div class="mission-stat">
+                                                <span class="mission-stat-icon" aria-hidden="true">🛸</span>
+                                                <div class="mission-stat-text">
+                                                    <span class="mission-stat-label">Active Sprite</span>
+                                                    <span class="mission-stat-value" id="active-sprite">Astro Pioneer</span>
+                                                </div>
+                                            </div>
+                                            <div class="mission-stat">
+                                                <span class="mission-stat-icon" aria-hidden="true">📡</span>
+                                                <div class="mission-stat-text">
+                                                    <span class="mission-stat-label">Comms Status</span>
+                                                    <span class="mission-stat-value">Link Stable</span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

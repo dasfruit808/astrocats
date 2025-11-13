@@ -475,22 +475,107 @@ button:disabled {
 }
 
 .pilot-card {
+    position: relative;
     flex: 1 1 220px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
+    overflow: hidden;
+    background: radial-gradient(circle at 0% 0%, rgba(0, 246, 255, 0.18), transparent 55%),
+        radial-gradient(circle at 100% 100%, rgba(255, 94, 246, 0.18), transparent 45%),
+        rgba(255, 255, 255, 0.86);
 }
 
-.pilot-identity {
+.pilot-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(0, 246, 255, 0.12) 0%, rgba(255, 94, 246, 0.08) 65%, transparent 100%);
+    pointer-events: none;
+}
+
+.pilot-card-header {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 16px;
+    padding: 4px 0 6px;
+}
+
+.pilot-avatar-wrap {
+    flex: 0 0 auto;
+    width: 86px;
+    height: 86px;
+    padding: 4px;
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(12, 39, 96, 0.18), rgba(12, 39, 96, 0.28));
+    box-shadow: inset 0 0 0 1px rgba(12, 39, 96, 0.18), 0 6px 14px rgba(12, 39, 96, 0.18);
+}
+
+.pilot-avatar-wrap img {
+    width: 100%;
+    height: 100%;
+    border-radius: 14px;
+    object-fit: cover;
+    display: block;
+}
+
+.pilot-card-identity {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: relative;
+    z-index: 1;
+}
+
+.pilot-card-label {
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(12, 39, 96, 0.56);
+}
+
+.pilot-name {
+    font-family: var(--font-display);
+    font-size: clamp(20px, 2.8vw, 24px);
+    font-weight: 700;
+    color: var(--xp-blue-dark);
+    line-height: 1.1;
+}
+
+.pilot-title-badge {
+    align-self: flex-start;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, rgba(255, 94, 246, 0.28) 0%, rgba(0, 246, 255, 0.35) 100%);
+    border: 1px solid rgba(12, 39, 96, 0.18);
+    color: rgba(12, 39, 96, 0.8);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.pilot-card-body {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-bottom: 4px;
 }
 
 .pilot-bio {
+    position: relative;
     margin: 0;
     font-size: 13px;
-    line-height: 1.4;
+    line-height: 1.5;
+    color: rgba(12, 39, 96, 0.82);
+}
+
+.pilot-card-helper {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: rgba(12, 39, 96, 0.64);
 }
 
 .hub-summary {
@@ -501,43 +586,161 @@ button:disabled {
     align-items: stretch;
 }
 
-.hub-summary .summary-card {
+.hub-summary .mission-card {
     grid-column: 1 / -1;
 }
 
-.summary-card h3,
+.mission-card h3,
 .hub-content-grid h3 {
     margin: 0;
     color: var(--xp-blue-dark);
     font-size: 18px;
 }
 
-.summary-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px 12px;
+.mission-card {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(180deg, rgba(12, 39, 96, 0.08) 0%, rgba(12, 39, 96, 0.18) 100%), rgba(255, 255, 255, 0.86);
+    gap: clamp(14px, 2vh, 18px);
 }
 
-.summary-stat {
+.mission-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at top right, rgba(0, 246, 255, 0.25), transparent 60%);
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.mission-card-header {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: center;
+}
+
+.mission-card-subtitle {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: rgba(12, 39, 96, 0.68);
+}
+
+.mission-readiness {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: 9px 12px;
-    border: 1px solid rgba(12, 39, 96, 0.15);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.9);
+    align-items: flex-end;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(0, 246, 255, 0.18), rgba(12, 39, 96, 0.12));
+    border: 1px solid rgba(12, 39, 96, 0.18);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
 }
 
-.summary-label {
+.mission-readiness-label {
     font-size: 12px;
-    color: #516077;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.08em;
+    color: rgba(12, 39, 96, 0.62);
 }
 
-.summary-value {
+.mission-readiness-value {
+    font-family: var(--font-display);
+    font-size: clamp(20px, 3vw, 26px);
     font-weight: 700;
-    font-size: 17px;
+    color: var(--xp-blue-dark);
+}
+
+.mission-card-body {
+    position: relative;
+    display: flex;
+    gap: clamp(14px, 3vw, 22px);
+    align-items: stretch;
+}
+
+.mission-level-callout {
+    flex: 0 0 210px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border-radius: 16px;
+    padding: clamp(14px, 4vw, 18px);
+    background: radial-gradient(circle at 50% 20%, rgba(0, 246, 255, 0.28), rgba(12, 39, 96, 0.2));
+    border: 1px solid rgba(12, 39, 96, 0.22);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35), 0 12px 24px rgba(12, 39, 96, 0.14);
+}
+
+.mission-level-label {
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(12, 39, 96, 0.66);
+}
+
+.mission-level-value {
+    font-family: var(--font-display);
+    font-size: clamp(36px, 6vw, 48px);
+    font-weight: 700;
+    color: var(--xp-blue-dark);
+    text-shadow: 0 8px 18px rgba(12, 39, 96, 0.35);
+}
+
+.mission-level-caption {
+    font-size: 12px;
+    text-align: center;
+    color: rgba(12, 39, 96, 0.68);
+}
+
+.mission-stats {
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+.mission-stat {
+    position: relative;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(12, 39, 96, 0.16);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+}
+
+.mission-stat-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, rgba(0, 246, 255, 0.28), rgba(255, 94, 246, 0.22));
+    font-size: 20px;
+}
+
+.mission-stat-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.mission-stat-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(12, 39, 96, 0.58);
+}
+
+.mission-stat-value {
+    font-family: var(--font-display);
+    font-size: clamp(16px, 2.6vw, 20px);
+    font-weight: 600;
     color: var(--xp-blue-dark);
 }
 
@@ -994,7 +1197,20 @@ button:disabled {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .summary-grid {
+    .mission-card-body {
+        flex-direction: column;
+    }
+
+    .mission-level-callout {
+        flex: 1 1 auto;
+        width: 100%;
+    }
+
+    .mission-readiness {
+        align-items: flex-start;
+    }
+
+    .mission-stats {
         grid-template-columns: minmax(0, 1fr);
     }
 
@@ -1039,6 +1255,10 @@ button:disabled {
     .hub-header {
         align-items: flex-start;
     }
+
+    .mission-readiness {
+        width: 100%;
+    }
 }
 
 @media (max-width: 540px) {
@@ -1074,6 +1294,29 @@ button:disabled {
     #combo {
         top: 82px;
         right: 12px;
+    }
+
+    .pilot-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .pilot-avatar-wrap {
+        width: 76px;
+        height: 76px;
+    }
+
+    .mission-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .mission-readiness {
+        align-items: flex-start;
+    }
+
+    .mission-level-callout {
+        padding: 16px 12px;
     }
 }
 
@@ -1308,14 +1551,13 @@ button:disabled {
 
 .xp-intro,
 .xp-balance,
-.summary-label,
 .skill-node-description,
 .skill-node-bonuses,
 .skill-node-requirements {
     color: rgba(214, 230, 255, 0.78);
 }
 
-.xp-card,
+.xp-card:not(.mission-card):not(.pilot-card),
 .skill-branch,
 .skill-summary,
 .skill-node {
@@ -1335,7 +1577,6 @@ button:disabled {
     box-shadow: 0 10px 22px rgba(0, 0, 0, 0.45);
 }
 
-.summary-value,
 .stat-grid span,
 .resource-grid span {
     color: #43ffd9;
