@@ -142,6 +142,7 @@ let joystickPointerId = null;
 let joystickInputType = null;
 let pointerCapabilityQuery = null;
 let guestStorageAvailable = false;
+let navigationUnlocked = false;
 
 function setInterfaceLocked(isLocked) {
     if (!bodyEl) return;
@@ -167,6 +168,30 @@ function bindButtonClick(element, handler, { preventDefault = true } = {}) {
         handler(event);
     });
 }
+
+function setNavigationUnlocked(unlocked) {
+    navigationUnlocked = !!unlocked;
+    document.body.classList.toggle('controls-locked', !navigationUnlocked);
+
+    const lockableButtons = [
+        windowShowDesktopBtn,
+        windowOpenHubBtn,
+        windowBackToStartBtn,
+        taskbarOpenHubBtn,
+        taskbarOpenShopBtn,
+        startOpenHubBtn,
+        startOpenShopBtn,
+        startTaskbarShopBtn
+    ];
+
+    lockableButtons.forEach((btn) => {
+        if (!btn) return;
+        btn.disabled = !navigationUnlocked;
+        btn.setAttribute('aria-disabled', navigationUnlocked ? 'false' : 'true');
+    });
+}
+
+setNavigationUnlocked(false);
 
 function hideOverlaysAndResumeGame() {
     resumeGameFromFocusLoss({ triggeredByUser: true });
@@ -5219,6 +5244,7 @@ async function connectWallet() {
         const resp = await provider.connect();
         walletPublicKey = resp.publicKey.toString();
         walletProvider = provider;
+        setNavigationUnlocked(true);
 
         pendingChainSnapshot = null;
         if (chainSyncTimeoutId) {
@@ -5266,6 +5292,7 @@ async function disconnectWallet() {
     if (walletStatusEl) walletStatusEl.textContent = 'Not Connected';
     if (nftStatusEl) nftStatusEl.textContent = 'Not Detected';
     if (connectBtn) connectBtn.textContent = 'Connect Phantom Wallet';
+    setNavigationUnlocked(false);
 
     playerData = createBasePlayerData();
     initializeSpriteSystem();
