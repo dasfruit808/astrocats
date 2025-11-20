@@ -146,6 +146,7 @@ let joystickInputType = null;
 let pointerCapabilityQuery = null;
 let guestStorageAvailable = false;
 let navigationUnlocked = false;
+let freePlaySessionActive = false;
 
 function setInterfaceLocked(isLocked) {
     if (!bodyEl) return;
@@ -205,6 +206,7 @@ function hideOverlaysAndResumeGame() {
 }
 
 function startFreePlaySession() {
+    freePlaySessionActive = true;
     applyPlayerDataSnapshot(null);
     startGame(true);
 }
@@ -3963,6 +3965,10 @@ function markLeaderboardDirty() {
 }
 
 function saveLocalLeaderboard(currentData) {
+    if (freePlaySessionActive) {
+        return;
+    }
+
     const sanitizedEntry = sanitizeLeaderboardEntry({
         publicKey: walletPublicKey,
         level: currentData.level,
@@ -4537,6 +4543,10 @@ async function fetchLatestOnChainSnapshot(publicKey) {
 }
 
 function savePlayerData() {
+    if (freePlaySessionActive) {
+        return;
+    }
+
     if (!walletPublicKey) {
         if (typeof localStorage === 'undefined') {
             guestStorageAvailable = false;
@@ -5255,6 +5265,7 @@ async function connectWallet() {
     try {
         const resp = await provider.connect();
         walletPublicKey = resp.publicKey.toString();
+        freePlaySessionActive = false;
         walletProvider = provider;
         setNavigationUnlocked(true);
 
