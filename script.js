@@ -22,6 +22,9 @@ const gameCanvas = document.createElement('canvas');
 gameCanvas.width = BASE_CANVAS_WIDTH;
 gameCanvas.height = BASE_CANVAS_HEIGHT;
 const gameCtx = gameCanvas.getContext('2d');
+if (!gameCtx) {
+    console.error('Unable to create the offscreen 2D context used for rendering.');
+}
 
 function configureCanvasResolution() {
     if (!canvas) return;
@@ -5648,6 +5651,10 @@ function updateBossAI(now, deltaStep) {
 // --- RENDERING & WEBGL FUNCTIONS ---
 
 function renderGameScene() {
+    if (!gameCtx) {
+        return;
+    }
+
     gameCtx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
 
     gameCtx.save();
@@ -5805,6 +5812,10 @@ function renderWithShader() {
         if (!ctx) {
             ctx = canvas.getContext('2d');
         }
+        if (!ctx) {
+            console.error('Unable to render: primary 2D context unavailable.');
+            return;
+        }
         configureCanvasResolution();
         ctx.imageSmoothingEnabled = true;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -5919,6 +5930,11 @@ async function initializeApp() {
 
     if (!canvas) {
         console.error('Unable to initialize Astro Invaders: canvas element not found.');
+        return;
+    }
+
+    if (!gameCtx) {
+        console.error('Unable to initialize Astro Invaders: 2D rendering context unavailable.');
         return;
     }
 
