@@ -204,8 +204,13 @@ function hideOverlaysAndResumeGame() {
     }
 }
 
+function startFreePlaySession() {
+    applyPlayerDataSnapshot(null);
+    startGame(true);
+}
+
 function initializeUIEvents() {
-    bindButtonClick(playBtn, () => startGame(true));
+    bindButtonClick(playBtn, startFreePlaySession);
     bindButtonClick(connectBtn, () => {
         if (walletPublicKey) {
             disconnectWallet();
@@ -4574,64 +4579,7 @@ function savePlayerData() {
     queueOnChainSync(snapshot);
 }
 
-
-async function loadPlayerData() {
-    let loadedData = null;
-
-    if (!walletPublicKey) {
-        guestStorageAvailable = false;
-
-        if (typeof localStorage === 'undefined') {
-            showStorageWarning();
-        } else {
-            try {
-                const saved = localStorage.getItem(GUEST_PROFILE_STORAGE_KEY);
-                guestStorageAvailable = true;
-                hideStorageWarning();
-                if (saved) {
-                    try {
-                        loadedData = JSON.parse(saved);
-                    } catch (err) {
-                        console.error('Failed to parse guest player data:', err);
-                    }
-                }
-            } catch (err) {
-                guestStorageAvailable = false;
-                console.error('Failed to access guest player data:', err);
-                showStorageWarning();
-            }
-        }
-    } else {
-        guestStorageAvailable = false;
-
-        try {
-            loadedData = await fetchLatestOnChainSnapshot(walletPublicKey);
-        } catch (err) {
-            console.error('On-chain progress load failed:', err);
-        }
-
-        if (!loadedData) {
-            if (typeof localStorage === 'undefined') {
-                showStorageWarning();
-            } else {
-                try {
-                    const saved = localStorage.getItem(`astro_invaders_${walletPublicKey}`);
-                    if (saved) {
-                        try {
-                            loadedData = JSON.parse(saved);
-                        } catch (err) {
-                            console.error('Failed to parse local player data:', err);
-                        }
-                    }
-                    hideStorageWarning();
-                } catch (err) {
-                    console.error('Failed to access local player data:', err);
-                    showStorageWarning();
-                }
-            }
-        }
-    }
-
+function applyPlayerDataSnapshot(loadedData) {
     const base = createBasePlayerData();
 
     if (loadedData) {
@@ -4697,6 +4645,67 @@ async function loadPlayerData() {
     updateHubUI();
 
     return playerData;
+}
+
+
+async function loadPlayerData() {
+    let loadedData = null;
+
+    if (!walletPublicKey) {
+        guestStorageAvailable = false;
+
+        if (typeof localStorage === 'undefined') {
+            showStorageWarning();
+        } else {
+            try {
+                const saved = localStorage.getItem(GUEST_PROFILE_STORAGE_KEY);
+                guestStorageAvailable = true;
+                hideStorageWarning();
+                if (saved) {
+                    try {
+                        loadedData = JSON.parse(saved);
+                    } catch (err) {
+                        console.error('Failed to parse guest player data:', err);
+                    }
+                }
+            } catch (err) {
+                guestStorageAvailable = false;
+                console.error('Failed to access guest player data:', err);
+                showStorageWarning();
+            }
+        }
+    } else {
+        guestStorageAvailable = false;
+
+        try {
+            loadedData = await fetchLatestOnChainSnapshot(walletPublicKey);
+        } catch (err) {
+            console.error('On-chain progress load failed:', err);
+        }
+
+        if (!loadedData) {
+            if (typeof localStorage === 'undefined') {
+                showStorageWarning();
+            } else {
+                try {
+                    const saved = localStorage.getItem(`astro_invaders_${walletPublicKey}`);
+                    if (saved) {
+                        try {
+                            loadedData = JSON.parse(saved);
+                        } catch (err) {
+                            console.error('Failed to parse local player data:', err);
+                        }
+                    }
+                    hideStorageWarning();
+                } catch (err) {
+                    console.error('Failed to access local player data:', err);
+                    showStorageWarning();
+                }
+            }
+        }
+    }
+
+    return applyPlayerDataSnapshot(loadedData);
 }
 
 
@@ -5977,12 +5986,6 @@ async function initializeApp() {
     initializeUIEvents();
     configureTouchControls();
     monitorPointerCapabilityChanges();
-
-    try {
-        await loadPlayerData();
-    } catch (err) {
-        console.error('Failed to load player data during initialization:', err);
-    }
 
     showStartMenu();
     loadAndDisplayLeaderboard();
