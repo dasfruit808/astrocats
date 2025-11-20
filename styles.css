@@ -39,6 +39,11 @@ body {
     color: var(--xp-text);
 }
 
+body.ui-locked .xp-window-controls,
+body.ui-locked #taskbar {
+    display: none;
+}
+
 .xp-desktop {
     display: flex;
     flex-direction: column;
