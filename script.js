@@ -57,6 +57,7 @@ const joystick = document.getElementById('joystick');
 const knob = document.getElementById('knob');
 const touchControlsContainer = document.getElementById('touch-controls');
 const fireButton = document.getElementById('fire-button');
+const bodyEl = document.body;
 const startMenuEl = document.getElementById('start-menu');
 const hubEl = document.getElementById('hub');
 const storageWarningEl = document.getElementById('storage-warning');
@@ -109,7 +110,6 @@ const pilotTitleStatsPanelEl = document.getElementById('pilot-title-stats-panel'
 const windowShowDesktopBtn = document.getElementById('window-show-desktop');
 const windowOpenHubBtn = document.getElementById('window-open-hub');
 const windowBackToStartBtn = document.getElementById('window-back-to-start');
-const startMenuCloseBtn = document.getElementById('start-menu-close');
 const hubCloseBtn = document.getElementById('hub-close');
 const hubOpenShopBtn = document.getElementById('hub-open-shop');
 const hubPlayNextBtn = document.getElementById('hub-play-next');
@@ -121,13 +121,6 @@ const shopRollPremiumBtn = document.getElementById('shop-roll-premium');
 const taskbarStartBtn = document.getElementById('taskbar-start');
 const taskbarOpenHubBtn = document.getElementById('taskbar-open-hub');
 const taskbarOpenShopBtn = document.getElementById('taskbar-open-shop');
-const startOpenProfileBtn = document.getElementById('start-open-profile');
-const startOpenStatBtn = document.getElementById('start-open-stat');
-const startOpenShopBtn = document.getElementById('start-open-shop');
-const startPlayNextBtn = document.getElementById('start-play-next');
-const startBackMenuBtn = document.getElementById('start-back-menu');
-const startOpenHubBtn = document.getElementById('start-open-hub');
-const startTaskbarShopBtn = document.getElementById('start-taskbar-shop');
 const statCloseBtn = document.getElementById('stat-close');
 const statReturnHubBtn = document.getElementById('stat-return-hub');
 const focusPauseOverlayEl = document.getElementById('focus-pause-overlay');
@@ -150,6 +143,19 @@ let joystickInputType = null;
 let pointerCapabilityQuery = null;
 let guestStorageAvailable = false;
 let navigationUnlocked = false;
+
+function setInterfaceLocked(isLocked) {
+    if (!bodyEl) return;
+    bodyEl.classList.toggle('ui-locked', Boolean(isLocked));
+}
+
+function unlockInterfaceControls() {
+    setInterfaceLocked(false);
+}
+
+function lockInterfaceControls() {
+    setInterfaceLocked(true);
+}
 
 function bindButtonClick(element, handler, { preventDefault = true } = {}) {
     const target = typeof element === 'string' ? document.getElementById(element) : element;
@@ -208,7 +214,6 @@ function initializeUIEvents() {
     bindButtonClick(windowOpenHubBtn, showHub);
     bindButtonClick(windowBackToStartBtn, showStartMenu);
     bindButtonClick(windowShowDesktopBtn, hideOverlaysAndResumeGame);
-    bindButtonClick(startMenuCloseBtn, hideOverlaysAndResumeGame);
 
     bindButtonClick(hubCloseBtn, showStartMenu);
     bindButtonClick(hubOpenShopBtn, openShop);
@@ -223,16 +228,6 @@ function initializeUIEvents() {
     bindButtonClick(taskbarStartBtn, showStartMenu);
     bindButtonClick(taskbarOpenHubBtn, showHub);
     bindButtonClick(taskbarOpenShopBtn, openShop);
-    bindButtonClick(startOpenHubBtn, showHub);
-    bindButtonClick(startOpenShopBtn, openShop);
-    bindButtonClick(startTaskbarShopBtn, openShop);
-    bindButtonClick(startOpenStatBtn, showStatAllocation);
-    bindButtonClick(startPlayNextBtn, () => startGame(true));
-    bindButtonClick(startBackMenuBtn, showStartMenu);
-    bindButtonClick(startOpenProfileBtn, () => {
-        showHub();
-        showProfileModal();
-    });
 
     if (dailyQuestsEl && !dailyQuestsEl.dataset.listenerAttached) {
         dailyQuestsEl.addEventListener('click', (event) => {
@@ -3389,6 +3384,7 @@ function handleProfileFormSubmit(event) {
 function showStartMenu() {
     gameRunning = false;
     gamePaused = true;
+    lockInterfaceControls();
     hideAllOverlays();
     if (startMenuEl) {
         startMenuEl.style.display = 'flex';
@@ -3421,7 +3417,7 @@ function showHub() {
 }
 
 function startGame(isNewSession = true) {
-    setNavigationUnlocked(true);
+    unlockInterfaceControls();
     hideAllOverlays();
 
     gameRunning = true;
@@ -5266,6 +5262,7 @@ async function connectWallet() {
         } else { await checkNFT(walletPublicKey); }
 
         await loadPlayerData();
+        unlockInterfaceControls();
         showHub();
     } catch (err) {
         console.error('Wallet connect error:', err);
