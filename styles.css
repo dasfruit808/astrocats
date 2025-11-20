@@ -1026,6 +1026,17 @@ button:disabled {
     box-shadow: var(--xp-panel-shadow);
 }
 
+body.controls-locked #bezel-top .xp-window-controls,
+body.controls-locked #taskbar .xp-task-buttons {
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+}
+
+body.controls-locked #taskbar {
+    cursor: not-allowed;
+}
+
 .xp-status-label {
     font-weight: 700;
     margin-right: 6px;
