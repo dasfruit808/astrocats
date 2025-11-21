@@ -118,6 +118,11 @@ const shopCloseBtn = document.getElementById('shop-close');
 const shopSkipBtn = document.getElementById('shop-skip');
 const shopRollBasicBtn = document.getElementById('shop-roll-basic');
 const shopRollPremiumBtn = document.getElementById('shop-roll-premium');
+const shopRollHelperEl = document.getElementById('shop-roll-helper');
+const shopUpgradeHelperEl = document.getElementById('shop-upgrade-helper');
+const shopHangarHelperEl = document.getElementById('shop-hangar-helper');
+const shopUpgradeResultsEl = document.getElementById('shop-upgrade-results');
+const shopSpriteGridEl = document.getElementById('shop-sprite-grid');
 const taskbarStartBtn = document.getElementById('taskbar-start');
 const taskbarOpenHubBtn = document.getElementById('taskbar-open-hub');
 const taskbarOpenShopBtn = document.getElementById('taskbar-open-shop');
@@ -238,6 +243,9 @@ function initializeUIEvents() {
     bindButtonClick(taskbarStartBtn, showStartMenu);
     bindButtonClick(taskbarOpenHubBtn, showHub);
     bindButtonClick(taskbarOpenShopBtn, openShop);
+    bindButtonClick(startOpenHubBtn, showHub);
+    bindButtonClick(startOpenShopBtn, openShop);
+    bindButtonClick(startTaskbarShopBtn, openShop);
 
     if (dailyQuestsEl && !dailyQuestsEl.dataset.listenerAttached) {
         dailyQuestsEl.addEventListener('click', (event) => {
@@ -4948,144 +4956,152 @@ function grantRestedXP(days = 1) {
 function renderShopOptions() {
     if (!shopOptionsEl) return;
 
-    shopOptionsEl.innerHTML = '';
     ensureSpriteProgression();
 
-    const rollContainer = document.createElement('div');
-    rollContainer.className = 'shop-roll-container';
+    const upgradeContainer = shopUpgradeResultsEl || shopOptionsEl.querySelector('#shop-upgrade-results');
+    const spriteContainer = shopSpriteGridEl || shopOptionsEl.querySelector('#shop-sprite-grid');
 
-    const basicRoll = document.createElement('button');
-    basicRoll.textContent = 'Basic Roll (50 Credits)';
-    basicRoll.disabled = credits < SHOP_ROLL_CONFIG.basic.cost;
-    basicRoll.onclick = () => rollUpgrade('basic');
-    rollContainer.appendChild(basicRoll);
+    const formatRarityOdds = (weights) => {
+        const entries = Object.entries(weights || {});
+        const total = entries.reduce((sum, [, weight]) => sum + weight, 0) || 1;
+        return entries.map(([rarity, weight]) => {
+            const percentage = Math.round((weight / total) * 100);
+            return `${rarity.toUpperCase()} ${percentage}%`;
+        }).join(', ');
+    };
 
-    const premiumRoll = document.createElement('button');
-    premiumRoll.textContent = 'Premium Roll (200 Credits)';
-    premiumRoll.disabled = credits < SHOP_ROLL_CONFIG.premium.cost;
-    premiumRoll.onclick = () => rollUpgrade('premium');
-    rollContainer.appendChild(premiumRoll);
-
-    shopOptionsEl.appendChild(rollContainer);
-
-    if (currentShopOptions.length === 0) {
-        const hint = document.createElement('p');
-        hint.className = 'shop-hint';
-        hint.textContent = 'Roll to reveal upgrades and claim a power boost for the next battle.';
-        shopOptionsEl.appendChild(hint);
+    if (shopRollHelperEl) {
+        const basicConfig = SHOP_ROLL_CONFIG.basic;
+        const premiumConfig = SHOP_ROLL_CONFIG.premium;
+        shopRollHelperEl.textContent = `Basic costs ${basicConfig.cost} credits for ${basicConfig.rolls} pulls (${formatRarityOdds(basicConfig.rarityWeights)}). Premium costs ${premiumConfig.cost} credits for ${premiumConfig.rolls} pulls (${formatRarityOdds(premiumConfig.rarityWeights)}) and leans toward rarer drops.`;
     }
 
-    if (currentShopOptions.length > 0) {
-        const list = document.createElement('div');
-        list.className = 'shop-option-list';
+    const basicRoll = shopRollBasicBtn || shopOptionsEl.querySelector('#shop-roll-basic');
+    const premiumRoll = shopRollPremiumBtn || shopOptionsEl.querySelector('#shop-roll-premium');
+    if (basicRoll) basicRoll.disabled = credits < SHOP_ROLL_CONFIG.basic.cost;
+    if (premiumRoll) premiumRoll.disabled = credits < SHOP_ROLL_CONFIG.premium.cost;
 
-        currentShopOptions.forEach(option => {
-            const optionEl = document.createElement('div');
-            optionEl.className = `shop-option ${option.rarity}`;
+    if (upgradeContainer) {
+        upgradeContainer.innerHTML = '';
+
+        const rarityCosts = Object.values(SHOP_RARITY_COSTS || {});
+        const minUpgradeCost = rarityCosts.length ? Math.min(...rarityCosts) : 0;
+        const maxUpgradeCost = rarityCosts.length ? Math.max(...rarityCosts) : 0;
+
+        if (shopUpgradeHelperEl) {
+            shopUpgradeHelperEl.textContent = `Each roll reveals up to ${SHOP_ROLL_CONFIG.basic.rolls} upgrades. Purchase your pick (${minUpgradeCost}-${maxUpgradeCost} credits by rarity) to lock it in for the next sortie.`;
+        }
+
+        if (currentShopOptions.length === 0) {
+            const hint = document.createElement('p');
+            hint.className = 'shop-hint';
+            hint.textContent = 'Roll above to reveal options. Your next step is to purchase a favorite or skip back to the hub.';
+            upgradeContainer.appendChild(hint);
+        } else {
+            const list = document.createElement('div');
+            list.className = 'shop-option-list';
+
+            currentShopOptions.forEach(option => {
+                const optionEl = document.createElement('div');
+                optionEl.className = `shop-option ${option.rarity}`;
+
+                const title = document.createElement('h4');
+                title.textContent = `${option.label} [${option.rarity.toUpperCase()}]`;
+                optionEl.appendChild(title);
+
+                const description = document.createElement('p');
+                description.textContent = option.description;
+                optionEl.appendChild(description);
+
+                const costLabel = document.createElement('p');
+                costLabel.className = 'shop-cost';
+                costLabel.textContent = `Cost: ${option.cost} Credits`;
+                optionEl.appendChild(costLabel);
+
+                const purchaseBtn = document.createElement('button');
+                purchaseBtn.textContent = 'Purchase';
+                purchaseBtn.disabled = credits < option.cost;
+                purchaseBtn.onclick = () => purchaseUpgrade(option.id);
+                optionEl.appendChild(purchaseBtn);
+
+                list.appendChild(optionEl);
+            });
+
+            upgradeContainer.appendChild(list);
+        }
+    }
+
+    if (spriteContainer) {
+        spriteContainer.innerHTML = '';
+
+        const paidShips = SPACECRAFT_CATALOG.filter(sprite => sprite.cost > 0);
+        const minShipCost = paidShips.length ? Math.min(...paidShips.map(sprite => sprite.cost)) : 0;
+        if (shopHangarHelperEl) {
+            const activeLabel = playerData.activeSpriteId ? 'Swap ships anytime; equipped craft carry into your next run.' : 'Select a craft to prep for your next run.';
+            shopHangarHelperEl.textContent = `Owned ships show as Equipped/Owned. New frames start at ${minShipCost} credits and equip instantly after purchase. ${activeLabel}`;
+        }
+
+        SPACECRAFT_CATALOG.forEach(sprite => {
+            const owned = playerData.ownedSprites.includes(sprite.id);
+            const active = playerData.activeSpriteId === sprite.id;
+
+            const card = document.createElement('div');
+            card.className = `shop-sprite-card ${sprite.rarity}`;
+
+            const preview = document.createElement('img');
+            preview.className = 'shop-sprite-preview';
+            preview.alt = `${sprite.name} preview`;
+            const fallback = getSpriteFallback(sprite);
+            preview.src = `${SPRITE_DIRECTORY}${sprite.fileName}`;
+            preview.onerror = () => {
+                preview.onerror = null;
+                if (fallback) preview.src = fallback;
+            };
+            preview.loading = 'lazy';
+            card.appendChild(preview);
+
+            const info = document.createElement('div');
+            info.className = 'shop-sprite-info';
 
             const title = document.createElement('h4');
-            title.textContent = `${option.label} [${option.rarity.toUpperCase()}]`;
-            optionEl.appendChild(title);
+            const rarityLabel = SPRITE_RARITY_LABELS[sprite.rarity] || 'Cosmetic';
+            title.textContent = `${sprite.name} [${rarityLabel.toUpperCase()}]`;
+            info.appendChild(title);
 
             const description = document.createElement('p');
-            description.textContent = option.description;
-            optionEl.appendChild(description);
+            description.textContent = sprite.description;
+            info.appendChild(description);
 
             const costLabel = document.createElement('p');
             costLabel.className = 'shop-cost';
-            costLabel.textContent = `Cost: ${option.cost} Credits`;
-            optionEl.appendChild(costLabel);
+            costLabel.textContent = sprite.cost > 0 ? `Cost: ${sprite.cost} Credits` : 'Starter Craft (Free)';
+            info.appendChild(costLabel);
 
-            const purchaseBtn = document.createElement('button');
-            purchaseBtn.textContent = 'Purchase';
-            purchaseBtn.disabled = credits < option.cost;
-            purchaseBtn.onclick = () => purchaseUpgrade(option.id);
-            optionEl.appendChild(purchaseBtn);
+            card.appendChild(info);
 
-            list.appendChild(optionEl);
+            const actions = document.createElement('div');
+            actions.className = 'shop-sprite-actions';
+
+            const status = document.createElement('span');
+            status.className = 'shop-sprite-status';
+            status.textContent = owned ? (active ? 'Equipped' : 'Owned') : (SPRITE_RARITY_LABELS[sprite.rarity] || 'Cosmetic');
+            actions.appendChild(status);
+
+            const actionBtn = document.createElement('button');
+            if (owned) {
+                actionBtn.textContent = active ? 'Equipped' : 'Equip';
+                actionBtn.disabled = active;
+            } else {
+                actionBtn.textContent = 'Purchase';
+                actionBtn.disabled = credits < sprite.cost;
+            }
+            actionBtn.onclick = () => purchaseSprite(sprite.id);
+            actions.appendChild(actionBtn);
+
+            card.appendChild(actions);
+            spriteContainer.appendChild(card);
         });
-
-        shopOptionsEl.appendChild(list);
     }
-
-    const spriteSection = document.createElement('div');
-    spriteSection.className = 'shop-section sprite-section';
-
-    const spriteHeader = document.createElement('h3');
-    spriteHeader.textContent = 'Spacecraft Hangar';
-    spriteSection.appendChild(spriteHeader);
-
-    const spriteHint = document.createElement('p');
-    spriteHint.className = 'shop-hint';
-    spriteHint.textContent = 'Equip your current ship or purchase new sprites using PNGs from assets/sprites/.';
-    spriteSection.appendChild(spriteHint);
-
-    const spriteList = document.createElement('div');
-    spriteList.className = 'shop-sprite-grid';
-
-    SPACECRAFT_CATALOG.forEach(sprite => {
-        const owned = playerData.ownedSprites.includes(sprite.id);
-        const active = playerData.activeSpriteId === sprite.id;
-
-        const card = document.createElement('div');
-        card.className = `shop-sprite-card ${sprite.rarity}`;
-
-        const preview = document.createElement('img');
-        preview.className = 'shop-sprite-preview';
-        preview.alt = `${sprite.name} preview`;
-        const fallback = getSpriteFallback(sprite);
-        preview.src = `${SPRITE_DIRECTORY}${sprite.fileName}`;
-        preview.onerror = () => {
-            preview.onerror = null;
-            if (fallback) preview.src = fallback;
-        };
-        preview.loading = 'lazy';
-        card.appendChild(preview);
-
-        const info = document.createElement('div');
-        info.className = 'shop-sprite-info';
-
-        const title = document.createElement('h4');
-        const rarityLabel = SPRITE_RARITY_LABELS[sprite.rarity] || 'Cosmetic';
-        title.textContent = `${sprite.name} [${rarityLabel.toUpperCase()}]`;
-        info.appendChild(title);
-
-        const description = document.createElement('p');
-        description.textContent = sprite.description;
-        info.appendChild(description);
-
-        const costLabel = document.createElement('p');
-        costLabel.className = 'shop-cost';
-        costLabel.textContent = sprite.cost > 0 ? `Cost: ${sprite.cost} Credits` : 'Starter Craft (Free)';
-        info.appendChild(costLabel);
-
-        card.appendChild(info);
-
-        const actions = document.createElement('div');
-        actions.className = 'shop-sprite-actions';
-
-        const status = document.createElement('span');
-        status.className = 'shop-sprite-status';
-        status.textContent = owned ? (active ? 'Equipped' : 'Owned') : (SPRITE_RARITY_LABELS[sprite.rarity] || 'Cosmetic');
-        actions.appendChild(status);
-
-        const actionBtn = document.createElement('button');
-        if (owned) {
-            actionBtn.textContent = active ? 'Equipped' : 'Equip';
-            actionBtn.disabled = active;
-        } else {
-            actionBtn.textContent = 'Purchase';
-            actionBtn.disabled = credits < sprite.cost;
-        }
-        actionBtn.onclick = () => purchaseSprite(sprite.id);
-        actions.appendChild(actionBtn);
-
-        card.appendChild(actions);
-        spriteList.appendChild(card);
-    });
-
-    spriteSection.appendChild(spriteList);
-    shopOptionsEl.appendChild(spriteSection);
 }
 
 function pickRarity(weights) {
