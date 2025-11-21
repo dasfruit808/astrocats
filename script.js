@@ -4332,11 +4332,18 @@ function buildLeaderboardDisplay(container, leaderboard) {
     leaderboard.slice(0, 10).forEach((entry, index) => {
         const rowEl = document.createElement('li');
         rowEl.className = 'leaderboard-row';
+        rowEl.dataset.rank = String(index + 1);
+        if (index < 3) {
+            rowEl.classList.add('leaderboard-row-top');
+        }
 
         const publicKey = entry.publicKey || 'Unknown Player';
         const snippet = publicKey.length > 10
             ? `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`
             : publicKey;
+
+        const levelValue = Number.isFinite(entry.level) ? entry.level : 0;
+        const bestScoreValue = Number.isFinite(entry.bestScore) ? entry.bestScore : 0;
 
         const rankEl = document.createElement('span');
         rankEl.className = 'leaderboard-rank';
@@ -4345,14 +4352,15 @@ function buildLeaderboardDisplay(container, leaderboard) {
         const walletEl = document.createElement('span');
         walletEl.className = 'leaderboard-wallet';
         walletEl.textContent = snippet;
+        walletEl.title = publicKey;
 
         const levelEl = document.createElement('span');
         levelEl.className = 'leaderboard-level';
-        levelEl.textContent = `Lv.${entry.level}`;
+        levelEl.textContent = `Lv.${levelValue}`;
 
         const scoreEl = document.createElement('span');
         scoreEl.className = 'leaderboard-score';
-        scoreEl.textContent = `${entry.bestScore}`;
+        scoreEl.textContent = bestScoreValue.toLocaleString();
 
         rowEl.appendChild(rankEl);
         rowEl.appendChild(walletEl);
