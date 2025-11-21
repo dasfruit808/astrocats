@@ -65,6 +65,10 @@
                                 <button id="connect-wallet">Connect Phantom Wallet</button>
                                 <button id="play-btn">Free Play</button>
                             </div>
+                            <div class="start-menu-secondary">
+                                <button id="start-open-hub" type="button">Open Player Hub</button>
+                                <button id="start-open-shop" type="button">Visit Gacha Shop</button>
+                            </div>
                             <div class="start-menu-status">
                                 <p id="wallet-status">Not Connected</p>
                                 <p id="nft-status">NFT Status: Not Detected</p>
@@ -251,11 +255,35 @@
                     </div>
                     <div class="xp-window-content">
                         <p class="xp-balance">Credits Available: <span id="shop-credits">0</span></p>
-                        <div id="shop-options">
-                             <button id="shop-roll-basic">Basic Roll (50 Credits)</button>
-                             <button id="shop-roll-premium">Premium Roll (200 Credits)</button>
+                        <div id="shop-options" class="shop-sections">
+                            <section class="shop-section roll-section">
+                                <div class="shop-section-header">
+                                    <h3>Roll Actions</h3>
+                                    <p id="shop-roll-helper" class="shop-helper">Spend credits to reveal new upgrades. Premium rolls boost higher-rarity odds.</p>
+                                </div>
+                                <div class="shop-roll-actions">
+                                    <button id="shop-roll-basic">Basic Roll (50 Credits)</button>
+                                    <button id="shop-roll-premium">Premium Roll (200 Credits)</button>
+                                    <button id="shop-skip">Return to Hub</button>
+                                </div>
+                            </section>
+
+                            <section class="shop-section upgrades-section">
+                                <div class="shop-section-header">
+                                    <h3>Upgrade Selections</h3>
+                                    <p id="shop-upgrade-helper" class="shop-helper">Reroll to populate this list, then purchase a favorite to queue it for your next mission.</p>
+                                </div>
+                                <div id="shop-upgrade-results" class="shop-upgrade-results"></div>
+                            </section>
+
+                            <section class="shop-section hangar-section">
+                                <div class="shop-section-header">
+                                    <h3>Spacecraft Hangar</h3>
+                                    <p id="shop-hangar-helper" class="shop-helper">Equip an owned craft or buy a new frame. Costs are shown per ship, and owned ships can be equipped immediately.</p>
+                                </div>
+                                <div id="shop-sprite-grid" class="shop-sprite-grid"></div>
+                            </section>
                         </div>
-                        <button id="shop-skip">Skip</button>
                     </div>
                 </div>
             </div>
