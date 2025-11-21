@@ -88,7 +88,6 @@ const statLevelOverlayEl = document.getElementById('stat-level-overlay');
 const statPointsEl = document.getElementById('stat-points');
 const statOptionsEl = document.getElementById('stat-options');
 const openStatAllocationBtn = document.getElementById('open-stat-allocation');
-const statusClockEl = document.getElementById('status-clock');
 const openProfileBtn = document.getElementById('open-profile-modal');
 const profileModalEl = document.getElementById('profile-modal');
 const closeProfileBtn = document.getElementById('close-profile-modal');
@@ -123,9 +122,6 @@ const shopUpgradeHelperEl = document.getElementById('shop-upgrade-helper');
 const shopHangarHelperEl = document.getElementById('shop-hangar-helper');
 const shopUpgradeResultsEl = document.getElementById('shop-upgrade-results');
 const shopSpriteGridEl = document.getElementById('shop-sprite-grid');
-const taskbarStartBtn = document.getElementById('taskbar-start');
-const taskbarOpenHubBtn = document.getElementById('taskbar-open-hub');
-const taskbarOpenShopBtn = document.getElementById('taskbar-open-shop');
 const uiRibbonButtons = Array.from(document.querySelectorAll('.ui-ribbon-button[data-ui-target]'));
 const hubTabButtons = Array.from(document.querySelectorAll('.hub-tab-button[data-tab]'));
 const hubTabPanels = Array.from(document.querySelectorAll('.hub-tab-panel[data-tab-panel]'));
@@ -194,8 +190,6 @@ function setNavigationUnlocked(unlocked) {
         windowShowDesktopBtn,
         windowOpenHubBtn,
         windowBackToStartBtn,
-        taskbarOpenHubBtn,
-        taskbarOpenShopBtn,
         ...uiRibbonButtons
     ];
 
@@ -244,9 +238,6 @@ function initializeUIEvents() {
     bindButtonClick(shopRollBasicBtn, () => rollUpgrade('basic'));
     bindButtonClick(shopRollPremiumBtn, () => rollUpgrade('premium'));
 
-    bindButtonClick(taskbarStartBtn, showStartMenu);
-    bindButtonClick(taskbarOpenHubBtn, showHub);
-    bindButtonClick(taskbarOpenShopBtn, openShop);
     uiRibbonButtons.forEach((button) => {
         bindButtonClick(button, () => setUiMode(button.dataset.uiTarget));
     });
@@ -992,7 +983,6 @@ const activeSpeedBuffs = new Map();
 let speedModifierSequence = 0;
 let screenShakeDuration = 0; let hitStopDuration = 0;
 const DAILY_INTERVAL_MS = 24 * 60 * 60 * 1000;
-let lastClockUpdate = 0;
 
 const uiCache = {
     score: null,
@@ -2852,14 +2842,6 @@ function updateUI() {
     if (shopCreditsEl && uiCache.shopCredits !== credits) {
         uiCache.shopCredits = credits;
         shopCreditsEl.textContent = credits;
-    }
-    if (statusClockEl) {
-        const now = Date.now();
-        if (now - lastClockUpdate >= 1000) {
-            lastClockUpdate = now;
-            const formatted = new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            statusClockEl.textContent = formatted;
-        }
     }
 }
 
