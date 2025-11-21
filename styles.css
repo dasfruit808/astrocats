@@ -39,8 +39,7 @@ body {
     color: var(--xp-text);
 }
 
-body.ui-locked .xp-window-controls,
-body.ui-locked #taskbar {
+body.ui-locked .xp-window-controls {
     display: none;
 }
 
@@ -1324,15 +1323,10 @@ button:disabled {
     box-shadow: var(--xp-panel-shadow);
 }
 
-body.controls-locked #bezel-top .xp-window-controls,
-body.controls-locked #taskbar .xp-task-buttons {
+body.controls-locked #bezel-top .xp-window-controls {
     opacity: 0;
     pointer-events: none;
     visibility: hidden;
-}
-
-body.controls-locked #taskbar {
-    cursor: not-allowed;
 }
 
 .xp-status-label {
@@ -1345,60 +1339,6 @@ body.controls-locked #taskbar {
     font-size: 13px;
 }
 
-.xp-taskbar {
-    width: 100%;
-    max-width: 900px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 6px 10px;
-    background: linear-gradient(180deg, #3d81f5 0%, #1b53b1 100%);
-    border: 1px solid #0a2a6a;
-    border-radius: 6px;
-    box-shadow: var(--xp-panel-shadow);
-}
-
-.xp-start-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: linear-gradient(180deg, #5abb5a 0%, #2f7e34 100%);
-    color: #ffffff;
-    border: 2px solid #0f4c16;
-    border-top-color: #72dd72;
-    border-left-color: #72dd72;
-    padding: 8px 16px;
-    font-size: 16px;
-    font-weight: 700;
-}
-
-.xp-start-button:hover {
-    background: linear-gradient(180deg, #6ad96a 0%, #368a38 100%);
-}
-
-.xp-start-icon {
-    font-size: 18px;
-}
-
-.xp-task-buttons {
-    display: flex;
-    gap: 8px;
-    flex: 1;
-}
-
-.xp-task-button {
-    padding: 6px 14px;
-    font-size: 13px;
-}
-
-.xp-task-clock {
-    min-width: 80px;
-    text-align: right;
-    color: #f1f5ff;
-    font-weight: 600;
-    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.4);
-}
 
 .skill-summary {
     display: flex;
@@ -1535,8 +1475,7 @@ body.controls-locked #taskbar {
     }
 
     .xp-primary-window,
-    .xp-statusbar,
-    .xp-taskbar {
+    .xp-statusbar {
         max-width: 100%;
     }
 
@@ -1558,11 +1497,6 @@ body.controls-locked #taskbar {
     #dash-cooldown {
         left: 14px;
         width: calc(100% - 28px);
-    }
-
-    .xp-task-buttons {
-        flex-wrap: wrap;
-        justify-content: flex-end;
     }
 
     .joystick {
@@ -2005,34 +1939,6 @@ button:disabled {
 .xp-status-value,
 .xp-status-tip {
     color: rgba(214, 230, 255, 0.78);
-}
-
-.xp-taskbar {
-    background: linear-gradient(120deg, rgba(5, 18, 46, 0.92) 0%, rgba(0, 246, 255, 0.2) 100%);
-    border: 1px solid rgba(0, 246, 255, 0.35);
-    box-shadow: 0 26px 40px rgba(0, 0, 0, 0.45), var(--xp-glow-soft);
-    border-radius: 14px;
-}
-
-.xp-start-button {
-    background: linear-gradient(140deg, rgba(255, 94, 246, 0.92) 0%, rgba(0, 246, 255, 0.92) 100%);
-    color: #041027;
-    border: none;
-    box-shadow: 0 16px 28px rgba(0, 0, 0, 0.4), 0 0 32px rgba(255, 94, 246, 0.6);
-}
-
-.xp-task-button {
-    border-radius: 999px;
-    background: rgba(8, 24, 52, 0.82);
-    border: 1px solid rgba(0, 246, 255, 0.4);
-    color: var(--xp-text);
-    padding: 10px 20px;
-}
-
-.xp-task-clock {
-    color: #43ffd9;
-    font-family: var(--font-display);
-    letter-spacing: 0.18em;
 }
 
 .skill-node.unlocked {
