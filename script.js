@@ -80,7 +80,7 @@ const itemsEl = document.getElementById('items');
 const activeSpriteEl = document.getElementById('active-sprite');
 const ownedSpritesEl = document.getElementById('owned-sprites');
 const dailyQuestsEl = document.getElementById('daily-quests');
-const leaderboardEl = document.getElementById('leaderboard');
+const leaderboardEls = Array.from(document.querySelectorAll('[data-leaderboard]'));
 const waveAnnounceEl = document.getElementById('wave-announce');
 const bossAnnounceEl = document.getElementById('boss-announce');
 // STAT UI ELEMENTS
@@ -4087,6 +4087,79 @@ function markLeaderboardDirty() {
     leaderboardChangeToken += 1;
 }
 
+function renderLeaderboardMessage(text) {
+    if (!leaderboardEls.length) return;
+
+    leaderboardEls.forEach((container) => {
+        container.innerHTML = '';
+        const messageEl = document.createElement('p');
+        messageEl.textContent = text;
+        container.appendChild(messageEl);
+    });
+}
+
+function buildLeaderboardDisplay(container, leaderboard) {
+    container.innerHTML = '';
+
+    if (!leaderboard.length) {
+        const emptyMessage = document.createElement('p');
+        emptyMessage.textContent = 'No leaderboard data yet.';
+        container.appendChild(emptyMessage);
+        return;
+    }
+
+    const headerEl = document.createElement('div');
+    headerEl.className = 'leaderboard-header';
+    headerEl.innerHTML = `
+        <span class="leaderboard-rank">Rank</span>
+        <span class="leaderboard-wallet">Wallet</span>
+        <span class="leaderboard-level">Level</span>
+        <span class="leaderboard-score">Best Score</span>
+    `;
+    container.appendChild(headerEl);
+
+    const listEl = document.createElement('ol');
+    listEl.className = 'leaderboard-list';
+
+    const fragment = document.createDocumentFragment();
+
+    leaderboard.slice(0, 10).forEach((entry, index) => {
+        const rowEl = document.createElement('li');
+        rowEl.className = 'leaderboard-row';
+
+        const publicKey = entry.publicKey || 'Unknown Player';
+        const snippet = publicKey.length > 10
+            ? `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`
+            : publicKey;
+
+        const rankEl = document.createElement('span');
+        rankEl.className = 'leaderboard-rank';
+        rankEl.textContent = `#${index + 1}`;
+
+        const walletEl = document.createElement('span');
+        walletEl.className = 'leaderboard-wallet';
+        walletEl.textContent = snippet;
+
+        const levelEl = document.createElement('span');
+        levelEl.className = 'leaderboard-level';
+        levelEl.textContent = `Lv.${entry.level}`;
+
+        const scoreEl = document.createElement('span');
+        scoreEl.className = 'leaderboard-score';
+        scoreEl.textContent = `${entry.bestScore}`;
+
+        rowEl.appendChild(rankEl);
+        rowEl.appendChild(walletEl);
+        rowEl.appendChild(levelEl);
+        rowEl.appendChild(scoreEl);
+
+        fragment.appendChild(rowEl);
+    });
+
+    listEl.appendChild(fragment);
+    container.appendChild(listEl);
+}
+
 function saveLocalLeaderboard(currentData) {
     if (freePlaySessionActive) {
         return;
@@ -4134,7 +4207,7 @@ function saveLocalLeaderboard(currentData) {
 }
 
 async function loadAndDisplayLeaderboard({ force = false } = {}) {
-    if (!leaderboardEl) return;
+    if (!leaderboardEls.length) return;
 
     const now = Date.now();
     const hasScoreChanges = leaderboardChangeToken !== lastLeaderboardFetchToken;
@@ -4152,10 +4225,7 @@ async function loadAndDisplayLeaderboard({ force = false } = {}) {
         return leaderboardLoadPromise;
     }
 
-    leaderboardEl.innerHTML = '';
-    const loadingMessage = document.createElement('p');
-    loadingMessage.textContent = 'Loading leaderboard...';
-    leaderboardEl.appendChild(loadingMessage);
+    renderLeaderboardMessage('Loading leaderboard...');
 
     const tokenAtStart = leaderboardChangeToken;
 
@@ -4207,74 +4277,15 @@ async function loadAndDisplayLeaderboard({ force = false } = {}) {
                 return b.bestScore - a.bestScore;
             });
 
-            leaderboardEl.innerHTML = '';
-
-            if (!leaderboard.length) {
-                const emptyMessage = document.createElement('p');
-                emptyMessage.textContent = 'No leaderboard data yet.';
-                leaderboardEl.appendChild(emptyMessage);
-                return;
-            }
-
-            const headerEl = document.createElement('div');
-            headerEl.className = 'leaderboard-header';
-            headerEl.innerHTML = `
-                <span class="leaderboard-rank">Rank</span>
-                <span class="leaderboard-wallet">Wallet</span>
-                <span class="leaderboard-level">Level</span>
-                <span class="leaderboard-score">Best Score</span>
-            `;
-            leaderboardEl.appendChild(headerEl);
-
-            const listEl = document.createElement('ol');
-            listEl.className = 'leaderboard-list';
-
-            const fragment = document.createDocumentFragment();
-
-            leaderboard.slice(0, 10).forEach((entry, index) => {
-                const rowEl = document.createElement('li');
-                rowEl.className = 'leaderboard-row';
-
-                const publicKey = entry.publicKey || 'Unknown Player';
-                const snippet = publicKey.length > 10
-                    ? `${publicKey.slice(0, 4)}…${publicKey.slice(-4)}`
-                    : publicKey;
-
-                const rankEl = document.createElement('span');
-                rankEl.className = 'leaderboard-rank';
-                rankEl.textContent = `#${index + 1}`;
-
-                const walletEl = document.createElement('span');
-                walletEl.className = 'leaderboard-wallet';
-                walletEl.textContent = snippet;
-
-                const levelEl = document.createElement('span');
-                levelEl.className = 'leaderboard-level';
-                levelEl.textContent = `Lv.${entry.level}`;
-
-                const scoreEl = document.createElement('span');
-                scoreEl.className = 'leaderboard-score';
-                scoreEl.textContent = `${entry.bestScore}`;
-
-                rowEl.appendChild(rankEl);
-                rowEl.appendChild(walletEl);
-                rowEl.appendChild(levelEl);
-                rowEl.appendChild(scoreEl);
-
-                fragment.appendChild(rowEl);
+            leaderboardEls.forEach((container) => {
+                buildLeaderboardDisplay(container, leaderboard);
             });
-
-            listEl.appendChild(fragment);
-            leaderboardEl.appendChild(listEl);
 
             lastLeaderboardFetchToken = tokenAtStart;
             lastLeaderboardFetchTime = Date.now();
         } catch (error) {
             console.error('Failed to render leaderboard:', error);
-            leaderboardEl.innerHTML = '';
-            const errorMessage = document.createElement('p');
-            errorMessage.textContent = 'Unable to load leaderboard right now.';
-            leaderboardEl.appendChild(errorMessage);
+            renderLeaderboardMessage('Unable to load leaderboard right now.');
         } finally {
             leaderboardLoadPromise = null;
         }
