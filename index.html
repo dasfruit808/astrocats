@@ -373,10 +373,28 @@
                             <button type="button" class="xp-control xp-close" id="stat-close" title="Return to Hub">&#10005;</button>
                         </div>
                     </div>
-                    <div class="xp-window-content">
-                        <p>Level: <span id="stat-level-overlay">1</span> | Specialization Points: <span id="stat-points">0</span></p>
-                        <div id="stat-options"></div>
-                        <button id="stat-return-hub">Return to HUB</button>
+                    <div class="xp-window-content stat-window">
+                        <div class="stat-window-header">
+                            <div class="stat-pill"><span class="stat-pill-label">Level</span><span class="stat-pill-value" id="stat-level-overlay">1</span></div>
+                            <div class="stat-pill stat-pill-accent"><span class="stat-pill-label">Specialization Points</span><span class="stat-pill-value" id="stat-points">0</span></div>
+                            <button id="stat-return-hub">Return to HUB</button>
+                        </div>
+                        <div class="stat-tabs" role="tablist" aria-label="Stat allocation sections">
+                            <button type="button" class="stat-tab-button active" role="tab" aria-selected="true" aria-controls="stat-panel-overview" data-tab="overview">Overview</button>
+                            <button type="button" class="stat-tab-button" role="tab" aria-selected="false" aria-controls="stat-panel-branches" data-tab="branches">Branches</button>
+                            <button type="button" class="stat-tab-button" role="tab" aria-selected="false" aria-controls="stat-panel-masteries" data-tab="masteries">Masteries</button>
+                        </div>
+                        <div class="stat-panels">
+                            <section id="stat-panel-overview" class="stat-panel active" role="tabpanel" data-tab-panel="overview">
+                                <div id="stat-summary" class="stat-summary"></div>
+                            </section>
+                            <section id="stat-panel-branches" class="stat-panel" role="tabpanel" data-tab-panel="branches" aria-hidden="true">
+                                <div id="stat-options"></div>
+                            </section>
+                            <section id="stat-panel-masteries" class="stat-panel" role="tabpanel" data-tab-panel="masteries" aria-hidden="true">
+                                <div id="stat-mastery-list"></div>
+                            </section>
+                        </div>
                     </div>
                 </div>
             </div>
