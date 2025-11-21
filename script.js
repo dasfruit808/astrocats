@@ -16,6 +16,10 @@ let texture;
 const BASE_CANVAS_WIDTH = 1280;
 const BASE_CANVAS_HEIGHT = 720;
 const MAX_DEVICE_PIXEL_RATIO = 2.5;
+const USERNAME_MAX_LENGTH = 12;
+const TITLE_MAX_LENGTH = 12;
+const USERNAME_CHANGE_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+const USERNAME_REGISTRY_STORAGE_KEY = 'astro_invaders_usernames';
 
 // Offscreen canvas setup
 const gameCanvas = document.createElement('canvas');
@@ -912,6 +916,22 @@ function createDefaultQuests() {
 
 const DEFAULT_SPRITE_ID = 'astro-pioneer';
 
+function generatePlayerId() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    return `guest-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function ensurePlayerIdentifier(data = playerData) {
+    const target = data || playerData;
+    if (!target) return '';
+    if (!target.playerId) {
+        target.playerId = generatePlayerId();
+    }
+    return walletPublicKey || target.playerId;
+}
+
 function createBasePlayerData() {
     const baseProfile = ensurePilotProfileMetadata({
         name: '',
@@ -921,6 +941,7 @@ function createBasePlayerData() {
     });
     baseProfile.metadata.summary = generatePilotSummary(baseProfile, {});
     return {
+        playerId: generatePlayerId(),
         gamesPlayed: 0,
         wins: 0,
         losses: 0,
@@ -3362,6 +3383,86 @@ function sanitizePilotAvatar(value) {
     return null;
 }
 
+function sanitizeUsernameClaim(entry) {
+    if (!entry || typeof entry !== 'object') return null;
+    const name = normalizePilotField(entry.name);
+    const ownerId = typeof entry.ownerId === 'string' ? entry.ownerId.trim() : '';
+    if (!name || !ownerId) return null;
+    const claimedAt = Number.isFinite(entry.claimedAt) ? entry.claimedAt : Date.now();
+    return { name, ownerId, claimedAt };
+}
+
+function readUsernameRegistry() {
+    if (typeof localStorage === 'undefined') {
+        return [];
+    }
+
+    try {
+        const raw = localStorage.getItem(USERNAME_REGISTRY_STORAGE_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.map(sanitizeUsernameClaim).filter(Boolean) : [];
+    } catch (error) {
+        console.warn('Failed to read username registry from local storage.', error);
+        return [];
+    }
+}
+
+function writeUsernameRegistry(entries) {
+    if (typeof localStorage === 'undefined') {
+        console.warn('Local storage is not available; username registry cannot be saved.');
+        showStorageWarning();
+        return false;
+    }
+
+    try {
+        const sanitized = Array.isArray(entries) ? entries.map(sanitizeUsernameClaim).filter(Boolean) : [];
+        localStorage.setItem(USERNAME_REGISTRY_STORAGE_KEY, JSON.stringify(sanitized));
+        hideStorageWarning();
+        return true;
+    } catch (error) {
+        console.warn('Failed to write username registry to local storage.', error);
+        showStorageWarning();
+        return false;
+    }
+}
+
+function findUsernameClaim(name) {
+    const normalized = normalizePilotField(name);
+    if (!normalized) return null;
+    return readUsernameRegistry().find(entry => entry && entry.name === normalized) || null;
+}
+
+function ensureUsernameClaimed(name, ownerId) {
+    const normalized = normalizePilotField(name);
+    if (!normalized || !ownerId) {
+        return { ok: true };
+    }
+
+    const registry = readUsernameRegistry();
+    const existingClaim = registry.find(entry => entry.name === normalized);
+    if (existingClaim) {
+        if (existingClaim.ownerId === ownerId) {
+            return { ok: true };
+        }
+        return { ok: false, error: 'Pilot name was claimed before it could be saved. Please choose another.' };
+    }
+
+    const nextRegistry = [...registry];
+    const sanitized = sanitizeUsernameClaim({ name: normalized, ownerId, claimedAt: Date.now() });
+    if (!sanitized) {
+        return { ok: false, error: 'Pilot name could not be claimed. Please try again.' };
+    }
+    nextRegistry.push(sanitized);
+
+    const saved = writeUsernameRegistry(nextRegistry);
+    if (!saved) {
+        return { ok: false, error: 'Pilot name could not be claimed due to storage limits.' };
+    }
+
+    return { ok: true };
+}
+
 function ensurePilotProfileMetadata(profile = {}) {
     const normalized = { ...(profile && typeof profile === 'object' ? profile : {}) };
     normalized.name = typeof normalized.name === 'string' ? normalized.name : '';
@@ -3377,6 +3478,7 @@ function ensurePilotProfileMetadata(profile = {}) {
     metadata.updatedAt = Number.isFinite(metadata.updatedAt) ? metadata.updatedAt : 0;
     metadata.summary = typeof metadata.summary === 'string' ? metadata.summary : '';
     metadata.history = Array.isArray(metadata.history) ? metadata.history.slice(-10) : [];
+    metadata.lastNameChangeAt = Number.isFinite(metadata.lastNameChangeAt) ? metadata.lastNameChangeAt : 0;
 
     normalized.metadata = metadata;
     return normalized;
@@ -3436,15 +3538,22 @@ function createPilotProfile(input = {}, stats = {}, previousProfile = {}) {
     const rawBio = normalizePilotBio(input.bio);
     const avatarValue = sanitizePilotAvatar(typeof input.avatar === 'string' ? input.avatar : '');
 
+    const now = Date.now();
+    const ownerId = ensurePlayerIdentifier(previousProfile && previousProfile.playerId ? { playerId: previousProfile.playerId } : playerData);
+    const sanitizedProfile = ensurePilotProfileMetadata(previousProfile);
+    const metadata = { ...sanitizedProfile.metadata };
+    const lastNameChangeAt = Number.isFinite(metadata.lastNameChangeAt) ? metadata.lastNameChangeAt : 0;
+    const isNameChanged = sanitizedProfile.name !== rawName;
+
     const errors = [];
     if (!rawName) {
         errors.push('Pilot name is required.');
-    } else if (rawName.length > 40) {
-        errors.push('Pilot name must be 40 characters or fewer.');
+    } else if (rawName.length > USERNAME_MAX_LENGTH) {
+        errors.push(`Pilot name must be ${USERNAME_MAX_LENGTH} characters or fewer.`);
     }
 
-    if (rawTitle.length > 60) {
-        errors.push('Title must be 60 characters or fewer.');
+    if (rawTitle.length > TITLE_MAX_LENGTH) {
+        errors.push(`Title must be ${TITLE_MAX_LENGTH} characters or fewer.`);
     }
 
     if (avatarValue === null) {
@@ -3455,14 +3564,24 @@ function createPilotProfile(input = {}, stats = {}, previousProfile = {}) {
         errors.push('Bio must be 280 characters or fewer.');
     }
 
+    if (isNameChanged && lastNameChangeAt && (now - lastNameChangeAt) < USERNAME_CHANGE_COOLDOWN_MS) {
+        errors.push('Pilot name can only be changed once every 24 hours.');
+    }
+
+    if (rawName && typeof localStorage === 'undefined') {
+        errors.push('Pilot name cannot be claimed because storage is unavailable.');
+    }
+
+    const existingClaim = rawName ? findUsernameClaim(rawName) : null;
+    if (existingClaim && existingClaim.ownerId !== ownerId) {
+        errors.push('Pilot name is already claimed.');
+    }
+
     if (errors.length) {
         return { ok: false, errors };
     }
 
     const sanitizedAvatar = avatarValue || '';
-    const sanitizedProfile = ensurePilotProfileMetadata(previousProfile);
-    const now = Date.now();
-    const metadata = { ...sanitizedProfile.metadata };
     const history = Array.isArray(metadata.history) ? [...metadata.history.slice(-9)] : [];
 
     const hasExistingProfile = Boolean(
@@ -3496,6 +3615,8 @@ function createPilotProfile(input = {}, stats = {}, previousProfile = {}) {
     const preserved = { ...sanitizedProfile };
     delete preserved.metadata;
 
+    const nextLastNameChangeAt = isNameChanged ? now : (metadata.lastNameChangeAt || createdAt);
+
     const nextProfile = {
         ...preserved,
         name: rawName,
@@ -3506,6 +3627,7 @@ function createPilotProfile(input = {}, stats = {}, previousProfile = {}) {
             ...metadata,
             createdAt,
             updatedAt: now,
+            lastNameChangeAt: nextLastNameChangeAt,
             history: history.slice(-10)
         }
     };
@@ -3516,7 +3638,9 @@ function createPilotProfile(input = {}, stats = {}, previousProfile = {}) {
     return {
         ok: true,
         profile: nextProfile,
-        status: hasExistingProfile ? 'updated' : 'created'
+        status: hasExistingProfile ? 'updated' : 'created',
+        claimedName: rawName,
+        ownerId
     };
 }
 
@@ -3537,6 +3661,12 @@ function handleProfileFormSubmit(event) {
     }
 
     playerData.profile = result.profile;
+    ensurePlayerIdentifier(playerData);
+    const claimResult = ensureUsernameClaimed(result.claimedName, result.ownerId || ensurePlayerIdentifier(playerData));
+    if (!claimResult.ok) {
+        if (profileErrorEl) profileErrorEl.textContent = claimResult.error;
+        return;
+    }
     if (profileErrorEl) profileErrorEl.textContent = '';
     updateHubUI();
     savePlayerData();
@@ -4717,6 +4847,8 @@ function applyPlayerDataSnapshot(loadedData) {
 
     if (loadedData) {
         playerData = { ...base, ...loadedData };
+
+        ensurePlayerIdentifier(playerData);
 
         const incomingStats = loadedData.stats && typeof loadedData.stats === 'object'
             ? loadedData.stats
