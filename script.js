@@ -87,6 +87,10 @@ const statLevelHubEl = document.getElementById('stat-level-hub');
 const statLevelOverlayEl = document.getElementById('stat-level-overlay');
 const statPointsEl = document.getElementById('stat-points');
 const statOptionsEl = document.getElementById('stat-options');
+const statSummaryEl = document.getElementById('stat-summary');
+const statMasteryListEl = document.getElementById('stat-mastery-list');
+const statTabButtons = Array.from(document.querySelectorAll('.stat-tab-button[data-tab]'));
+const statTabPanels = Array.from(document.querySelectorAll('.stat-panel[data-tab-panel]'));
 const openStatAllocationBtn = document.getElementById('open-stat-allocation');
 const openProfileBtn = document.getElementById('open-profile-modal');
 const profileModalEl = document.getElementById('profile-modal');
@@ -247,7 +251,13 @@ function initializeUIEvents() {
         bindButtonClick(button, () => setActiveHubTab(tab), { preventDefault: false });
     });
 
+    statTabButtons.forEach((button) => {
+        const tab = button.dataset.tab;
+        bindButtonClick(button, () => setActiveStatTab(tab), { preventDefault: false });
+    });
+
     setActiveHubTab('missions');
+    setActiveStatTab('overview');
     updateNavigationRibbon();
 
     if (dailyQuestsEl && !dailyQuestsEl.dataset.listenerAttached) {
@@ -1990,13 +2000,15 @@ function createSkillNodeElement(node, depth = 0) {
 }
 
 function renderSkillTree() {
-    if (!statOptionsEl) return;
+    if (!statOptionsEl && !statSummaryEl && !statMasteryListEl) return;
 
     if (!Array.isArray(playerData.unlockedNodes)) {
         playerData.unlockedNodes = [];
     }
 
-    statOptionsEl.innerHTML = '';
+    if (statOptionsEl) statOptionsEl.innerHTML = '';
+    if (statSummaryEl) statSummaryEl.innerHTML = '';
+    if (statMasteryListEl) statMasteryListEl.innerHTML = '';
 
     const { totals, masteries, levelBase } = recomputeSpecializationTotals();
     const summaryWrapper = document.createElement('div');
@@ -2029,9 +2041,14 @@ function renderSkillTree() {
     }
     summaryWrapper.appendChild(masterySummary);
 
-    statOptionsEl.appendChild(summaryWrapper);
+    if (statSummaryEl) {
+        statSummaryEl.appendChild(summaryWrapper);
+    } else if (statOptionsEl) {
+        statOptionsEl.appendChild(summaryWrapper);
+    }
 
     const unlockedNodes = Array.isArray(playerData.unlockedNodes) ? playerData.unlockedNodes : [];
+    const masteryListFragment = document.createDocumentFragment();
 
     Object.entries(skillTree).forEach(([branchKey, branch]) => {
         const branchEl = document.createElement('div');
@@ -2095,11 +2112,30 @@ function renderSkillTree() {
                 masteryInfo.textContent = `Mastery Progress ${unlockedCount}/${required}: ${branch.mastery.description}`;
             }
             branchEl.appendChild(masteryInfo);
+
+            const masteryListItem = document.createElement('li');
+            masteryListItem.className = masteryInfo.className;
+            masteryListItem.textContent = masteryInfo.textContent;
+            masteryListFragment.appendChild(masteryListItem);
         }
-        statOptionsEl.appendChild(branchEl);
+        if (statOptionsEl) {
+            statOptionsEl.appendChild(branchEl);
+        }
     });
 
-    if (playerData.specializationPoints <= 0) {
+    if (statMasteryListEl && masteryListFragment.childNodes.length) {
+        const masteryList = document.createElement('ul');
+        masteryList.className = 'skill-branch-summary';
+        masteryList.appendChild(masteryListFragment);
+        statMasteryListEl.appendChild(masteryList);
+    } else if (statMasteryListEl) {
+        const emptyState = document.createElement('p');
+        emptyState.className = 'skill-hint';
+        emptyState.textContent = 'Unlock nodes within a branch to activate its mastery bonus.';
+        statMasteryListEl.appendChild(emptyState);
+    }
+
+    if (playerData.specializationPoints <= 0 && statOptionsEl) {
         const hint = document.createElement('p');
         hint.className = 'skill-hint';
         hint.textContent = 'Earn more specialization points by leveling up or completing quests to unlock additional nodes.';
@@ -3056,6 +3092,22 @@ function setActiveHubTab(tab) {
     });
 
     hubTabPanels.forEach((panel) => {
+        const isActive = panel.dataset.tabPanel === tab;
+        panel.classList.toggle('active', isActive);
+        panel.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+    });
+}
+
+function setActiveStatTab(tab) {
+    if (!tab) return;
+    statTabButtons.forEach((button) => {
+        const isActive = button.dataset.tab === tab;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        button.tabIndex = isActive ? 0 : -1;
+    });
+
+    statTabPanels.forEach((panel) => {
         const isActive = panel.dataset.tabPanel === tab;
         panel.classList.toggle('active', isActive);
         panel.setAttribute('aria-hidden', isActive ? 'false' : 'true');

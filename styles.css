@@ -1102,6 +1102,109 @@ button:disabled {
     gap: 10px;
 }
 
+.stat-window {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.stat-window-header {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    align-items: center;
+    gap: 10px;
+}
+
+.stat-pill {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(12, 39, 96, 0.06);
+    border: 1px solid rgba(12, 39, 96, 0.14);
+}
+
+.stat-pill-accent {
+    background: linear-gradient(135deg, rgba(0, 246, 255, 0.18), rgba(12, 39, 96, 0.08));
+    border-color: rgba(0, 246, 255, 0.35);
+}
+
+.stat-pill-label {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 12px;
+    color: rgba(12, 39, 96, 0.6);
+}
+
+.stat-pill-value {
+    font-family: var(--font-display);
+    font-weight: 700;
+    color: var(--xp-blue-dark);
+}
+
+.stat-tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.stat-tab-button {
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(12, 39, 96, 0.18);
+    background: rgba(255, 255, 255, 0.9);
+    color: #0c2760;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(12, 39, 96, 0.12);
+}
+
+.stat-tab-button.active {
+    background: linear-gradient(135deg, rgba(0, 246, 255, 0.22), rgba(12, 39, 96, 0.14));
+    border-color: rgba(0, 246, 255, 0.6);
+    box-shadow: 0 0 0 2px rgba(0, 246, 255, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+}
+
+.stat-panels {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.stat-panel {
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.stat-panel.active {
+    display: flex;
+}
+
+.stat-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+}
+
+.stat-summary .skill-summary-line,
+.stat-summary .skill-masteries {
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(12, 39, 96, 0.14);
+}
+
+#stat-options,
+#stat-mastery-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
 .shop-section-header {
     display: flex;
     flex-direction: column;
