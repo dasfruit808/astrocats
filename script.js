@@ -4113,6 +4113,20 @@ function showAnnounce(el, text) {
 
 // --- LEADERBOARD & STORAGE ---
 
+const REMOTE_API_BASE_URL = (typeof window !== 'undefined' && window.ASTROCATS_API_BASE_URL)
+    ? String(window.ASTROCATS_API_BASE_URL).replace(/\/$/, '')
+    : '';
+const REMOTE_PROFILE_ENDPOINT = REMOTE_API_BASE_URL ? `${REMOTE_API_BASE_URL}/profile` : '';
+const REALTIME_SOCKET_URL = (() => {
+    if (!REMOTE_API_BASE_URL || typeof window === 'undefined') return '';
+    const { protocol, host } = window.location;
+    const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${wsProtocol}//${host}/api/realtime`;
+})();
+let realtimeSocket = null;
+let profileSyncQueue = [];
+let profileSyncTimeout = null;
+
 function sanitizeLeaderboardEntry(entry) {
     if (typeof window !== 'undefined' && window.LeaderboardAPI?.sanitizeEntry) {
         try {
@@ -4212,6 +4226,68 @@ let leaderboardLoadPromise = null;
 let leaderboardChangeToken = 0;
 let lastLeaderboardFetchToken = -1;
 let lastLeaderboardFetchTime = 0;
+
+function enqueueProfileSync(snapshot) {
+    if (!REMOTE_PROFILE_ENDPOINT || !snapshot) return;
+    profileSyncQueue.push(snapshot);
+    if (profileSyncTimeout) return;
+
+    profileSyncTimeout = setTimeout(async () => {
+        const queue = [...profileSyncQueue];
+        profileSyncQueue = [];
+        profileSyncTimeout = null;
+
+        for (const payload of queue) {
+            try {
+                await fetch(`${REMOTE_PROFILE_ENDPOINT}/${encodeURIComponent(payload.owner)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload.data)
+                });
+            } catch (error) {
+                console.warn('Profile sync failed; re-queueing.', error);
+                enqueueProfileSync(payload);
+            }
+        }
+    }, 500);
+}
+
+async function fetchRemoteProfile(owner) {
+    if (!REMOTE_PROFILE_ENDPOINT || !owner) return null;
+    try {
+        const response = await fetch(`${REMOTE_PROFILE_ENDPOINT}/${encodeURIComponent(owner)}`);
+        if (!response.ok) return null;
+        return await response.json();
+    } catch (error) {
+        console.warn('Failed to fetch remote profile:', error);
+        return null;
+    }
+}
+
+function connectRealtimeChannel() {
+    if (!REALTIME_SOCKET_URL || realtimeSocket) return;
+    try {
+        realtimeSocket = new WebSocket(REALTIME_SOCKET_URL);
+        realtimeSocket.addEventListener('message', (event) => {
+            try {
+                const payload = JSON.parse(event.data);
+                if (payload?.type === 'leaderboard_update') {
+                    markLeaderboardDirty();
+                    loadAndDisplayLeaderboard({ force: true });
+                }
+            } catch (err) {
+                console.warn('Realtime message parse failed:', err);
+            }
+        });
+
+        realtimeSocket.addEventListener('close', () => {
+            realtimeSocket = null;
+            setTimeout(connectRealtimeChannel, 1000);
+        });
+    } catch (error) {
+        console.warn('Failed to connect to realtime channel:', error);
+    }
+}
 
 function markLeaderboardDirty() {
     leaderboardChangeToken += 1;
@@ -4828,6 +4904,11 @@ function savePlayerData() {
             hideStorageWarning();
             saveLocalLeaderboard(playerData);
             loadAndDisplayLeaderboard();
+
+            enqueueProfileSync({
+                owner: 'guest',
+                data: sanitizePlayerDataForChain(playerData)
+            });
         } catch (err) {
             guestStorageAvailable = false;
             console.error('Failed to save guest player data:', err);
@@ -4851,6 +4932,7 @@ function savePlayerData() {
 
     const snapshot = sanitizePlayerDataForChain(playerData);
     queueOnChainSync(snapshot);
+    enqueueProfileSync({ owner: walletPublicKey, data: snapshot });
 }
 
 function applyPlayerDataSnapshot(loadedData) {
@@ -4930,33 +5012,49 @@ async function loadPlayerData() {
     if (!walletPublicKey) {
         guestStorageAvailable = false;
 
-        if (typeof localStorage === 'undefined') {
-            showStorageWarning();
-        } else {
-            try {
-                const saved = localStorage.getItem(GUEST_PROFILE_STORAGE_KEY);
-                guestStorageAvailable = true;
-                hideStorageWarning();
-                if (saved) {
-                    try {
-                        loadedData = JSON.parse(saved);
-                    } catch (err) {
-                        console.error('Failed to parse guest player data:', err);
-                    }
-                }
-            } catch (err) {
-                guestStorageAvailable = false;
-                console.error('Failed to access guest player data:', err);
+        try {
+            loadedData = await fetchRemoteProfile('guest');
+        } catch (err) {
+            console.warn('Remote guest profile unavailable:', err);
+        }
+
+        if (!loadedData) {
+            if (typeof localStorage === 'undefined') {
                 showStorageWarning();
+            } else {
+                try {
+                    const saved = localStorage.getItem(GUEST_PROFILE_STORAGE_KEY);
+                    guestStorageAvailable = true;
+                    hideStorageWarning();
+                    if (saved) {
+                        try {
+                            loadedData = JSON.parse(saved);
+                        } catch (err) {
+                            console.error('Failed to parse guest player data:', err);
+                        }
+                    }
+                } catch (err) {
+                    guestStorageAvailable = false;
+                    console.error('Failed to access guest player data:', err);
+                    showStorageWarning();
+                }
             }
         }
     } else {
         guestStorageAvailable = false;
 
         try {
-            loadedData = await fetchLatestOnChainSnapshot(walletPublicKey);
+            loadedData = await fetchRemoteProfile(walletPublicKey);
         } catch (err) {
-            console.error('On-chain progress load failed:', err);
+            console.warn('Remote profile fetch failed:', err);
+        }
+
+        if (!loadedData) {
+            try {
+                loadedData = await fetchLatestOnChainSnapshot(walletPublicKey);
+            } catch (err) {
+                console.error('On-chain progress load failed:', err);
+            }
         }
 
         if (!loadedData) {
@@ -6527,6 +6625,7 @@ async function initializeApp() {
 
     showStartMenu();
     loadAndDisplayLeaderboard();
+    connectRealtimeChannel();
 
     gameLoop();
 }
