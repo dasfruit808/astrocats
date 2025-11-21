@@ -1092,6 +1092,12 @@ const SHOP_ROLL_CONFIG = {
 };
 
 const SHOP_RARITY_COSTS = { common: 75, rare: 125, epic: 200, legendary: 350 };
+const SHOP_RARITY_COLORS = {
+    common: '#278027',
+    rare: '#3c76ce',
+    epic: '#9754ce',
+    legendary: '#d8ad46'
+};
 
 const UPGRADE_DETAILS = {
     speed: { name: 'Speed Boost', description: 'Increase ship movement speed for a short duration.' },
@@ -2319,6 +2325,7 @@ function initializeSpriteSystem() {
 }
 
 let currentShopOptions = [];
+let shopRollHistory = [];
 
 const DASH_WINDOW = 300; const DASH_DURATION = 500;
 const DASH_SPEED_MULTIPLIER = 2.6;
@@ -3539,6 +3546,15 @@ function openShop() {
     }
 }
 
+function recordRollHistory(tier, options = []) {
+    const timestamp = Date.now();
+    const snapshot = (options || []).map(opt => ({ label: opt.label, rarity: opt.rarity }));
+    shopRollHistory.push({ id: `${timestamp}-${Math.random().toString(16).slice(2)}`, tier, options: snapshot, timestamp });
+    if (shopRollHistory.length > SHOP_HISTORY_LIMIT * 2) {
+        shopRollHistory = shopRollHistory.slice(-SHOP_HISTORY_LIMIT * 2);
+    }
+}
+
 function rollUpgrade(tier) {
     const config = SHOP_ROLL_CONFIG[tier];
     if (!config) return;
@@ -3566,6 +3582,7 @@ function rollUpgrade(tier) {
         });
     }
 
+    recordRollHistory(tier, currentShopOptions);
     renderShopOptions();
     updateUI();
     updateHubUI();
@@ -4953,155 +4970,381 @@ function grantRestedXP(days = 1) {
     return newTotal - previous;
 }
 
+const SHOP_HISTORY_LIMIT = 5;
+
+function formatRarityOdds(weights) {
+    const entries = Object.entries(weights || {});
+    const total = entries.reduce((sum, [, weight]) => sum + weight, 0) || 1;
+    return entries.map(([rarity, weight]) => {
+        const percentage = Math.round((weight / total) * 100);
+        return `${rarity.toUpperCase()} ${percentage}%`;
+    }).join(', ');
+}
+
+function ensureShopTabLayout() {
+    if (!shopOptionsEl) return {};
+
+    const existingWrapper = shopOptionsEl.querySelector('.shop-tab-wrapper');
+    const rollSection = shopOptionsEl.querySelector('.roll-section');
+    const upgradesSection = shopOptionsEl.querySelector('.upgrades-section');
+    const hangarSection = shopOptionsEl.querySelector('.hangar-section');
+
+    if (existingWrapper) {
+        const panels = existingWrapper.querySelector('.shop-tab-panels');
+        const activeTab = shopOptionsEl.dataset.activeTab || 'shop-tab-rolls';
+        const tabButtons = Array.from(existingWrapper.querySelectorAll('.shop-tab-button'));
+        const tabPanels = [
+            panels?.querySelector('#shop-tab-rolls') || rollSection,
+            panels?.querySelector('#shop-tab-upgrades') || upgradesSection,
+            panels?.querySelector('#shop-tab-hangar') || hangarSection
+        ].filter(Boolean);
+
+        tabButtons.forEach(btn => {
+            const isActive = btn.dataset.target === activeTab;
+            btn.classList.toggle('active', isActive);
+            btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        });
+
+        tabPanels.forEach(panel => {
+            const isActive = panel.id === activeTab;
+            panel.hidden = !isActive;
+            panel.setAttribute('aria-hidden', (!isActive).toString());
+        });
+
+        return {
+            tabWrapper: existingWrapper,
+            rollSection: panels?.querySelector('#shop-tab-rolls') || rollSection,
+            upgradesSection: panels?.querySelector('#shop-tab-upgrades') || upgradesSection,
+            hangarSection: panels?.querySelector('#shop-tab-hangar') || hangarSection
+        };
+    }
+
+    const tabWrapper = document.createElement('div');
+    tabWrapper.className = 'shop-tab-wrapper';
+
+    const tabList = document.createElement('div');
+    tabList.className = 'shop-tablist';
+
+    const panels = document.createElement('div');
+    panels.className = 'shop-tab-panels';
+
+    const sectionDefs = [
+        { id: 'shop-tab-rolls', label: 'Rolls', node: rollSection, description: 'Roll odds and pull history' },
+        { id: 'shop-tab-upgrades', label: 'Upgrades', node: upgradesSection, description: 'Pick your favorite perks' },
+        { id: 'shop-tab-hangar', label: 'Hangar', node: hangarSection, description: 'Ships and loadouts' }
+    ];
+
+    shopOptionsEl.innerHTML = '';
+
+    sectionDefs.forEach(def => {
+        if (!def.node) {
+            def.node = document.createElement('section');
+            def.node.className = 'shop-section';
+        }
+        def.node.id = def.id;
+        def.node.classList.add('shop-tab-panel');
+        panels.appendChild(def.node);
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'shop-tab-button';
+        btn.dataset.target = def.id;
+        btn.textContent = def.label;
+        btn.title = def.description;
+        tabList.appendChild(btn);
+    });
+
+    tabWrapper.append(tabList, panels);
+    shopOptionsEl.appendChild(tabWrapper);
+
+    const tabButtons = Array.from(tabList.querySelectorAll('.shop-tab-button'));
+
+    const setActiveTab = (tabId) => {
+        tabButtons.forEach(btn => {
+            const isActive = btn.dataset.target === tabId;
+            btn.classList.toggle('active', isActive);
+            btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        });
+
+        sectionDefs.forEach(({ node, id }) => {
+            const isActive = id === tabId;
+            if (node) {
+                node.hidden = !isActive;
+                node.setAttribute('aria-hidden', (!isActive).toString());
+            }
+        });
+
+        shopOptionsEl.dataset.activeTab = tabId;
+    };
+
+    tabButtons.forEach(btn => btn.addEventListener('click', () => setActiveTab(btn.dataset.target)));
+    setActiveTab(shopOptionsEl.dataset.activeTab || sectionDefs[0].id);
+
+    return {
+        tabWrapper,
+        rollSection: sectionDefs[0].node,
+        upgradesSection: sectionDefs[1].node,
+        hangarSection: sectionDefs[2].node
+    };
+}
+
+function renderRollSection(rollSection) {
+    if (!rollSection) return;
+
+    const basicConfig = SHOP_ROLL_CONFIG.basic;
+    const premiumConfig = SHOP_ROLL_CONFIG.premium;
+
+    const rollHelper = shopRollHelperEl || rollSection.querySelector('#shop-roll-helper');
+    if (rollHelper) {
+        rollHelper.textContent = `Basic costs ${basicConfig.cost} credits for ${basicConfig.rolls} pulls (${formatRarityOdds(basicConfig.rarityWeights)}). Premium costs ${premiumConfig.cost} credits for ${premiumConfig.rolls} pulls (${formatRarityOdds(premiumConfig.rarityWeights)}) and leans toward rarer drops.`;
+    }
+
+    const basicRoll = rollSection.querySelector('#shop-roll-basic') || shopRollBasicBtn;
+    const premiumRoll = rollSection.querySelector('#shop-roll-premium') || shopRollPremiumBtn;
+    if (basicRoll) basicRoll.disabled = credits < SHOP_ROLL_CONFIG.basic.cost;
+    if (premiumRoll) premiumRoll.disabled = credits < SHOP_ROLL_CONFIG.premium.cost;
+
+    let rollMeta = rollSection.querySelector('.shop-roll-meta');
+    if (!rollMeta) {
+        rollMeta = document.createElement('div');
+        rollMeta.className = 'shop-roll-meta';
+        rollSection.appendChild(rollMeta);
+    }
+
+    let oddsLegend = rollMeta.querySelector('.shop-roll-odds');
+    if (!oddsLegend) {
+        oddsLegend = document.createElement('div');
+        oddsLegend.className = 'shop-roll-odds';
+        rollMeta.appendChild(oddsLegend);
+    }
+    oddsLegend.innerHTML = '';
+    const oddsTitle = document.createElement('h4');
+    oddsTitle.textContent = 'Roll Odds';
+    oddsLegend.appendChild(oddsTitle);
+
+    [
+        { label: 'Basic', config: basicConfig },
+        { label: 'Premium', config: premiumConfig }
+    ].forEach(({ label, config }) => {
+        const entry = document.createElement('div');
+        entry.className = 'roll-odds-entry';
+        entry.textContent = `${label}: ${config.rolls} pulls · ${formatRarityOdds(config.rarityWeights)}`;
+        oddsLegend.appendChild(entry);
+    });
+
+    let rarityKey = rollMeta.querySelector('.shop-rarity-key');
+    if (!rarityKey) {
+        rarityKey = document.createElement('div');
+        rarityKey.className = 'shop-rarity-key';
+        rollMeta.appendChild(rarityKey);
+    }
+    rarityKey.innerHTML = '';
+    const keyTitle = document.createElement('h4');
+    keyTitle.textContent = 'Rarity Color Key';
+    rarityKey.appendChild(keyTitle);
+
+    const keyList = document.createElement('div');
+    keyList.className = 'rarity-key-list';
+    Object.keys(SHOP_RARITY_COSTS).forEach(rarity => {
+        const pill = document.createElement('div');
+        pill.className = 'rarity-pill';
+        pill.style.setProperty('--rarity-color', SHOP_RARITY_COLORS[rarity] || '#2b3f63');
+        pill.textContent = `${rarity.charAt(0).toUpperCase()}${rarity.slice(1)}`;
+        keyList.appendChild(pill);
+    });
+    rarityKey.appendChild(keyList);
+
+    let history = rollSection.querySelector('.shop-roll-history');
+    if (!history) {
+        history = document.createElement('div');
+        history.className = 'shop-roll-history';
+        rollSection.appendChild(history);
+    }
+    history.innerHTML = '';
+    const historyTitle = document.createElement('h4');
+    historyTitle.textContent = 'Recent Pulls';
+    history.appendChild(historyTitle);
+
+    const historyList = document.createElement('ol');
+    historyList.className = 'shop-history-list';
+    const recentHistory = shopRollHistory.slice(-SHOP_HISTORY_LIMIT).reverse();
+    if (recentHistory.length === 0) {
+        const emptyState = document.createElement('li');
+        emptyState.className = 'shop-history-empty';
+        emptyState.textContent = 'No pulls yet. Roll to reveal upgrades and log them here.';
+        historyList.appendChild(emptyState);
+    } else {
+        recentHistory.forEach(entry => {
+            const item = document.createElement('li');
+            item.className = 'shop-history-entry';
+
+            const meta = document.createElement('div');
+            meta.className = 'shop-history-meta';
+            const tierLabel = entry.tier === 'premium' ? 'Premium Roll' : 'Basic Roll';
+            meta.textContent = `${tierLabel} • ${new Date(entry.timestamp).toLocaleTimeString()}`;
+            item.appendChild(meta);
+
+            const results = document.createElement('div');
+            results.className = 'shop-history-results';
+            if (entry.options.length === 0) {
+                results.textContent = 'No upgrades pulled.';
+            } else {
+                results.textContent = entry.options
+                    .map(opt => `${opt.label} (${opt.rarity.toUpperCase()})`)
+                    .join(' • ');
+            }
+            item.appendChild(results);
+
+            historyList.appendChild(item);
+        });
+    }
+    history.appendChild(historyList);
+}
+
+function renderUpgradeSection(upgradesSection) {
+    if (!upgradesSection) return;
+
+    const upgradeContainer = shopUpgradeResultsEl || upgradesSection.querySelector('#shop-upgrade-results');
+    if (!upgradeContainer) return;
+
+    upgradeContainer.innerHTML = '';
+
+    const rarityCosts = Object.values(SHOP_RARITY_COSTS || {});
+    const minUpgradeCost = rarityCosts.length ? Math.min(...rarityCosts) : 0;
+    const maxUpgradeCost = rarityCosts.length ? Math.max(...rarityCosts) : 0;
+
+    const helper = shopUpgradeHelperEl || upgradesSection.querySelector('#shop-upgrade-helper');
+    if (helper) {
+        helper.textContent = `Each roll reveals up to ${SHOP_ROLL_CONFIG.basic.rolls} upgrades. Purchase your pick (${minUpgradeCost}-${maxUpgradeCost} credits by rarity) to lock it in for the next sortie.`;
+    }
+
+    if (currentShopOptions.length === 0) {
+        const hint = document.createElement('p');
+        hint.className = 'shop-hint';
+        hint.textContent = 'Roll above to reveal options. Your next step is to purchase a favorite or skip back to the hub.';
+        upgradeContainer.appendChild(hint);
+        return;
+    }
+
+    const list = document.createElement('div');
+    list.className = 'shop-option-list';
+
+    currentShopOptions.forEach(option => {
+        const optionEl = document.createElement('div');
+        optionEl.className = `shop-option ${option.rarity}`;
+
+        const title = document.createElement('h4');
+        title.textContent = `${option.label} [${option.rarity.toUpperCase()}]`;
+        optionEl.appendChild(title);
+
+        const description = document.createElement('p');
+        description.textContent = option.description;
+        optionEl.appendChild(description);
+
+        const costLabel = document.createElement('p');
+        costLabel.className = 'shop-cost';
+        costLabel.textContent = `Cost: ${option.cost} Credits`;
+        optionEl.appendChild(costLabel);
+
+        const purchaseBtn = document.createElement('button');
+        purchaseBtn.textContent = 'Purchase';
+        purchaseBtn.disabled = credits < option.cost;
+        purchaseBtn.onclick = () => purchaseUpgrade(option.id);
+        optionEl.appendChild(purchaseBtn);
+
+        list.appendChild(optionEl);
+    });
+
+    upgradeContainer.appendChild(list);
+}
+
+function renderHangarSection(hangarSection) {
+    if (!hangarSection) return;
+
+    const spriteContainer = shopSpriteGridEl || hangarSection.querySelector('#shop-sprite-grid');
+    if (!spriteContainer) return;
+
+    spriteContainer.innerHTML = '';
+
+    const paidShips = SPACECRAFT_CATALOG.filter(sprite => sprite.cost > 0);
+    const minShipCost = paidShips.length ? Math.min(...paidShips.map(sprite => sprite.cost)) : 0;
+    const helper = shopHangarHelperEl || hangarSection.querySelector('#shop-hangar-helper');
+    if (helper) {
+        const activeLabel = playerData.activeSpriteId ? 'Swap ships anytime; equipped craft carry into your next run.' : 'Select a craft to prep for your next run.';
+        helper.textContent = `Owned ships show as Equipped/Owned. New frames start at ${minShipCost} credits and equip instantly after purchase. ${activeLabel}`;
+    }
+
+    SPACECRAFT_CATALOG.forEach(sprite => {
+        const owned = playerData.ownedSprites.includes(sprite.id);
+        const active = playerData.activeSpriteId === sprite.id;
+
+        const card = document.createElement('div');
+        card.className = `shop-sprite-card ${sprite.rarity}`;
+
+        const preview = document.createElement('img');
+        preview.className = 'shop-sprite-preview';
+        preview.alt = `${sprite.name} preview`;
+        const fallback = getSpriteFallback(sprite);
+        preview.src = `${SPRITE_DIRECTORY}${sprite.fileName}`;
+        preview.onerror = () => {
+            preview.onerror = null;
+            if (fallback) preview.src = fallback;
+        };
+        preview.loading = 'lazy';
+        card.appendChild(preview);
+
+        const info = document.createElement('div');
+        info.className = 'shop-sprite-info';
+
+        const title = document.createElement('h4');
+        const rarityLabel = SPRITE_RARITY_LABELS[sprite.rarity] || 'Cosmetic';
+        title.textContent = `${sprite.name} [${rarityLabel.toUpperCase()}]`;
+        info.appendChild(title);
+
+        const description = document.createElement('p');
+        description.textContent = sprite.description;
+        info.appendChild(description);
+
+        const costLabel = document.createElement('p');
+        costLabel.className = 'shop-cost';
+        costLabel.textContent = sprite.cost > 0 ? `Cost: ${sprite.cost} Credits` : 'Starter Craft (Free)';
+        info.appendChild(costLabel);
+
+        card.appendChild(info);
+
+        const actions = document.createElement('div');
+        actions.className = 'shop-sprite-actions';
+
+        const status = document.createElement('span');
+        status.className = 'shop-sprite-status';
+        status.textContent = owned ? (active ? 'Equipped' : 'Owned') : (SPRITE_RARITY_LABELS[sprite.rarity] || 'Cosmetic');
+        actions.appendChild(status);
+
+        const actionBtn = document.createElement('button');
+        if (owned) {
+            actionBtn.textContent = active ? 'Equipped' : 'Equip';
+            actionBtn.disabled = active;
+        } else {
+            actionBtn.textContent = 'Purchase';
+            actionBtn.disabled = credits < sprite.cost;
+        }
+        actionBtn.onclick = () => purchaseSprite(sprite.id);
+        actions.appendChild(actionBtn);
+
+        card.appendChild(actions);
+        spriteContainer.appendChild(card);
+    });
+}
+
 function renderShopOptions() {
     if (!shopOptionsEl) return;
 
     ensureSpriteProgression();
 
-    const upgradeContainer = shopUpgradeResultsEl || shopOptionsEl.querySelector('#shop-upgrade-results');
-    const spriteContainer = shopSpriteGridEl || shopOptionsEl.querySelector('#shop-sprite-grid');
-
-    const formatRarityOdds = (weights) => {
-        const entries = Object.entries(weights || {});
-        const total = entries.reduce((sum, [, weight]) => sum + weight, 0) || 1;
-        return entries.map(([rarity, weight]) => {
-            const percentage = Math.round((weight / total) * 100);
-            return `${rarity.toUpperCase()} ${percentage}%`;
-        }).join(', ');
-    };
-
-    if (shopRollHelperEl) {
-        const basicConfig = SHOP_ROLL_CONFIG.basic;
-        const premiumConfig = SHOP_ROLL_CONFIG.premium;
-        shopRollHelperEl.textContent = `Basic costs ${basicConfig.cost} credits for ${basicConfig.rolls} pulls (${formatRarityOdds(basicConfig.rarityWeights)}). Premium costs ${premiumConfig.cost} credits for ${premiumConfig.rolls} pulls (${formatRarityOdds(premiumConfig.rarityWeights)}) and leans toward rarer drops.`;
-    }
-
-    const basicRoll = shopRollBasicBtn || shopOptionsEl.querySelector('#shop-roll-basic');
-    const premiumRoll = shopRollPremiumBtn || shopOptionsEl.querySelector('#shop-roll-premium');
-    if (basicRoll) basicRoll.disabled = credits < SHOP_ROLL_CONFIG.basic.cost;
-    if (premiumRoll) premiumRoll.disabled = credits < SHOP_ROLL_CONFIG.premium.cost;
-
-    if (upgradeContainer) {
-        upgradeContainer.innerHTML = '';
-
-        const rarityCosts = Object.values(SHOP_RARITY_COSTS || {});
-        const minUpgradeCost = rarityCosts.length ? Math.min(...rarityCosts) : 0;
-        const maxUpgradeCost = rarityCosts.length ? Math.max(...rarityCosts) : 0;
-
-        if (shopUpgradeHelperEl) {
-            shopUpgradeHelperEl.textContent = `Each roll reveals up to ${SHOP_ROLL_CONFIG.basic.rolls} upgrades. Purchase your pick (${minUpgradeCost}-${maxUpgradeCost} credits by rarity) to lock it in for the next sortie.`;
-        }
-
-        if (currentShopOptions.length === 0) {
-            const hint = document.createElement('p');
-            hint.className = 'shop-hint';
-            hint.textContent = 'Roll above to reveal options. Your next step is to purchase a favorite or skip back to the hub.';
-            upgradeContainer.appendChild(hint);
-        } else {
-            const list = document.createElement('div');
-            list.className = 'shop-option-list';
-
-            currentShopOptions.forEach(option => {
-                const optionEl = document.createElement('div');
-                optionEl.className = `shop-option ${option.rarity}`;
-
-                const title = document.createElement('h4');
-                title.textContent = `${option.label} [${option.rarity.toUpperCase()}]`;
-                optionEl.appendChild(title);
-
-                const description = document.createElement('p');
-                description.textContent = option.description;
-                optionEl.appendChild(description);
-
-                const costLabel = document.createElement('p');
-                costLabel.className = 'shop-cost';
-                costLabel.textContent = `Cost: ${option.cost} Credits`;
-                optionEl.appendChild(costLabel);
-
-                const purchaseBtn = document.createElement('button');
-                purchaseBtn.textContent = 'Purchase';
-                purchaseBtn.disabled = credits < option.cost;
-                purchaseBtn.onclick = () => purchaseUpgrade(option.id);
-                optionEl.appendChild(purchaseBtn);
-
-                list.appendChild(optionEl);
-            });
-
-            upgradeContainer.appendChild(list);
-        }
-    }
-
-    if (spriteContainer) {
-        spriteContainer.innerHTML = '';
-
-        const paidShips = SPACECRAFT_CATALOG.filter(sprite => sprite.cost > 0);
-        const minShipCost = paidShips.length ? Math.min(...paidShips.map(sprite => sprite.cost)) : 0;
-        if (shopHangarHelperEl) {
-            const activeLabel = playerData.activeSpriteId ? 'Swap ships anytime; equipped craft carry into your next run.' : 'Select a craft to prep for your next run.';
-            shopHangarHelperEl.textContent = `Owned ships show as Equipped/Owned. New frames start at ${minShipCost} credits and equip instantly after purchase. ${activeLabel}`;
-        }
-
-        SPACECRAFT_CATALOG.forEach(sprite => {
-            const owned = playerData.ownedSprites.includes(sprite.id);
-            const active = playerData.activeSpriteId === sprite.id;
-
-            const card = document.createElement('div');
-            card.className = `shop-sprite-card ${sprite.rarity}`;
-
-            const preview = document.createElement('img');
-            preview.className = 'shop-sprite-preview';
-            preview.alt = `${sprite.name} preview`;
-            const fallback = getSpriteFallback(sprite);
-            preview.src = `${SPRITE_DIRECTORY}${sprite.fileName}`;
-            preview.onerror = () => {
-                preview.onerror = null;
-                if (fallback) preview.src = fallback;
-            };
-            preview.loading = 'lazy';
-            card.appendChild(preview);
-
-            const info = document.createElement('div');
-            info.className = 'shop-sprite-info';
-
-            const title = document.createElement('h4');
-            const rarityLabel = SPRITE_RARITY_LABELS[sprite.rarity] || 'Cosmetic';
-            title.textContent = `${sprite.name} [${rarityLabel.toUpperCase()}]`;
-            info.appendChild(title);
-
-            const description = document.createElement('p');
-            description.textContent = sprite.description;
-            info.appendChild(description);
-
-            const costLabel = document.createElement('p');
-            costLabel.className = 'shop-cost';
-            costLabel.textContent = sprite.cost > 0 ? `Cost: ${sprite.cost} Credits` : 'Starter Craft (Free)';
-            info.appendChild(costLabel);
-
-            card.appendChild(info);
-
-            const actions = document.createElement('div');
-            actions.className = 'shop-sprite-actions';
-
-            const status = document.createElement('span');
-            status.className = 'shop-sprite-status';
-            status.textContent = owned ? (active ? 'Equipped' : 'Owned') : (SPRITE_RARITY_LABELS[sprite.rarity] || 'Cosmetic');
-            actions.appendChild(status);
-
-            const actionBtn = document.createElement('button');
-            if (owned) {
-                actionBtn.textContent = active ? 'Equipped' : 'Equip';
-                actionBtn.disabled = active;
-            } else {
-                actionBtn.textContent = 'Purchase';
-                actionBtn.disabled = credits < sprite.cost;
-            }
-            actionBtn.onclick = () => purchaseSprite(sprite.id);
-            actions.appendChild(actionBtn);
-
-            card.appendChild(actions);
-            spriteContainer.appendChild(card);
-        });
-    }
+    const { rollSection, upgradesSection, hangarSection } = ensureShopTabLayout();
+    renderRollSection(rollSection);
+    renderUpgradeSection(upgradesSection);
+    renderHangarSection(hangarSection);
 }
 
 function pickRarity(weights) {
