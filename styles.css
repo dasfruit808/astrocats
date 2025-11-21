@@ -944,6 +944,44 @@ button:disabled {
     gap: 14px;
 }
 
+.shop-tab-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.shop-tablist {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.shop-tab-button {
+    background: rgba(12, 39, 96, 0.08);
+    border: 1px solid rgba(12, 39, 96, 0.25);
+    border-radius: 16px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-weight: 600;
+    color: #0c2760;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.shop-tab-button.active {
+    background: rgba(12, 39, 96, 0.16);
+    border-color: rgba(12, 39, 96, 0.45);
+}
+
+.shop-tab-panels {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.shop-tab-panel[hidden] {
+    display: none;
+}
+
 .shop-section {
     background: rgba(255, 255, 255, 0.86);
     border: 1px solid rgba(12, 39, 96, 0.2);
@@ -977,6 +1015,92 @@ button:disabled {
     flex-wrap: wrap;
     gap: 10px;
     align-items: center;
+}
+
+.shop-roll-meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 10px;
+}
+
+.shop-roll-odds,
+.shop-rarity-key,
+.shop-roll-history {
+    background: rgba(12, 39, 96, 0.04);
+    border: 1px solid rgba(12, 39, 96, 0.15);
+    border-radius: 10px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.shop-roll-odds h4,
+.shop-rarity-key h4,
+.shop-roll-history h4 {
+    margin: 0;
+    color: #0c2760;
+}
+
+.roll-odds-entry {
+    font-size: 13px;
+    color: #2b3f63;
+}
+
+.rarity-key-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.rarity-pill {
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid var(--rarity-color, rgba(12, 39, 96, 0.45));
+    border-radius: 12px;
+    color: #0c2760;
+    padding: 6px 10px;
+    font-size: 13px;
+    font-weight: 700;
+    box-shadow: 0 0 0 1px rgba(12, 39, 96, 0.04);
+}
+
+.shop-roll-history {
+    margin-top: 4px;
+}
+
+.shop-history-list {
+    margin: 0;
+    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.shop-history-entry {
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(12, 39, 96, 0.12);
+    border-radius: 8px;
+    padding: 8px;
+    list-style: decimal;
+}
+
+.shop-history-meta {
+    font-weight: 700;
+    font-size: 13px;
+    color: #0c2760;
+    margin-bottom: 2px;
+}
+
+.shop-history-results {
+    font-size: 13px;
+    color: #2b3f63;
+}
+
+.shop-history-empty {
+    list-style: none;
+    padding-left: 0;
+    font-size: 13px;
+    color: #2f3c56;
 }
 
 .shop-upgrade-results {
