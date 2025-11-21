@@ -103,6 +103,8 @@ const pilotAvatarEl = document.getElementById('pilot-avatar');
 const pilotNameDisplayEl = document.getElementById('pilot-name-display');
 const pilotTitleDisplayEl = document.getElementById('pilot-title-display');
 const pilotBioDisplayEl = document.getElementById('pilot-bio-display');
+const pilotTitleDisplaySocialEl = document.getElementById('pilot-title-display-social');
+const pilotBioDisplaySocialEl = document.getElementById('pilot-bio-display-social');
 const pilotNameStatEl = document.getElementById('pilot-name-stat');
 const pilotTitleStatEl = document.getElementById('pilot-title-stat');
 const pilotNameStatsPanelEl = document.getElementById('pilot-name-stats-panel');
@@ -111,9 +113,7 @@ const windowShowDesktopBtn = document.getElementById('window-show-desktop');
 const windowOpenHubBtn = document.getElementById('window-open-hub');
 const windowBackToStartBtn = document.getElementById('window-back-to-start');
 const hubCloseBtn = document.getElementById('hub-close');
-const hubOpenShopBtn = document.getElementById('hub-open-shop');
 const hubPlayNextBtn = document.getElementById('hub-play-next');
-const hubBackMenuBtn = document.getElementById('hub-back-menu');
 const shopCloseBtn = document.getElementById('shop-close');
 const shopSkipBtn = document.getElementById('shop-skip');
 const shopRollBasicBtn = document.getElementById('shop-roll-basic');
@@ -126,9 +126,9 @@ const shopSpriteGridEl = document.getElementById('shop-sprite-grid');
 const taskbarStartBtn = document.getElementById('taskbar-start');
 const taskbarOpenHubBtn = document.getElementById('taskbar-open-hub');
 const taskbarOpenShopBtn = document.getElementById('taskbar-open-shop');
-const startOpenHubBtn = document.getElementById('start-open-hub');
-const startOpenShopBtn = document.getElementById('start-open-shop');
-const startTaskbarShopBtn = document.getElementById('start-taskbar-shop');
+const uiRibbonButtons = Array.from(document.querySelectorAll('.ui-ribbon-button[data-ui-target]'));
+const hubTabButtons = Array.from(document.querySelectorAll('.hub-tab-button[data-tab]'));
+const hubTabPanels = Array.from(document.querySelectorAll('.hub-tab-panel[data-tab-panel]'));
 const statCloseBtn = document.getElementById('stat-close');
 const statReturnHubBtn = document.getElementById('stat-return-hub');
 const focusPauseOverlayEl = document.getElementById('focus-pause-overlay');
@@ -139,6 +139,14 @@ const statusValueEl = document.querySelector('.xp-status-value');
 const statusTipEl = document.querySelector('.xp-status-tip');
 const DEFAULT_STATUS_VALUE_TEXT = statusValueEl ? statusValueEl.textContent : '';
 const DEFAULT_STATUS_TIP_TEXT = statusTipEl ? statusTipEl.textContent : '';
+
+const UI_MODES = {
+    START: 'start',
+    HUB: 'hub',
+    SHOP: 'shop',
+    STAT: 'stat'
+};
+let uiMode = UI_MODES.START;
 
 const FOCUSABLE_SELECTOR = "a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type='hidden']), select:not([disabled]), [tabindex]:not([tabindex='-1'])";
 const focusTrapStates = new Map();
@@ -188,9 +196,7 @@ function setNavigationUnlocked(unlocked) {
         windowBackToStartBtn,
         taskbarOpenHubBtn,
         taskbarOpenShopBtn,
-        startOpenHubBtn,
-        startOpenShopBtn,
-        startTaskbarShopBtn
+        ...uiRibbonButtons
     ];
 
     lockableButtons.forEach((btn) => {
@@ -231,9 +237,7 @@ function initializeUIEvents() {
     bindButtonClick(windowShowDesktopBtn, hideOverlaysAndResumeGame);
 
     bindButtonClick(hubCloseBtn, showStartMenu);
-    bindButtonClick(hubOpenShopBtn, openShop);
     bindButtonClick(hubPlayNextBtn, () => startGame(true));
-    bindButtonClick(hubBackMenuBtn, showStartMenu);
 
     bindButtonClick(shopCloseBtn, showHub);
     bindButtonClick(shopSkipBtn, skipShop);
@@ -243,9 +247,17 @@ function initializeUIEvents() {
     bindButtonClick(taskbarStartBtn, showStartMenu);
     bindButtonClick(taskbarOpenHubBtn, showHub);
     bindButtonClick(taskbarOpenShopBtn, openShop);
-    bindButtonClick(startOpenHubBtn, showHub);
-    bindButtonClick(startOpenShopBtn, openShop);
-    bindButtonClick(startTaskbarShopBtn, openShop);
+    uiRibbonButtons.forEach((button) => {
+        bindButtonClick(button, () => setUiMode(button.dataset.uiTarget));
+    });
+
+    hubTabButtons.forEach((button) => {
+        const tab = button.dataset.tab;
+        bindButtonClick(button, () => setActiveHubTab(tab), { preventDefault: false });
+    });
+
+    setActiveHubTab('missions');
+    updateNavigationRibbon();
 
     if (dailyQuestsEl && !dailyQuestsEl.dataset.listenerAttached) {
         dailyQuestsEl.addEventListener('click', (event) => {
@@ -2957,6 +2969,7 @@ function updateHubUI() {
 
     const nameText = profile.name.trim() || 'Rookie Pilot';
     const titleText = profile.title.trim() || 'Cadet';
+    const bioText = profile.bio.trim() || 'Set your pilot bio to share your legend.';
     const avatarCandidate = profile.avatar.trim();
     const isAvatarValid = avatarCandidate && (/^https?:\/\//i.test(avatarCandidate) || avatarCandidate.startsWith('data:'));
     const avatarSrc = isAvatarValid ? avatarCandidate : DEFAULT_PILOT_AVATAR;
@@ -2965,6 +2978,8 @@ function updateHubUI() {
     if (pilotNameDisplayEl) pilotNameDisplayEl.textContent = nameText;
     if (pilotTitleDisplayEl) pilotTitleDisplayEl.textContent = titleText;
     if (pilotBioDisplayEl) pilotBioDisplayEl.textContent = summaryText;
+    if (pilotTitleDisplaySocialEl) pilotTitleDisplaySocialEl.textContent = titleText;
+    if (pilotBioDisplaySocialEl) pilotBioDisplaySocialEl.textContent = bioText;
     if (pilotAvatarEl) {
         pilotAvatarEl.src = avatarSrc;
         pilotAvatarEl.alt = `${nameText} avatar`;
@@ -3039,6 +3054,91 @@ function hideAllOverlays() {
         if (statusTipEl) statusTipEl.textContent = DEFAULT_STATUS_TIP_TEXT;
     }
     if (profileErrorEl) profileErrorEl.textContent = '';
+}
+
+function updateNavigationRibbon() {
+    uiRibbonButtons.forEach((button) => {
+        const isActive = button.dataset.uiTarget === uiMode;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-current', isActive ? 'page' : 'false');
+    });
+}
+
+function setActiveHubTab(tab) {
+    if (!tab) return;
+    hubTabButtons.forEach((button) => {
+        const isActive = button.dataset.tab === tab;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        button.tabIndex = isActive ? 0 : -1;
+    });
+
+    hubTabPanels.forEach((panel) => {
+        const isActive = panel.dataset.tabPanel === tab;
+        panel.classList.toggle('active', isActive);
+        panel.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+    });
+}
+
+function setUiMode(nextMode) {
+    if (!nextMode || !Object.values(UI_MODES).includes(nextMode)) return;
+    uiMode = nextMode;
+    hideAllOverlays();
+
+    switch (nextMode) {
+        case UI_MODES.START:
+            gameRunning = false;
+            gamePaused = true;
+            lockInterfaceControls();
+            if (startMenuEl) {
+                startMenuEl.style.display = 'flex';
+                const initialFocus = findFirstContentControl(startMenuEl);
+                activateFocusTrap(startMenuEl, { initialFocus });
+            }
+            updateUI();
+            updateHubUI();
+            if (playBtn && playBtn.dataset.walletLocked === 'true') {
+                playBtn.disabled = false;
+            }
+            break;
+        case UI_MODES.HUB:
+            gameRunning = false;
+            gamePaused = true;
+            if (hubEl) {
+                hubEl.style.display = 'flex';
+                const initialFocus = findFirstContentControl(hubEl);
+                activateFocusTrap(hubEl, { initialFocus });
+            }
+            updateUI();
+            updateHubUI();
+            loadAndDisplayLeaderboard({ force: true });
+            break;
+        case UI_MODES.SHOP:
+            gameRunning = false;
+            gamePaused = true;
+            if (shopEl) {
+                shopEl.style.display = 'flex';
+                const initialFocus = findFirstContentControl(shopEl);
+                activateFocusTrap(shopEl, { initialFocus });
+            }
+            renderShopOptions();
+            updateUI();
+            updateHubUI();
+            break;
+        case UI_MODES.STAT:
+            gamePaused = true;
+            if (statAllocationEl) {
+                statAllocationEl.style.display = 'flex';
+                const initialFocus = findFirstContentControl(statAllocationEl);
+                activateFocusTrap(statAllocationEl, { initialFocus });
+            }
+            refreshStatAllocationOverlay({ forceRender: true });
+            break;
+        default:
+            break;
+    }
+
+    updateNavigationRibbon();
 }
 
 function populateProfileForm() {
@@ -3407,38 +3507,11 @@ function handleProfileFormSubmit(event) {
 }
 
 function showStartMenu() {
-    gameRunning = false;
-    gamePaused = true;
-    lockInterfaceControls();
-    hideAllOverlays();
-    if (startMenuEl) {
-        startMenuEl.style.display = 'flex';
-    }
-    updateUI();
-    updateHubUI();
-    if (startMenuEl) {
-        const initialFocus = findFirstContentControl(startMenuEl);
-        activateFocusTrap(startMenuEl, { initialFocus });
-    }
-    if (playBtn && playBtn.dataset.walletLocked === 'true') {
-        playBtn.disabled = false;
-    }
+    setUiMode(UI_MODES.START);
 }
 
 function showHub() {
-    gameRunning = false;
-    gamePaused = true;
-    hideAllOverlays();
-    if (hubEl) {
-        hubEl.style.display = 'flex';
-    }
-    updateUI();
-    updateHubUI();
-    loadAndDisplayLeaderboard({ force: true });
-    if (hubEl) {
-        const initialFocus = findFirstContentControl(hubEl);
-        activateFocusTrap(hubEl, { initialFocus });
-    }
+    setUiMode(UI_MODES.HUB);
 }
 
 function startGame(isNewSession = true) {
@@ -3531,19 +3604,7 @@ function startGame(isNewSession = true) {
 }
 
 function openShop() {
-    gameRunning = false;
-    gamePaused = true;
-    hideAllOverlays();
-    if (shopEl) {
-        shopEl.style.display = 'flex';
-    }
-    renderShopOptions();
-    updateUI();
-    updateHubUI();
-    if (shopEl) {
-        const initialFocus = findFirstContentControl(shopEl);
-        activateFocusTrap(shopEl, { initialFocus });
-    }
+    setUiMode(UI_MODES.SHOP);
 }
 
 function recordRollHistory(tier, options = []) {
@@ -5363,17 +5424,7 @@ function pickRarity(weights) {
 }
 
 function showStatAllocation() {
-    gamePaused = true;
-    hideAllOverlays();
-    if (statAllocationEl) {
-        statAllocationEl.style.display = 'flex';
-    }
-
-    refreshStatAllocationOverlay({ forceRender: true });
-    if (statAllocationEl) {
-        const initialFocus = findFirstContentControl(statAllocationEl);
-        activateFocusTrap(statAllocationEl, { initialFocus });
-    }
+    setUiMode(UI_MODES.STAT);
 }
 
 // --- DAILY LOGIN AND QUEST SYSTEM ---
