@@ -109,6 +109,36 @@ body.ui-locked .xp-window-controls {
     font-weight: 500;
 }
 
+.wallet-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: rgba(13, 55, 105, 0.7);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    font-size: 12px;
+    color: #e8f1ff;
+}
+
+.wallet-badge.connected {
+    background: linear-gradient(135deg, rgba(32, 112, 202, 0.9), rgba(43, 170, 255, 0.85));
+    color: #0f1b2c;
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.wallet-badge-label {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+}
+
+.wallet-badge-address {
+    font-family: "Rajdhani", "Orbitron", "Segoe UI", sans-serif;
+    font-weight: 600;
+}
+
 .xp-window-controls {
     display: flex;
     align-items: center;

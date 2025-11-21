@@ -69,6 +69,8 @@ const nftStatusEl = document.getElementById('nft-status');
 const playBtn = document.getElementById('play-btn');
 const connectBtn = document.getElementById('connect-wallet');
 const walletAddressEl = document.getElementById('wallet-address');
+const walletBadgeEl = document.getElementById('connected-wallet');
+const walletBadgeAddressEl = document.getElementById('connected-wallet-address');
 const gamesPlayedEl = document.getElementById('games-played');
 const winsEl = document.getElementById('wins');
 const lossesEl = document.getElementById('losses');
@@ -3023,8 +3025,9 @@ function updateHubUI() {
 
     refreshStatAllocationOverlay();
 
+    updateConnectedWalletDisplay(walletPublicKey);
+
     if (!walletPublicKey) return;
-    if (walletAddressEl) walletAddressEl.textContent = walletPublicKey.slice(0, 8) + '...';
     if (gamesPlayedEl) gamesPlayedEl.textContent = playerData.gamesPlayed;
     if (winsEl) winsEl.textContent = playerData.wins;
     if (lossesEl) lossesEl.textContent = playerData.losses;
@@ -5540,6 +5543,38 @@ function claimQuestReward(questId) {
 
 const PHANTOM_GUIDE_CARD_ID = 'phantom-guide-card';
 
+function formatWalletDisplay(key) {
+    if (!key || typeof key !== 'string') {
+        return { snippet: '', full: '' };
+    }
+
+    const trimmed = key.trim();
+    const snippet = trimmed.length > 8
+        ? `${trimmed.slice(0, 4)}...${trimmed.slice(-4)}`
+        : trimmed;
+
+    return { snippet, full: trimmed };
+}
+
+function updateConnectedWalletDisplay(key = walletPublicKey) {
+    const hasWallet = Boolean(key);
+    const { snippet } = formatWalletDisplay(key || '');
+    const badgeText = hasWallet ? snippet : 'Not Connected';
+
+    if (walletBadgeEl) {
+        walletBadgeEl.classList.toggle('connected', hasWallet);
+        walletBadgeEl.setAttribute('aria-label', hasWallet ? `Connected wallet ${snippet}` : 'No wallet connected');
+    }
+
+    if (walletBadgeAddressEl) {
+        walletBadgeAddressEl.textContent = badgeText;
+    }
+
+    if (walletAddressEl) {
+        walletAddressEl.textContent = hasWallet ? `${key.slice(0, 8)}...` : '-';
+    }
+}
+
 function openPhantomInstallGuide() {
     if (walletStatusEl) {
         walletStatusEl.textContent = 'Phantom Wallet not detected. Use the Player Hub guide to install it.';
@@ -5611,6 +5646,7 @@ async function connectWallet() {
         walletPublicKey = resp.publicKey.toString();
         freePlaySessionActive = false;
         walletProvider = provider;
+        updateConnectedWalletDisplay(walletPublicKey);
         setNavigationUnlocked(true);
 
         pendingChainSnapshot = null;
@@ -5655,6 +5691,8 @@ async function disconnectWallet() {
     hasAstroCatNFT = false;
     pendingChainSnapshot = null;
     solanaConnection = null;
+
+    updateConnectedWalletDisplay(null);
 
     if (walletStatusEl) walletStatusEl.textContent = 'Not Connected';
     if (nftStatusEl) nftStatusEl.textContent = 'Not Detected';
@@ -6331,6 +6369,8 @@ async function initializeApp() {
     }
 
     hasInitialized = true;
+
+    updateConnectedWalletDisplay(walletPublicKey);
 
     initializeVisualAssets();
     const webglReady = initWebGL();
