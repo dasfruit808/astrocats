@@ -504,6 +504,43 @@ button:disabled {
     color: var(--xp-blue-dark);
 }
 
+.ui-ribbon {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 12px;
+    padding: 8px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(0, 246, 255, 0.12), rgba(67, 255, 217, 0.16));
+    border: 1px solid rgba(12, 39, 96, 0.12);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.ui-ribbon-button {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(12, 39, 96, 0.25);
+    background: rgba(255, 255, 255, 0.85);
+    color: #0c2760;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease;
+}
+
+.ui-ribbon-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 12px rgba(12, 39, 96, 0.18);
+}
+
+.ui-ribbon-button.active {
+    background: linear-gradient(135deg, rgba(0, 246, 255, 0.25), rgba(12, 39, 96, 0.14));
+    border-color: rgba(0, 246, 255, 0.6);
+    color: var(--xp-blue-dark);
+    box-shadow: 0 0 0 2px rgba(0, 246, 255, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+}
+
 .xp-intro {
     margin: 0 0 6px 0;
     font-size: 14px;
@@ -519,8 +556,8 @@ button:disabled {
 
 
 .hub-panel {
-    width: min(100%, 920px);
-    max-width: min(94vw, 920px);
+    width: min(100%, 1040px);
+    max-width: min(94vw, 1040px);
     max-height: calc(100vh - clamp(48px, 10vh, 140px));
 }
 
@@ -555,13 +592,6 @@ button:disabled {
 
 .hub-header button {
     align-self: flex-start;
-}
-
-.hub-overview {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: clamp(12px, 2vw, 20px);
-    align-items: stretch;
 }
 
 .xp-card {
@@ -685,10 +715,6 @@ button:disabled {
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: clamp(12px, 2vh, 18px);
     align-items: stretch;
-}
-
-.hub-summary .mission-card {
-    grid-column: 1 / -1;
 }
 
 .mission-card h3,
@@ -846,8 +872,25 @@ button:disabled {
 }
 
 .hub-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.hub-controls h3 {
+    margin: 0;
+    color: var(--xp-blue-dark);
+}
+
+.hub-controls-helper {
+    margin: 0;
+    color: rgba(12, 39, 96, 0.68);
+    font-size: 13px;
+}
+
+.hub-controls-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 10px;
 }
 
@@ -878,11 +921,79 @@ button:disabled {
     justify-self: stretch;
 }
 
-.hub-content-grid {
+
+.hub-layout {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: clamp(12px, 2vw, 18px);
-    align-items: stretch;
+    grid-template-columns: 300px 1fr;
+    gap: clamp(14px, 2vw, 22px);
+    align-items: start;
+}
+
+.hub-rail {
+    position: relative;
+}
+
+.hub-rail-inner {
+    position: sticky;
+    top: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.hub-main {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.hub-tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.hub-tab-button {
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(12, 39, 96, 0.18);
+    background: rgba(255, 255, 255, 0.85);
+    color: #0c2760;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(12, 39, 96, 0.12);
+}
+
+.hub-tab-button.active {
+    background: linear-gradient(135deg, rgba(0, 246, 255, 0.22), rgba(12, 39, 96, 0.14));
+    border-color: rgba(0, 246, 255, 0.6);
+    color: var(--xp-blue-dark);
+    box-shadow: 0 0 0 2px rgba(0, 246, 255, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+}
+
+.hub-tab-panels {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.hub-tab-panel {
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.hub-tab-panel.active {
+    display: flex;
+}
+
+.hub-social-list {
+    margin: 8px 0 0;
+    padding-left: 18px;
+    display: grid;
+    gap: 6px;
+    color: #0c2760;
 }
 
 .resource-grid,
@@ -1474,10 +1585,12 @@ body.controls-locked #taskbar {
         gap: clamp(10px, 3vh, 16px);
     }
 
-    .hub-overview,
-    .hub-content-grid,
-    .hub-summary {
+    .hub-layout {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    .hub-rail-inner {
+        position: static;
     }
 
     .mission-card-body {
