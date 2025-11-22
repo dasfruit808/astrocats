@@ -890,8 +890,13 @@ const SOLANA_WEB3_SOURCES = [
 ];
 
 const METAPLEX_JS_SOURCES = [
+    // Prefer an official pre-bundled build if available.
+    'https://cdn.jsdelivr.net/npm/@metaplex-foundation/js@0.20.1/dist/index.iife.js',
+    'https://unpkg.com/@metaplex-foundation/js@0.20.1/dist/index.iife.js',
+    // Fall back to esm.sh but avoid blocking on it.
     'https://esm.sh/@metaplex-foundation/js@0.20.1?bundle&format=iife&target=es2019&globalName=Metaplex',
-    'https://cdn.jsdelivr.net/npm/esm.sh@0.131.1/@metaplex-foundation/js@0.20.1?bundle&format=iife&target=es2019&globalName=Metaplex'
+    // Local stub to keep the app functional if CDNs fail (returns empty NFT results).
+    './assets/metaplex-stub.js'
 ];
 
 let solanaEndpointIndex = 0;
@@ -5966,6 +5971,13 @@ async function checkNFT(publicKey) {
 
         try {
             const metaplex = Metaplex.make(connection);
+            if (metaplex && metaplex.__isStub) {
+                console.warn('Metaplex stub in use; skipping on-chain NFT lookup.');
+                hasAstroCatNFT = false;
+                if (nftStatusEl) nftStatusEl.textContent = 'NFT Check Unavailable (Offline Libraries)';
+                if (playBtn) playBtn.disabled = false;
+                return;
+            }
             const nfts = await metaplex.nfts().findAllByOwner({ owner: new solanaWeb3.PublicKey(publicKey) }).run();
             hasAstroCatNFT = nfts.some(nft => nft.collection?.key.toString() === ASTRO_CAT_COLLECTION_MINT);
             if (nftStatusEl) nftStatusEl.textContent = `NFT Status: ${hasAstroCatNFT ? 'Detected! Persistent Account' : 'Not Detected (Volatile Session)'}`;
