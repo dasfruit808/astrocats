@@ -430,8 +430,11 @@
         </div>
     </div>
     <script>
-        window.ASTROCATS_API_BASE_URL = '/api';
-        window.ASTROCATS_LEADERBOARD_API_BASE_URL = `${window.ASTROCATS_API_BASE_URL}/leaderboard`;
+        const isStaticHost = typeof window !== 'undefined' && /\.github\.io$/.test(window.location.hostname);
+        window.ASTROCATS_API_BASE_URL = isStaticHost ? '' : '/api';
+        window.ASTROCATS_LEADERBOARD_API_BASE_URL = window.ASTROCATS_API_BASE_URL
+            ? `${window.ASTROCATS_API_BASE_URL}/leaderboard`
+            : '';
     </script>
     <script src="scripts/api/leaderboard.js" defer></script>
     <script src="script.js" defer></script>

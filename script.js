@@ -890,8 +890,8 @@ const SOLANA_WEB3_SOURCES = [
 ];
 
 const METAPLEX_JS_SOURCES = [
-    'https://unpkg.com/@metaplex-foundation/js@0.20.1/dist/js/index.js',
-    'https://cdn.jsdelivr.net/npm/@metaplex-foundation/js@0.20.1/dist/js/index.js'
+    'https://esm.sh/@metaplex-foundation/js@0.20.1?bundle&format=iife&target=es2019&globalName=Metaplex',
+    'https://cdn.jsdelivr.net/npm/esm.sh@0.131.1/@metaplex-foundation/js@0.20.1?bundle&format=iife&target=es2019&globalName=Metaplex'
 ];
 
 let solanaEndpointIndex = 0;
