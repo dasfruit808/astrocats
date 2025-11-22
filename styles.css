@@ -454,9 +454,11 @@ button:disabled {
     gap: 6px;
     padding: 12px;
     border-radius: 6px;
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(6, 12, 28, 0.8);
+    border: 1px solid rgba(67, 255, 217, 0.25);
     font-size: 13px;
-    color: #1b2940;
+    color: var(--xp-text);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 
 .start-menu-status p {
