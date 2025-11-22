@@ -5883,6 +5883,12 @@ function clearPhantomInstallGuide({ resetStatus = false } = {}) {
 async function connectWallet() {
     const provider = window.phantom?.solana;
 
+    // Always surface the hub immediately so players get feedback after clicking Connect
+    // even if the wallet flow takes time or fails.
+    setNavigationUnlocked(true);
+    unlockInterfaceControls();
+    showHub();
+
     if (!provider) { openPhantomInstallGuide(); return; }
 
     clearPhantomInstallGuide({ resetStatus: true });
