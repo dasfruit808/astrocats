@@ -2,6 +2,18 @@
     const STORAGE_KEY = 'astro_invaders_leaderboard_queue';
 
     function resolveApiBaseUrl() {
+        const location = global.location;
+        const hostname = location && typeof location === 'object'
+            ? (location.hostname || '').toLowerCase()
+            : '';
+
+        // GitHub Pages hosts this project as a static site and does not provide the
+        // leaderboard API endpoints. Attempting to call them results in 405/404
+        // responses, so opt out of remote calls entirely on that host.
+        if (hostname.endsWith('github.io')) {
+            return '';
+        }
+
         const configured = typeof global.ASTROCATS_LEADERBOARD_API_BASE_URL === 'string'
             ? global.ASTROCATS_LEADERBOARD_API_BASE_URL.trim()
             : '';
@@ -10,12 +22,10 @@
             return configured;
         }
 
-        const location = global.location;
-        if (!location || typeof location !== 'object') {
+        if (!hostname) {
             return '';
         }
 
-        const hostname = (location.hostname || '').toLowerCase();
         const isLocalhost = hostname === 'localhost'
             || hostname === '127.0.0.1'
             || hostname === '0.0.0.0'
