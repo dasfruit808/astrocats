@@ -223,18 +223,13 @@ function hideOverlaysAndResumeGame() {
 function startFreePlaySession() {
     freePlaySessionActive = true;
     applyPlayerDataSnapshot(null);
-    startGame(true);
+    setNavigationUnlocked(true);
+    showHub();
 }
 
 function initializeUIEvents() {
     bindButtonClick(playBtn, startFreePlaySession);
-    bindButtonClick(connectBtn, () => {
-        if (walletPublicKey) {
-            disconnectWallet();
-        } else {
-            connectWallet();
-        }
-    });
+    bindButtonClick(connectBtn, () => connectWallet());
 
     bindButtonClick(windowOpenHubBtn, showHub);
     bindButtonClick(windowBackToStartBtn, showStartMenu);
@@ -5849,7 +5844,7 @@ function openPhantomInstallGuide() {
                 guideCard.innerHTML = `
                     <h3>Phantom Wallet Required</h3>
                     <p>Install the <a href="https://phantom.app/download" target="_blank" rel="noopener noreferrer">Phantom Wallet</a> browser extension to sync your Astrocat progress and access on-chain rewards.</p>
-                    <p>After installation, refresh this cabinet or press <strong>Connect Phantom Wallet</strong> again to link your pilot.</p>
+                    <p>After installation, refresh this cabinet or press <strong>Connect Wallet</strong> again to link your pilot.</p>
                 `;
                 hubContent.prepend(guideCard);
             } else {
@@ -5865,6 +5860,7 @@ function openPhantomInstallGuide() {
         }
     }
 
+    setNavigationUnlocked(true);
     showHub();
 }
 
@@ -5921,6 +5917,8 @@ async function connectWallet() {
     } catch (err) {
         console.error('Wallet connect error:', err);
         if (walletStatusEl) walletStatusEl.textContent = 'Connection Rejected/Failed';
+        setNavigationUnlocked(true);
+        showHub();
     }
 }
 
@@ -5947,7 +5945,7 @@ async function disconnectWallet() {
 
     if (walletStatusEl) walletStatusEl.textContent = 'Not Connected';
     if (nftStatusEl) nftStatusEl.textContent = 'Not Detected';
-    if (connectBtn) connectBtn.textContent = 'Connect Phantom Wallet';
+    if (connectBtn) connectBtn.textContent = 'Connect Wallet';
     setNavigationUnlocked(false);
 
     playerData = createBasePlayerData();
