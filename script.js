@@ -878,10 +878,10 @@ let hasAstroCatNFT = false;
 let solanaConnection = null;
 
 const SOLANA_RPC_ENDPOINTS = [
+    // Prefer a permissive public endpoint to avoid browser 403 errors.
+    'https://solana-api.projectserum.com',
     'https://api.mainnet-beta.solana.com',
-    'https://rpc.ankr.com/solana',
-    'https://solana-mainnet.public.blastapi.io',
-    'https://solana-api.projectserum.com'
+    'https://rpc.ankr.com/solana'
 ].filter(Boolean);
 
 const SOLANA_WEB3_SOURCES = [
@@ -890,13 +890,10 @@ const SOLANA_WEB3_SOURCES = [
 ];
 
 const METAPLEX_JS_SOURCES = [
-    // Prefer an official pre-bundled build if available.
-    'https://cdn.jsdelivr.net/npm/@metaplex-foundation/js@0.20.1/dist/index.iife.js',
-    'https://unpkg.com/@metaplex-foundation/js@0.20.1/dist/index.iife.js',
-    // Fall back to esm.sh but avoid blocking on it.
-    'https://esm.sh/@metaplex-foundation/js@0.20.1?bundle&format=iife&target=es2019&globalName=Metaplex',
-    // Local stub to keep the app functional if CDNs fail (returns empty NFT results).
-    './assets/metaplex-stub.js'
+    // Use the local stub first to avoid MIME/CORS failures from external CDNs.
+    './assets/metaplex-stub.js',
+    // Keep one CDN fallback in case a hosted build is available in the future.
+    'https://cdn.jsdelivr.net/npm/@metaplex-foundation/js@0.20.1/dist/index.iife.min.js'
 ];
 
 let solanaEndpointIndex = 0;
