@@ -748,8 +748,7 @@ button:disabled {
     align-items: stretch;
 }
 
-.mission-card h3,
-.hub-content-grid h3 {
+.mission-card h3 {
     margin: 0;
     color: var(--xp-blue-dark);
     font-size: 18px;
