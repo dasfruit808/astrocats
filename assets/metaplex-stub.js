@@ -24,6 +24,7 @@
   }
 
   global.Metaplex = {
-    make: createStub
+    make: createStub,
+    __isStub: true
   };
 })(typeof window !== 'undefined' ? window : globalThis);

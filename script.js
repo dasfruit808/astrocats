@@ -885,10 +885,9 @@ const SOLANA_WEB3_SOURCES = [
 ];
 
 const METAPLEX_JS_SOURCES = [
-    // Use the local stub first to avoid MIME/CORS failures from external CDNs.
-    './assets/metaplex-stub.js',
-    // Keep one CDN fallback in case a hosted build is available in the future.
-    'https://cdn.jsdelivr.net/npm/@metaplex-foundation/js@0.20.1/dist/index.iife.min.js'
+    // Prefer loading the full library first; fall back to the stub if needed.
+    'https://cdn.jsdelivr.net/npm/@metaplex-foundation/js@0.20.1/dist/index.iife.min.js',
+    './assets/metaplex-stub.js'
 ];
 
 let solanaEndpointIndex = 0;
@@ -4571,13 +4570,17 @@ function loadExternalScript(src) {
 }
 
 async function ensureSolanaLibrariesLoaded() {
-    if (typeof solanaWeb3 !== 'undefined' && typeof Metaplex !== 'undefined') {
+    const isMetaplexAvailable = () => typeof Metaplex !== 'undefined';
+    const isMetaplexStub = () => isMetaplexAvailable() && Metaplex.__isStub === true;
+    const isMetaplexReady = () => isMetaplexAvailable() && !isMetaplexStub();
+
+    if (typeof solanaWeb3 !== 'undefined' && isMetaplexReady()) {
         return true;
     }
 
     if (!solanaLibraryLoadPromise) {
         solanaLibraryLoadPromise = (async () => {
-            const ensureLibrary = async (sources, validator) => {
+            const ensureLibrary = async (sources, validator, isStub) => {
                 if (validator()) return true;
 
                 for (const src of sources) {
@@ -4586,23 +4589,29 @@ async function ensureSolanaLibrariesLoaded() {
                         if (validator()) {
                             return true;
                         }
+                        if (isStub && isStub()) {
+                            continue;
+                        }
                     } catch (err) {
                         console.warn(`Failed to load external script: ${src}`, err);
                     }
                 }
 
-                return validator();
+                if (validator()) return true;
+                if (isStub && isStub()) return true;
+
+                return false;
             };
 
             if (typeof solanaWeb3 === 'undefined') {
                 await ensureLibrary(SOLANA_WEB3_SOURCES, () => typeof solanaWeb3 !== 'undefined');
             }
 
-            if (typeof Metaplex === 'undefined') {
-                await ensureLibrary(METAPLEX_JS_SOURCES, () => typeof Metaplex !== 'undefined');
+            if (!isMetaplexReady()) {
+                await ensureLibrary(METAPLEX_JS_SOURCES, isMetaplexReady, isMetaplexStub);
             }
 
-            return typeof solanaWeb3 !== 'undefined' && typeof Metaplex !== 'undefined';
+            return typeof solanaWeb3 !== 'undefined' && (isMetaplexReady() || isMetaplexStub());
         })();
     }
 
