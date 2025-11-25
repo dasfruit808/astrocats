@@ -873,9 +873,12 @@ let hasAstroCatNFT = false;
 let solanaConnection = null;
 
 const SOLANA_RPC_CONFIG_STORAGE_KEY = 'astro_invaders_rpc_config';
+// Prefer endpoints that do not require an API key to avoid 403 errors for players.
+// The list is ordered by reliability; the first reachable endpoint will be used.
 const RATE_LIMITED_PUBLIC_RPC_ENDPOINTS = [
-    'https://api.mainnet-beta.solana.com',
-    'https://rpc.ankr.com/solana'
+    'https://rpc.publicnode.com/solana',
+    'https://solana-api.projectserum.com',
+    'https://api.mainnet-beta.solana.com'
 ].filter(Boolean);
 const SOLANA_RPC_FAILURE_COOLDOWN_MS = 3 * 60 * 1000;
 
@@ -886,7 +889,10 @@ const SOLANA_WEB3_SOURCES = [
 
 const METAPLEX_JS_SOURCES = [
     // Prefer loading the full library first; fall back to the stub if needed.
+    // Some CDNs no longer ship the minified bundle, so try both filenames.
+    'https://cdn.jsdelivr.net/npm/@metaplex-foundation/js@0.20.1/dist/js/index.iife.js',
     'https://cdn.jsdelivr.net/npm/@metaplex-foundation/js@0.20.1/dist/js/index.iife.min.js',
+    'https://unpkg.com/@metaplex-foundation/js@0.20.1/dist/js/index.iife.js',
     'https://unpkg.com/@metaplex-foundation/js@0.20.1/dist/js/index.iife.min.js',
     './assets/metaplex-stub.js'
 ];
