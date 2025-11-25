@@ -872,12 +872,12 @@ let walletProvider = null;
 let hasAstroCatNFT = false;
 let solanaConnection = null;
 
-const SOLANA_RPC_ENDPOINTS = [
-    // Prefer a permissive public endpoint to avoid browser 403 errors.
-    'https://solana-api.projectserum.com',
+const SOLANA_RPC_CONFIG_STORAGE_KEY = 'astro_invaders_rpc_config';
+const RATE_LIMITED_PUBLIC_RPC_ENDPOINTS = [
     'https://api.mainnet-beta.solana.com',
     'https://rpc.ankr.com/solana'
 ].filter(Boolean);
+const SOLANA_RPC_FAILURE_COOLDOWN_MS = 3 * 60 * 1000;
 
 const SOLANA_WEB3_SOURCES = [
     'https://unpkg.com/@solana/web3.js@1.95.3/lib/index.iife.min.js',
@@ -890,8 +890,165 @@ const METAPLEX_JS_SOURCES = [
     './assets/metaplex-stub.js'
 ];
 
+function normalizeRpcEndpoint(entry, sharedHeaders = {}) {
+    if (!entry) return null;
+
+    const defaultHeaders = sharedHeaders && typeof sharedHeaders === 'object' ? sharedHeaders : {};
+
+    if (typeof entry === 'string') {
+        const url = entry.trim();
+        return url ? { url, headers: { ...defaultHeaders } } : null;
+    }
+
+    if (typeof entry === 'object' && typeof entry.url === 'string') {
+        const url = entry.url.trim();
+        if (!url) return null;
+
+        const headers = { ...defaultHeaders };
+        if (entry.headers && typeof entry.headers === 'object') {
+            for (const [key, value] of Object.entries(entry.headers)) {
+                if (typeof key === 'string' && typeof value === 'string' && key.trim() && value.trim()) {
+                    headers[key.trim()] = value.trim();
+                }
+            }
+        }
+
+        if (typeof entry.apiKey === 'string' && entry.apiKey.trim()) {
+            headers['x-api-key'] = entry.apiKey.trim();
+        }
+
+        return { url, headers };
+    }
+
+    return null;
+}
+
+function normalizeRpcList(list, sharedHeaders = {}) {
+    if (!list) return [];
+    const rawList = Array.isArray(list) ? list : [list];
+    return rawList.map(item => normalizeRpcEndpoint(item, sharedHeaders)).filter(Boolean);
+}
+
+function parseRpcConfigSource(source) {
+    if (!source) return { endpoints: [], headers: {} };
+
+    if (Array.isArray(source)) {
+        return { endpoints: source, headers: {} };
+    }
+
+    if (typeof source === 'string') {
+        return { endpoints: source.split(',').map(part => part.trim()).filter(Boolean), headers: {} };
+    }
+
+    if (typeof source === 'object') {
+        const endpoints = Array.isArray(source.endpoints)
+            ? source.endpoints
+            : (source.endpoint ? [source.endpoint] : []);
+        const headers = source.headers && typeof source.headers === 'object' ? { ...source.headers } : {};
+        if (typeof source.apiKey === 'string' && source.apiKey.trim()) {
+            headers['x-api-key'] = source.apiKey.trim();
+        }
+
+        return { endpoints, headers };
+    }
+
+    return { endpoints: [], headers: {} };
+}
+
+function parseRpcConfigFromLocation() {
+    if (typeof window === 'undefined' || typeof window.location === 'undefined') {
+        return { endpoints: [], headers: {} };
+    }
+
+    const params = new URLSearchParams(window.location.search || '');
+    const endpointParam = params.get('rpc') || params.get('solanaRpc') || params.get('endpoint');
+    const endpoints = endpointParam
+        ? endpointParam.split(',').map(val => decodeURIComponent(val.trim())).filter(Boolean)
+        : [];
+
+    let headers = {};
+    const headersParam = params.get('rpcHeaders');
+    if (headersParam) {
+        try {
+            const parsed = JSON.parse(headersParam);
+            if (parsed && typeof parsed === 'object') {
+                headers = parsed;
+            }
+        } catch (err) {
+            console.warn('Failed to parse rpcHeaders query parameter as JSON:', err);
+        }
+    }
+
+    const apiKey = params.get('rpcApiKey');
+    if (typeof apiKey === 'string' && apiKey.trim()) {
+        headers['x-api-key'] = apiKey.trim();
+    }
+
+    return { endpoints, headers };
+}
+
+function loadPersistedRpcConfig() {
+    if (typeof localStorage === 'undefined') {
+        return { endpoints: [], headers: {} };
+    }
+
+    try {
+        const cached = localStorage.getItem(SOLANA_RPC_CONFIG_STORAGE_KEY);
+        if (!cached) return { endpoints: [], headers: {} };
+
+        const parsed = JSON.parse(cached);
+        const endpoints = Array.isArray(parsed?.endpoints) ? parsed.endpoints : [];
+        const headers = parsed?.headers && typeof parsed.headers === 'object' ? { ...parsed.headers } : {};
+        if (typeof parsed?.apiKey === 'string' && parsed.apiKey.trim()) {
+            headers['x-api-key'] = parsed.apiKey.trim();
+        }
+
+        return { endpoints, headers };
+    } catch (err) {
+        console.warn('Failed to parse cached Solana RPC configuration:', err);
+        return { endpoints: [], headers: {} };
+    }
+}
+
+function resolveSolanaRpcConfig() {
+    const windowConfig = typeof window !== 'undefined'
+        ? parseRpcConfigSource(window.ASTROCATS_RPC_CONFIG || window.SOLANA_RPC_CONFIG || {
+            endpoints: window.ASTROCATS_RPC_ENDPOINTS || window.SOLANA_RPC_ENDPOINTS,
+            headers: window.ASTROCATS_RPC_HEADERS || window.SOLANA_RPC_HEADERS,
+            apiKey: window.ASTROCATS_RPC_API_KEY || window.SOLANA_RPC_API_KEY
+        })
+        : { endpoints: [], headers: {} };
+
+    const persistedConfig = loadPersistedRpcConfig();
+    const urlConfig = parseRpcConfigFromLocation();
+
+    const sharedHeaders = { ...windowConfig.headers, ...persistedConfig.headers, ...urlConfig.headers };
+    const preferredEndpoints = [
+        ...normalizeRpcList(urlConfig.endpoints, sharedHeaders),
+        ...normalizeRpcList(persistedConfig.endpoints, sharedHeaders),
+        ...normalizeRpcList(windowConfig.endpoints, sharedHeaders)
+    ];
+
+    const fallbackEndpoints = RATE_LIMITED_PUBLIC_RPC_ENDPOINTS
+        .map(url => normalizeRpcEndpoint(url, sharedHeaders))
+        .filter(Boolean);
+
+    const deduped = [];
+    const seen = new Set();
+    for (const endpoint of [...preferredEndpoints, ...fallbackEndpoints]) {
+        if (!endpoint?.url || seen.has(endpoint.url)) continue;
+        seen.add(endpoint.url);
+        deduped.push(endpoint);
+    }
+
+    return { solanaRpcEndpoints: deduped, solanaRpcHeaders: sharedHeaders };
+}
+
+const { solanaRpcEndpoints: SOLANA_RPC_ENDPOINTS, solanaRpcHeaders: SOLANA_RPC_DEFAULT_HEADERS } = resolveSolanaRpcConfig();
+
 let solanaEndpointIndex = 0;
 let solanaLibraryLoadPromise = null;
+const solanaEndpointFailures = new Map();
 
 const PROGRESS_MEMO_PREFIX = 'ASTRO_INVADERS_PROGRESS:';
 const MEMO_PROGRAM_ID = 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr';
@@ -4626,35 +4783,70 @@ async function ensureSolanaLibrariesLoaded() {
     }
 }
 
+function markSolanaEndpointAsFailed(endpointUrl, reason) {
+    if (!endpointUrl) return;
+    solanaEndpointFailures.set(endpointUrl, { lastFailure: Date.now(), reason: reason || null });
+}
+
+function shouldSkipSolanaEndpoint(endpointUrl) {
+    if (!endpointUrl) return false;
+    const failure = solanaEndpointFailures.get(endpointUrl);
+    if (!failure) return false;
+
+    if (Date.now() - failure.lastFailure > SOLANA_RPC_FAILURE_COOLDOWN_MS) {
+        solanaEndpointFailures.delete(endpointUrl);
+        return false;
+    }
+
+    return true;
+}
+
 function getCurrentSolanaEndpoint() {
     if (SOLANA_RPC_ENDPOINTS.length > 0) {
-        return SOLANA_RPC_ENDPOINTS[solanaEndpointIndex % SOLANA_RPC_ENDPOINTS.length];
+        const endpoint = SOLANA_RPC_ENDPOINTS[solanaEndpointIndex % SOLANA_RPC_ENDPOINTS.length];
+        if (endpoint?.url) return endpoint;
     }
 
     if (typeof solanaWeb3 !== 'undefined' && typeof solanaWeb3.clusterApiUrl === 'function') {
-        return solanaWeb3.clusterApiUrl('mainnet-beta');
+        return { url: solanaWeb3.clusterApiUrl('mainnet-beta'), headers: { ...SOLANA_RPC_DEFAULT_HEADERS } };
     }
 
     return null;
 }
 
-function advanceSolanaEndpoint(reason) {
+function advanceSolanaEndpoint(reason, { banCurrent = false } = {}) {
     if (SOLANA_RPC_ENDPOINTS.length === 0) {
         return;
     }
 
     const failedEndpoint = getCurrentSolanaEndpoint();
-    if (failedEndpoint) {
-        console.warn(`Solana RPC endpoint failed (${failedEndpoint}).`, reason);
+    if (failedEndpoint?.url) {
+        console.warn(`Solana RPC endpoint failed (${failedEndpoint.url}).`, reason);
+        if (banCurrent) {
+            markSolanaEndpointAsFailed(failedEndpoint.url, reason);
+        }
     }
 
-    solanaEndpointIndex = (solanaEndpointIndex + 1) % SOLANA_RPC_ENDPOINTS.length;
+    let nextIndex = (solanaEndpointIndex + 1) % (SOLANA_RPC_ENDPOINTS.length || 1);
+    let iterations = 0;
+
+    while (iterations < SOLANA_RPC_ENDPOINTS.length) {
+        const candidate = SOLANA_RPC_ENDPOINTS[nextIndex];
+        if (candidate?.url && !shouldSkipSolanaEndpoint(candidate.url)) {
+            break;
+        }
+
+        nextIndex = (nextIndex + 1) % (SOLANA_RPC_ENDPOINTS.length || 1);
+        iterations += 1;
+    }
+
+    solanaEndpointIndex = nextIndex;
     solanaConnection = null;
 
     if (SOLANA_RPC_ENDPOINTS.length > 1) {
         const nextEndpoint = getCurrentSolanaEndpoint();
-        if (nextEndpoint && nextEndpoint !== failedEndpoint) {
-            console.info(`Switching to fallback Solana RPC endpoint: ${nextEndpoint}`);
+        if (nextEndpoint?.url && nextEndpoint.url !== failedEndpoint?.url) {
+            console.info(`Switching to fallback Solana RPC endpoint: ${nextEndpoint.url}`);
         }
     }
 }
@@ -4673,9 +4865,16 @@ function handleSolanaRpcError(err) {
     const forbidden = code === 403
         || message.includes('403')
         || message.toLowerCase().includes('forbidden');
+    const timedOut = message.toLowerCase().includes('timeout')
+        || message.toLowerCase().includes('timed out')
+        || code === 408
+        || code === 504
+        || err?.name === 'AbortError';
     const networkIssue = message.includes('Failed to fetch') || message.includes('NetworkError');
 
-    if (forbidden || networkIssue) {
+    if (forbidden || timedOut) {
+        advanceSolanaEndpoint(err, { banCurrent: true });
+    } else if (networkIssue) {
         advanceSolanaEndpoint(err);
     }
 }
@@ -4688,17 +4887,33 @@ function getSolanaConnection() {
 
         while (!solanaConnection) {
             const endpoint = getCurrentSolanaEndpoint();
-            if (!endpoint || attempted.has(endpoint)) {
+            const endpointUrl = endpoint?.url || endpoint;
+            if (!endpointUrl || attempted.has(endpointUrl)) {
                 break;
             }
 
-            attempted.add(endpoint);
+            attempted.add(endpointUrl);
+
+            if (shouldSkipSolanaEndpoint(endpointUrl)) {
+                advanceSolanaEndpoint('Skipping unhealthy Solana endpoint');
+                continue;
+            }
 
             try {
-                solanaConnection = new solanaWeb3.Connection(endpoint, 'confirmed');
+                const connectionConfig = { commitment: 'confirmed' };
+                const headers = endpoint?.headers && Object.keys(endpoint.headers).length > 0
+                    ? endpoint.headers
+                    : SOLANA_RPC_DEFAULT_HEADERS;
+
+                if (headers && Object.keys(headers).length > 0) {
+                    connectionConfig.httpHeaders = headers;
+                }
+
+                solanaConnection = new solanaWeb3.Connection(endpointUrl, connectionConfig);
             } catch (err) {
                 console.error('Failed to initialize Solana connection:', err);
-                advanceSolanaEndpoint(err);
+                markSolanaEndpointAsFailed(endpointUrl, err);
+                advanceSolanaEndpoint(err, { banCurrent: true });
             }
         }
     }
