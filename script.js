@@ -4269,8 +4269,12 @@ function connectRealtimeChannel() {
             try {
                 const payload = JSON.parse(event.data);
                 if (payload?.type === 'leaderboard_update') {
-                    markLeaderboardDirty();
-                    loadAndDisplayLeaderboard({ force: true });
+                    if (Array.isArray(payload.entries) && payload.entries.length) {
+                        applyLeaderboardRealtimeUpdate(payload.entries);
+                    } else {
+                        markLeaderboardDirty();
+                        loadAndDisplayLeaderboard({ force: true });
+                    }
                 }
             } catch (err) {
                 console.warn('Realtime message parse failed:', err);
@@ -4288,6 +4292,30 @@ function connectRealtimeChannel() {
 
 function markLeaderboardDirty() {
     leaderboardChangeToken += 1;
+}
+
+function applyLeaderboardRealtimeUpdate(entries) {
+    const sanitizedEntries = Array.isArray(entries)
+        ? entries.map(sanitizeLeaderboardEntry).filter(Boolean)
+        : [];
+
+    sanitizedEntries.sort((a, b) => {
+        if (b.level !== a.level) { return b.level - a.level; }
+        return b.bestScore - a.bestScore;
+    });
+
+    if (sanitizedEntries.length) {
+        leaderboardEls.forEach((container) => {
+            buildLeaderboardDisplay(container, sanitizedEntries);
+        });
+        writeLeaderboardSafely(sanitizedEntries.slice(0, 10));
+    } else {
+        renderLeaderboardMessage('No leaderboard data yet.');
+    }
+
+    markLeaderboardDirty();
+    lastLeaderboardFetchToken = leaderboardChangeToken;
+    lastLeaderboardFetchTime = Date.now();
 }
 
 function renderLeaderboardMessage(text) {

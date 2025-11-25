@@ -10,6 +10,15 @@ app.use(express.json({ limit: '1mb' }));
 const leaderboardEntries = new Map();
 const profiles = new Map();
 
+function getSortedLeaderboardSnapshot(limit = 50) {
+    return Array.from(leaderboardEntries.values())
+        .sort((a, b) => {
+            if (b.level !== a.level) return b.level - a.level;
+            return b.bestScore - a.bestScore;
+        })
+        .slice(0, limit);
+}
+
 function sanitizeEntry(entry) {
     if (!entry || typeof entry !== 'object') return null;
     const publicKey = typeof entry.publicKey === 'string' && entry.publicKey.trim()
@@ -22,9 +31,9 @@ function sanitizeEntry(entry) {
     return { publicKey, level, bestScore, stats };
 }
 
-function broadcastLeaderboard(wss) {
+function broadcastLeaderboard(wss, snapshot) {
     if (!wss || wss.clients.size === 0) return;
-    const payload = JSON.stringify({ type: 'leaderboard_update' });
+    const payload = JSON.stringify({ type: 'leaderboard_update', entries: snapshot || [] });
     wss.clients.forEach((client) => {
         if (client.readyState === 1) {
             client.send(payload);
@@ -33,13 +42,7 @@ function broadcastLeaderboard(wss) {
 }
 
 app.get('/api/leaderboard/top', (req, res) => {
-    const sorted = Array.from(leaderboardEntries.values())
-        .sort((a, b) => {
-            if (b.level !== a.level) return b.level - a.level;
-            return b.bestScore - a.bestScore;
-        })
-        .slice(0, 50);
-    res.json(sorted);
+    res.json(getSortedLeaderboardSnapshot());
 });
 
 app.post('/api/leaderboard', (req, res) => {
@@ -50,7 +53,7 @@ app.post('/api/leaderboard', (req, res) => {
     }
 
     leaderboardEntries.set(sanitized.publicKey, sanitized);
-    broadcastLeaderboard(server.wss);
+    broadcastLeaderboard(server.wss, getSortedLeaderboardSnapshot());
     res.json({ ok: true });
 });
 
@@ -77,6 +80,10 @@ const server = http.createServer(app);
 server.wss = new WebSocketServer({ server, path: '/api/realtime' });
 server.wss.on('connection', (socket) => {
     socket.send(JSON.stringify({ type: 'connected' }));
+    const snapshot = getSortedLeaderboardSnapshot();
+    if (snapshot.length && socket.readyState === 1) {
+        socket.send(JSON.stringify({ type: 'leaderboard_update', entries: snapshot }));
+    }
 });
 
 const port = process.env.PORT || 3000;
