@@ -873,12 +873,13 @@ let hasAstroCatNFT = false;
 let solanaConnection = null;
 
 const SOLANA_RPC_CONFIG_STORAGE_KEY = 'astro_invaders_rpc_config';
-// Prefer endpoints that do not require an API key to avoid 403 errors for players.
-// The list is ordered by reliability; the first reachable endpoint will be used.
+// Prefer endpoints that do not require an API key and respond with CORS headers to
+// avoid browser failures for players. The list is ordered by reliability; the first
+// reachable endpoint will be used.
 const RATE_LIMITED_PUBLIC_RPC_ENDPOINTS = [
-    'https://rpc.publicnode.com/solana',
     'https://solana-api.projectserum.com',
-    'https://api.mainnet-beta.solana.com'
+    'https://api.mainnet-beta.solana.com',
+    'https://rpc.publicnode.com/solana'
 ].filter(Boolean);
 const BLOCKED_RPC_PATTERNS = [/\bankr\.com\b/i];
 const SOLANA_RPC_FAILURE_COOLDOWN_MS = 3 * 60 * 1000;
@@ -4899,8 +4900,12 @@ function handleSolanaRpcError(err) {
         || code === 504
         || err?.name === 'AbortError';
     const networkIssue = message.includes('Failed to fetch') || message.includes('NetworkError');
+    const corsBlocked = networkIssue && typeof window !== 'undefined' && typeof window.location === 'object'
+        && typeof window.location.origin === 'string' && window.location.origin.startsWith('http');
 
     if (forbidden || timedOut) {
+        advanceSolanaEndpoint(err, { banCurrent: true });
+    } else if (corsBlocked) {
         advanceSolanaEndpoint(err, { banCurrent: true });
     } else if (networkIssue) {
         advanceSolanaEndpoint(err);
