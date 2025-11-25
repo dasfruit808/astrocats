@@ -880,6 +880,7 @@ const RATE_LIMITED_PUBLIC_RPC_ENDPOINTS = [
     'https://solana-api.projectserum.com',
     'https://api.mainnet-beta.solana.com'
 ].filter(Boolean);
+const BLOCKED_RPC_PATTERNS = [/\bankr\.com\b/i];
 const SOLANA_RPC_FAILURE_COOLDOWN_MS = 3 * 60 * 1000;
 
 const SOLANA_WEB3_SOURCES = [
@@ -888,13 +889,18 @@ const SOLANA_WEB3_SOURCES = [
 ];
 
 const METAPLEX_JS_SOURCES = [
-    // Prefer loading the full library first; fall back to the stub if needed.
-    // Some CDNs no longer ship the minified bundle, so try both filenames.
-    'https://cdn.jsdelivr.net/npm/@metaplex-foundation/js@0.20.1/dist/js/index.iife.js',
-    'https://cdn.jsdelivr.net/npm/@metaplex-foundation/js@0.20.1/dist/js/index.iife.min.js',
-    'https://unpkg.com/@metaplex-foundation/js@0.20.1/dist/js/index.iife.js',
-    'https://unpkg.com/@metaplex-foundation/js@0.20.1/dist/js/index.iife.min.js',
-    './assets/metaplex-stub.js'
+    // Load a bundled stub first to avoid CORS / MIME errors in browser environments
+    // where CDN access is blocked. The CDN sources remain opt-in via a query param
+    // so that developers can still test with the full library locally.
+    './assets/metaplex-stub.js',
+    ...(new URLSearchParams(window.location.search || '').has('enableMetaplexCdn')
+        ? [
+            'https://cdn.jsdelivr.net/npm/@metaplex-foundation/js@0.20.1/dist/js/index.iife.js',
+            'https://cdn.jsdelivr.net/npm/@metaplex-foundation/js@0.20.1/dist/js/index.iife.min.js',
+            'https://unpkg.com/@metaplex-foundation/js@0.20.1/dist/js/index.iife.js',
+            'https://unpkg.com/@metaplex-foundation/js@0.20.1/dist/js/index.iife.min.js'
+        ]
+        : [])
 ];
 
 function normalizeRpcEndpoint(entry, sharedHeaders = {}) {
@@ -934,6 +940,17 @@ function normalizeRpcList(list, sharedHeaders = {}) {
     if (!list) return [];
     const rawList = Array.isArray(list) ? list : [list];
     return rawList.map(item => normalizeRpcEndpoint(item, sharedHeaders)).filter(Boolean);
+}
+
+function isRpcEndpointAllowed(url) {
+    try {
+        const parsed = new URL(url);
+        const host = parsed.host || '';
+        const full = `${parsed.protocol}//${host}${parsed.pathname || ''}`;
+        return !BLOCKED_RPC_PATTERNS.some((pattern) => pattern.test(full));
+    } catch (err) {
+        return false;
+    }
 }
 
 function parseRpcConfigSource(source) {
@@ -1044,6 +1061,10 @@ function resolveSolanaRpcConfig() {
     const seen = new Set();
     for (const endpoint of [...preferredEndpoints, ...fallbackEndpoints]) {
         if (!endpoint?.url || seen.has(endpoint.url)) continue;
+        if (!isRpcEndpointAllowed(endpoint.url)) {
+            console.warn(`Skipping blocked Solana RPC endpoint: ${endpoint.url}`);
+            continue;
+        }
         seen.add(endpoint.url);
         deduped.push(endpoint);
     }
