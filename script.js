@@ -3229,6 +3229,10 @@ function updateHubUI() {
     refreshStatAllocationOverlay();
 
     updateConnectedWalletDisplay(walletPublicKey);
+    // Always refresh missions so the hub shows daily quests for both guests and
+    // connected pilots. Previously this ran only for connected wallets, which
+    // left the Daily Missions card stuck on the placeholder text.
+    updateQuestsUI();
 
     if (!walletPublicKey) return;
     if (gamesPlayedEl) gamesPlayedEl.textContent = playerData.gamesPlayed;
@@ -3246,7 +3250,6 @@ function updateHubUI() {
     }
     credits = playerData.credits;
     updateUI();
-    updateQuestsUI();
     loadAndDisplayLeaderboard();
 }
 
