@@ -886,7 +886,8 @@ const SOLANA_WEB3_SOURCES = [
 
 const METAPLEX_JS_SOURCES = [
     // Prefer loading the full library first; fall back to the stub if needed.
-    'https://cdn.jsdelivr.net/npm/@metaplex-foundation/js@0.20.1/dist/index.iife.min.js',
+    'https://cdn.jsdelivr.net/npm/@metaplex-foundation/js@0.20.1/dist/js/index.iife.min.js',
+    'https://unpkg.com/@metaplex-foundation/js@0.20.1/dist/js/index.iife.min.js',
     './assets/metaplex-stub.js'
 ];
 
