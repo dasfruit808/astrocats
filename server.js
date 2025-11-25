@@ -2,13 +2,17 @@ import express from 'express';
 import cors from 'cors';
 import { WebSocketServer } from 'ws';
 import http from 'http';
+import {
+    getProfile,
+    getTopLeaderboard,
+    saveProfile,
+    storeReady,
+    upsertLeaderboardEntry,
+} from './data/store.js';
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
-
-const leaderboardEntries = new Map();
-const profiles = new Map();
 
 function sanitizeEntry(entry) {
     if (!entry || typeof entry !== 'object') return null;
@@ -32,46 +36,50 @@ function broadcastLeaderboard(wss) {
     });
 }
 
-app.get('/api/leaderboard/top', (req, res) => {
-    const sorted = Array.from(leaderboardEntries.values())
-        .sort((a, b) => {
-            if (b.level !== a.level) return b.level - a.level;
-            return b.bestScore - a.bestScore;
-        })
-        .slice(0, 50);
+app.get('/api/leaderboard/top', async (req, res) => {
+    await storeReady;
+    const sorted = await getTopLeaderboard(50);
     res.json(sorted);
 });
 
-app.post('/api/leaderboard', (req, res) => {
+app.post('/api/leaderboard', async (req, res) => {
     const sanitized = sanitizeEntry(req.body);
     if (!sanitized) {
         res.status(400).json({ error: 'invalid_entry' });
         return;
     }
 
-    leaderboardEntries.set(sanitized.publicKey, sanitized);
+    await upsertLeaderboardEntry(sanitized);
     broadcastLeaderboard(server.wss);
     res.json({ ok: true });
 });
 
-app.put('/api/profile/:owner', (req, res) => {
+app.put('/api/profile/:owner', async (req, res) => {
     const owner = req.params.owner;
     if (!owner) {
         res.status(400).json({ error: 'missing_owner' });
         return;
     }
-    profiles.set(owner, req.body || {});
+    await saveProfile(owner, req.body || {});
     res.json({ ok: true });
 });
 
-app.get('/api/profile/:owner', (req, res) => {
+app.get('/api/profile/:owner', async (req, res) => {
     const owner = req.params.owner;
-    if (!owner || !profiles.has(owner)) {
+    if (!owner) {
         res.status(404).json({ error: 'not_found' });
         return;
     }
-    res.json(profiles.get(owner));
+
+    const profile = await getProfile(owner);
+    if (!profile) {
+        res.status(404).json({ error: 'not_found' });
+        return;
+    }
+    res.json(profile);
 });
+
+await storeReady;
 
 const server = http.createServer(app);
 server.wss = new WebSocketServer({ server, path: '/api/realtime' });
