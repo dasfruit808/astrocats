@@ -227,9 +227,17 @@ function startFreePlaySession() {
     showHub();
 }
 
+function handleConnectButtonClick() {
+    if (walletPublicKey) {
+        disconnectWallet();
+    } else {
+        connectWallet();
+    }
+}
+
 function initializeUIEvents() {
     bindButtonClick(playBtn, startFreePlaySession);
-    bindButtonClick(connectBtn, () => connectWallet());
+    bindButtonClick(connectBtn, handleConnectButtonClick);
 
     bindButtonClick(windowOpenHubBtn, showHub);
     bindButtonClick(windowBackToStartBtn, showStartMenu);
