@@ -242,27 +242,46 @@
                                 </div>
                             </div>
                             <div class="xp-window-content">
-                                <form id="profile-form">
-                                    <label for="profile-name">Pilot Name</label>
-                                    <input id="profile-name" type="text" maxlength="12" placeholder="e.g., Nova" />
-                                    <p class="form-helper">Allowed: letters, numbers, spaces, underscores, and hyphens.</p>
+                                <div class="profile-modal-body">
+                                    <form id="profile-form">
+                                        <label for="profile-name">Pilot Name</label>
+                                        <input id="profile-name" type="text" maxlength="12" placeholder="e.g., Nova" />
+                                        <p class="form-helper">Allowed: letters, numbers, spaces, underscores, and hyphens.</p>
 
-                                    <label for="profile-title">Title / Callsign</label>
-                                    <input id="profile-title" type="text" maxlength="12" placeholder="e.g., Star Commander" />
+                                        <label for="profile-title">Title / Callsign</label>
+                                        <input id="profile-title" type="text" maxlength="12" placeholder="e.g., Star Commander" />
 
-                                    <label for="profile-avatar">Avatar Image URL</label>
-                                    <input id="profile-avatar" type="text" placeholder="https://example.com/avatar.png" />
+                                        <label for="profile-avatar">Avatar Image URL</label>
+                                        <input id="profile-avatar" type="text" placeholder="https://example.com/avatar.png" />
 
-                                    <label for="profile-bio">Pilot Bio</label>
-                                    <textarea id="profile-bio" rows="3" maxlength="280" placeholder="Share your origin story..."></textarea>
+                                        <label for="profile-bio">Pilot Bio</label>
+                                        <textarea id="profile-bio" rows="3" maxlength="280" placeholder="Share your origin story..."></textarea>
 
-                                    <p id="profile-error" class="form-error" role="alert"></p>
+                                        <p id="profile-error" class="form-error" role="alert"></p>
 
-                                    <div class="profile-actions">
-                                        <button type="submit">Save Pilot</button>
-                                        <button type="button" id="cancel-profile">Cancel</button>
+                                        <div class="profile-actions">
+                                            <button type="submit">Save Pilot</button>
+                                            <button type="button" id="cancel-profile">Cancel</button>
+                                        </div>
+                                    </form>
+
+                                    <div class="pilot-card profile-preview" aria-live="polite">
+                                        <div class="pilot-card-header">
+                                            <div class="pilot-avatar-wrap">
+                                                <img id="profile-preview-avatar" src="https://placehold.co/80x80?text=Pilot" alt="Pilot avatar preview" loading="lazy" width="80" height="80" />
+                                            </div>
+                                            <div class="pilot-card-identity">
+                                                <span class="pilot-card-label">Preview</span>
+                                                <span class="pilot-name" id="profile-preview-name">Rookie Pilot</span>
+                                                <span class="pilot-title-badge" id="profile-preview-title">Cadet</span>
+                                            </div>
+                                        </div>
+                                        <div class="pilot-card-body">
+                                            <p id="profile-preview-bio" class="pilot-bio">Set your pilot bio to share your legend.</p>
+                                            <p class="pilot-card-helper">Your dossier updates as you type.</p>
+                                        </div>
                                     </div>
-                                </form>
+                                </div>
                             </div>
                         </div>
 

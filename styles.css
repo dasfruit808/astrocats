@@ -404,12 +404,33 @@ button:disabled {
     flex-direction: column;
 }
 
+.profile-modal {
+    max-width: min(96vw, 860px);
+}
+
 .xp-window-content {
     padding: clamp(16px, 2.5vh, 22px);
     display: flex;
     flex-direction: column;
     gap: clamp(12px, 2vh, 18px);
     overflow-y: auto;
+}
+
+.profile-modal-body {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: clamp(14px, 2vh, 18px);
+    align-items: start;
+}
+
+.profile-modal-body form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.profile-preview {
+    height: 100%;
 }
 
 .form-helper {
