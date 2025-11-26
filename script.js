@@ -890,9 +890,7 @@ const RATE_LIMITED_PUBLIC_RPC_ENDPOINTS = [
     // for players loading the game from static hosts (e.g. GitHub Pages).
     'https://api.mainnet-beta.solana.com',
     'https://solana.public-rpc.com',
-    'https://solana-api.projectserum.com',
-    'https://rpc.publicnode.com/solana',
-    'https://solana-mainnet.public.blastapi.io'
+    'https://rpc.publicnode.com/solana'
 ].filter(Boolean);
 const BLOCKED_RPC_PATTERNS = [];
 const SOLANA_RPC_FAILURE_COOLDOWN_MS = 3 * 60 * 1000;
@@ -4983,7 +4981,12 @@ function handleSolanaRpcError(err) {
         || code === 408
         || code === 504
         || err?.name === 'AbortError';
-    const networkIssue = message.includes('Failed to fetch') || message.includes('NetworkError');
+    const dnsFailure = message.toLowerCase().includes('err_name_not_resolved')
+        || message.toLowerCase().includes('enotfound')
+        || message.toLowerCase().includes('dns');
+    const networkIssue = message.includes('Failed to fetch')
+        || message.includes('NetworkError')
+        || dnsFailure;
     const corsBlocked = networkIssue && typeof window !== 'undefined' && typeof window.location === 'object'
         && typeof window.location.origin === 'string' && window.location.origin.startsWith('http');
 
@@ -4992,7 +4995,7 @@ function handleSolanaRpcError(err) {
     } else if (corsBlocked) {
         advanceSolanaEndpoint(err, { banCurrent: true });
     } else if (networkIssue) {
-        advanceSolanaEndpoint(err);
+        advanceSolanaEndpoint(err, { banCurrent: true });
     }
 
     if (!hasAvailableSolanaEndpoint()) {
