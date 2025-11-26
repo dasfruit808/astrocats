@@ -109,6 +109,10 @@ const profileTitleInput = document.getElementById('profile-title');
 const profileAvatarInput = document.getElementById('profile-avatar');
 const profileBioInput = document.getElementById('profile-bio');
 const profileErrorEl = document.getElementById('profile-error');
+const profilePreviewNameEl = document.getElementById('profile-preview-name');
+const profilePreviewTitleEl = document.getElementById('profile-preview-title');
+const profilePreviewBioEl = document.getElementById('profile-preview-bio');
+const profilePreviewAvatarEl = document.getElementById('profile-preview-avatar');
 const pilotAvatarEl = document.getElementById('pilot-avatar');
 const pilotNameDisplayEl = document.getElementById('pilot-name-display');
 const pilotTitleDisplayEl = document.getElementById('pilot-title-display');
@@ -1270,6 +1274,16 @@ if (openProfileBtn) openProfileBtn.addEventListener('click', showProfileModal);
 if (closeProfileBtn) closeProfileBtn.addEventListener('click', hideProfileModal);
 if (cancelProfileBtn) cancelProfileBtn.addEventListener('click', hideProfileModal);
 if (profileForm) profileForm.addEventListener('submit', handleProfileFormSubmit);
+[
+    profileNameInput,
+    profileTitleInput,
+    profileAvatarInput,
+    profileBioInput
+].forEach(input => {
+    if (input) {
+        input.addEventListener('input', updateProfilePreview);
+    }
+});
 
 function updateDifficultyProgress(elapsedSeconds) {
     if (!gameRunning || gamePaused) return;
@@ -3415,6 +3429,22 @@ function populateProfileForm() {
     if (profileAvatarInput) profileAvatarInput.value = profile.avatar;
     if (profileBioInput) profileBioInput.value = profile.bio;
     if (profileErrorEl) profileErrorEl.textContent = '';
+    updateProfilePreview();
+}
+
+function updateProfilePreview() {
+    const nameText = profileNameInput && profileNameInput.value.trim() ? profileNameInput.value.trim() : 'Rookie Pilot';
+    const titleText = profileTitleInput && profileTitleInput.value.trim() ? profileTitleInput.value.trim() : 'Cadet';
+    const bioText = profileBioInput && profileBioInput.value.trim() ? profileBioInput.value.trim() : 'Set your pilot bio to share your legend.';
+    const avatarSource = profileAvatarInput && profileAvatarInput.value.trim() ? profileAvatarInput.value.trim() : DEFAULT_PILOT_AVATAR;
+
+    if (profilePreviewNameEl) profilePreviewNameEl.textContent = nameText;
+    if (profilePreviewTitleEl) profilePreviewTitleEl.textContent = titleText;
+    if (profilePreviewBioEl) profilePreviewBioEl.textContent = bioText;
+    if (profilePreviewAvatarEl) {
+        profilePreviewAvatarEl.src = avatarSource;
+        profilePreviewAvatarEl.alt = `${nameText} avatar preview`;
+    }
 }
 
 function showProfileModal() {

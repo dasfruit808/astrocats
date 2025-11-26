@@ -404,6 +404,10 @@ button:disabled {
     flex-direction: column;
 }
 
+.profile-modal {
+    max-width: min(96vw, 860px);
+}
+
 .xp-window-content {
     padding: clamp(16px, 2.5vh, 22px);
     display: flex;
