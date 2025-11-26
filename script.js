@@ -1244,15 +1244,15 @@ const starField = Array.from({ length: STAR_COUNT }, () => ({
 }));
 
 // LEVELING CONSTANTS
-const BASE_XP_TO_LEVEL = 150;
+const BASE_XP_TO_LEVEL = 240;
 const XP_MULTIPLIER = 1.2;
 const MAX_PLAYER_LEVEL = 50;
 
 const XP_CURVE_SEGMENTS = [
-    { minLevel: 1, maxLevel: 10, base: BASE_XP_TO_LEVEL, growth: 1.3, bonus: 0 },
-    { minLevel: 11, maxLevel: 25, base: BASE_XP_TO_LEVEL * 6, growth: 1.25, bonus: 400 },
-    { minLevel: 26, maxLevel: 40, base: BASE_XP_TO_LEVEL * 13, growth: 1.3, bonus: 1000 },
-    { minLevel: 41, maxLevel: MAX_PLAYER_LEVEL, base: BASE_XP_TO_LEVEL * 20, growth: 1.38, bonus: 2000 }
+    { minLevel: 1, maxLevel: 10, base: BASE_XP_TO_LEVEL, growth: 1.42, bonus: 0 },
+    { minLevel: 11, maxLevel: 25, base: BASE_XP_TO_LEVEL * 7.5, growth: 1.32, bonus: 900 },
+    { minLevel: 26, maxLevel: 40, base: BASE_XP_TO_LEVEL * 16, growth: 1.36, bonus: 2200 },
+    { minLevel: 41, maxLevel: MAX_PLAYER_LEVEL, base: BASE_XP_TO_LEVEL * 30, growth: 1.45, bonus: 4500 }
 ];
 
 const LEVEL_BASELINE_STATS = { strength: 3, speed: 2, vitality: 3, focus: 1 };
