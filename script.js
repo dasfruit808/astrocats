@@ -2370,51 +2370,61 @@ function renderSkillTree() {
         const statSummaries = summarizeStats(branchTotals.stats);
         const perkSummaries = summarizePerks(branchTotals.perks);
 
+        let masteryActive = false;
+        let masteryBadge;
+        let masteryProgressText = '';
+        let unlockedCount = 0;
+        let required = 0;
+
         if (branch.mastery) {
             const nodeIds = branchNodeIds[branchKey] || [];
-            const unlockedCount = nodeIds.filter(id => unlockedNodes.includes(id)).length;
-            const required = branch.mastery.requiredUnlocked || nodeIds.length;
-            const masteryBadge = document.createElement('span');
-            masteryBadge.className = `skill-mastery-pill ${masteries?.[branchKey] ? 'active' : 'inactive'}`;
-            masteryBadge.textContent = masteries?.[branchKey]
+            unlockedCount = nodeIds.filter(id => unlockedNodes.includes(id)).length;
+            required = branch.mastery.requiredUnlocked || nodeIds.length;
+            masteryActive = Boolean(masteries?.[branchKey]);
+            masteryProgressText = masteryActive
+                ? `${branch.mastery.name} active`
+                : `${unlockedCount}/${required} unlocked`;
+            masteryBadge = document.createElement('span');
+            masteryBadge.className = `skill-mastery-pill ${masteryActive ? 'active' : 'inactive'}`;
+            masteryBadge.textContent = masteryActive
                 ? `Mastery Active · ${branch.mastery.name}`
                 : `Mastery Progress ${unlockedCount}/${required}`;
             masteryBadge.title = branch.mastery.description || 'Complete this branch to activate its mastery bonus.';
             branchHeader.appendChild(masteryBadge);
         }
 
-        const branchMeta = document.createElement('div');
-        branchMeta.className = 'skill-branch-meta';
+        const branchOverview = document.createElement('div');
+        branchOverview.className = 'skill-branch-overview';
 
+        const summaryItems = [];
         if (statSummaries.length) {
-            const statHighlight = document.createElement('div');
-            statHighlight.className = 'skill-highlight';
-            const statTitle = document.createElement('p');
-            statTitle.className = 'skill-highlight-title';
-            statTitle.textContent = 'Stat Gains';
-            const statBody = document.createElement('p');
-            statBody.className = 'skill-highlight-body';
-            statBody.textContent = statSummaries.join(', ');
-            statHighlight.append(statTitle, statBody);
-            branchMeta.appendChild(statHighlight);
+            summaryItems.push({ label: 'Stat focus', value: statSummaries.join(', ') });
         }
-
         if (perkSummaries.length) {
-            const perkHighlight = document.createElement('div');
-            perkHighlight.className = 'skill-highlight';
-            const perkTitle = document.createElement('p');
-            perkTitle.className = 'skill-highlight-title';
-            perkTitle.textContent = 'Perks & Effects';
-            const perkBody = document.createElement('p');
-            perkBody.className = 'skill-highlight-body';
-            perkBody.textContent = perkSummaries.join(', ');
-            perkHighlight.append(perkTitle, perkBody);
-            branchMeta.appendChild(perkHighlight);
+            summaryItems.push({ label: 'Perks', value: perkSummaries.join(', ') });
+        }
+        if (branch.mastery) {
+            summaryItems.push({ label: 'Mastery', value: masteryProgressText });
         }
 
-        if (branchMeta.childNodes.length) {
-            branchEl.appendChild(branchMeta);
+        if (summaryItems.length === 0) {
+            summaryItems.push({ label: 'Overview', value: 'Balanced gains across the tree.' });
         }
+
+        summaryItems.forEach(item => {
+            const chip = document.createElement('div');
+            chip.className = 'skill-branch-chip';
+            const chipLabel = document.createElement('span');
+            chipLabel.className = 'skill-branch-chip-label';
+            chipLabel.textContent = item.label;
+            const chipValue = document.createElement('span');
+            chipValue.className = 'skill-branch-chip-value';
+            chipValue.textContent = item.value;
+            chip.append(chipLabel, chipValue);
+            branchOverview.appendChild(chip);
+        });
+
+        branchEl.appendChild(branchOverview);
 
         const nodesContainer = document.createElement('div');
         nodesContainer.className = 'skill-node-container';
@@ -2425,18 +2435,10 @@ function renderSkillTree() {
         branchEl.appendChild(nodesContainer);
         if (branch.mastery) {
             const masteryInfo = document.createElement('p');
-            masteryInfo.className = `skill-branch-mastery ${masteries?.[branchKey] ? 'active' : 'inactive'}`;
-
-            const nodeIds = branchNodeIds[branchKey] || [];
-            const unlockedCount = nodeIds.filter(id => unlockedNodes.includes(id)).length;
-            const required = branch.mastery.requiredUnlocked || nodeIds.length;
-            const masteryActive = Boolean(masteries?.[branchKey]);
-
-            if (masteryActive) {
-                masteryInfo.textContent = `Mastery Active: ${branch.mastery.name} — ${branch.mastery.description}`;
-            } else {
-                masteryInfo.textContent = `Mastery Progress ${unlockedCount}/${required}: ${branch.mastery.description}`;
-            }
+            masteryInfo.className = `skill-branch-mastery ${masteryActive ? 'active' : 'inactive'}`;
+            masteryInfo.textContent = masteryActive
+                ? `Mastery Active: ${branch.mastery.name} — ${branch.mastery.description}`
+                : `Mastery: ${masteryProgressText} until ${branch.mastery.name} (${branch.mastery.description})`;
             branchEl.appendChild(masteryInfo);
 
             const masteryListItem = document.createElement('li');
