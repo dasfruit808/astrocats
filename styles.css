@@ -260,28 +260,48 @@ body.ui-locked .xp-window-controls {
     z-index: 10;
 }
 
-#score,
-#credits,
-#level,
-#lives,
-#combo {
+#status-bar {
     position: absolute;
-    font-size: clamp(12px, 2.8vw, 16px);
-    font-weight: 700;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: clamp(6px, 1.5vw, 10px);
+    padding: clamp(6px, 1.6vw, 10px) clamp(10px, 2vw, 14px);
     background: linear-gradient(145deg, rgba(12, 18, 44, 0.9), rgba(26, 44, 86, 0.95));
     border: 1px solid rgba(255, 233, 171, 0.35);
-    border-radius: 10px;
-    padding: clamp(4px, 1.8vw, 6px) clamp(8px, 3.4vw, 12px);
-    color: var(--xp-text);
+    border-radius: 999px;
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35), var(--xp-glow-soft);
-    z-index: 10;
+    z-index: 12;
 }
 
-#score { top: 14px; left: 14px; }
-#credits { top: 14px; left: 160px; }
-#lives { top: 56px; left: 14px; }
-#level { top: 14px; right: 14px; }
-#combo { top: 56px; right: 14px; }
+.status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: clamp(4px, 1.4vw, 6px) clamp(10px, 2.8vw, 14px);
+    border-radius: 999px;
+    border: 1px solid rgba(255, 233, 171, 0.32);
+    background: rgba(7, 12, 28, 0.65);
+    color: var(--xp-text);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.24);
+    backdrop-filter: blur(6px);
+}
+
+.status-label {
+    font-size: clamp(10px, 2.3vw, 12px);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: rgba(255, 233, 171, 0.78);
+}
+
+.status-value {
+    font-size: clamp(14px, 3vw, 16px);
+    color: #f4f6ff;
+}
 
 #dash-cooldown {
     position: absolute;
@@ -346,30 +366,31 @@ button:disabled {
     left: 24px;
     display: none;
     align-items: center;
-    gap: 18px;
+    gap: 20px;
     z-index: 8;
 }
 
 .joystick {
     position: relative;
-    width: 100px;
-    height: 100px;
+    width: 132px;
+    height: 132px;
     border-radius: 50%;
     border: 2px solid rgba(12, 39, 96, 0.5);
-    background: rgba(236, 233, 216, 0.85);
+    background: linear-gradient(180deg, #f9fafc 0%, #e5e7ef 100%);
     display: none;
     align-items: center;
     justify-content: center;
     touch-action: none;
     user-select: none;
     pointer-events: auto;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.18);
+    box-shadow: 0 14px 26px rgba(0, 0, 0, 0.2), inset 0 2px 6px rgba(255, 255, 255, 0.6);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 
 .joystick-knob {
     position: absolute;
-    width: 48px;
-    height: 48px;
+    width: 64px;
+    height: 64px;
     background: linear-gradient(180deg, #ffffff 0%, #d2d2d6 100%);
     border: 2px solid rgba(12, 39, 96, 0.65);
     border-radius: 50%;
@@ -382,11 +403,11 @@ button:disabled {
 
 .touch-fire-button {
     position: relative;
-    width: 88px;
-    height: 88px;
+    width: 108px;
+    height: 108px;
     border-radius: 50%;
     border: 2px solid rgba(12, 39, 96, 0.5);
-    background: linear-gradient(180deg, #ffffff 0%, #dfe1f3 100%);
+    background: linear-gradient(180deg, #ffffff 0%, #e5e8f5 100%);
     display: none;
     align-items: center;
     justify-content: center;
@@ -396,20 +417,38 @@ button:disabled {
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: #0c2760;
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22), inset 0 2px 6px rgba(255, 255, 255, 0.8);
     cursor: pointer;
     touch-action: manipulation;
     user-select: none;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 
 .touch-fire-button:active {
     transform: translateY(1px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
 }
 
 .touch-fire-button:focus-visible {
     outline: 3px solid rgba(12, 39, 96, 0.6);
     outline-offset: 3px;
+}
+
+.touch-haptic {
+    will-change: transform;
+}
+
+.touch-haptic.haptic-active,
+.touch-haptic.active {
+    transform: scale(0.96);
+}
+
+#joystick.haptic-active {
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.22), inset 0 4px 10px rgba(255, 255, 255, 0.7);
+}
+
+#fire-button.haptic-active {
+    box-shadow: 0 10px 18px rgba(0, 0, 0, 0.22), inset 0 4px 10px rgba(255, 255, 255, 0.8);
 }
 
 .touch-supported #touch-controls {
@@ -2128,10 +2167,11 @@ body.controls-locked #bezel-top .xp-window-controls {
         align-items: flex-start;
     }
 
-    #credits {
-        left: auto;
-        right: 14px;
-        top: 56px;
+    #status-bar {
+        top: 10px;
+        max-width: calc(100% - 20px);
+        flex-wrap: wrap;
+        justify-content: center;
     }
 
     #dash-cooldown {
@@ -2242,28 +2282,19 @@ body.controls-locked #bezel-top .xp-window-controls {
         gap: 6px;
     }
 
-    #score {
-        top: 12px;
-        left: 12px;
-    }
-
-    #credits {
-        top: 48px;
-        right: 12px;
+    #status-bar {
+        position: static;
+        transform: none;
+        margin: 6px auto 0;
+        justify-content: center;
+        flex-wrap: wrap;
     }
 
     #dash-cooldown {
-        top: 86px;
-    }
-
-    #lives {
-        top: 44px;
-        left: 12px;
-    }
-
-    #combo {
         top: 82px;
+        left: 12px;
         right: 12px;
+        width: auto;
     }
 
     .pilot-card-header {
@@ -2419,17 +2450,18 @@ body::before {
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4), var(--xp-glow-strong);
 }
 
-#score,
-#credits,
-#level,
-#lives,
-#combo {
+#status-bar {
     background: linear-gradient(135deg, rgba(5, 28, 62, 0.92) 0%, rgba(8, 14, 34, 0.82) 100%);
     border: 1px solid rgba(0, 246, 255, 0.35);
-    color: var(--xp-text);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+}
+
+.status-chip {
+    border-color: rgba(0, 246, 255, 0.35);
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4), var(--xp-glow-soft);
+}
+
+.status-label {
+    color: rgba(0, 246, 255, 0.78);
 }
 
 #dash-cooldown {

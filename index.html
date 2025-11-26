@@ -35,23 +35,40 @@
             </div>
             <div id="game-container">
             <canvas id="canvas" width="1280" height="720"></canvas>
-            <div id="score">Score: 0</div>
-            <div id="credits">Credits: 0</div>
+            <div id="status-bar" role="status" aria-live="polite">
+                <span class="status-chip" id="score" aria-label="Score">
+                    <span class="status-label">Score</span>
+                    <span class="status-value">0</span>
+                </span>
+                <span class="status-chip" id="credits" aria-label="Credits">
+                    <span class="status-label">Credits</span>
+                    <span class="status-value">0</span>
+                </span>
+                <span class="status-chip" id="lives" aria-label="Lives">
+                    <span class="status-label">Lives</span>
+                    <span class="status-value">3</span>
+                </span>
+                <span class="status-chip" id="level" aria-label="Level">
+                    <span class="status-label">Lv</span>
+                    <span class="status-value">1</span>
+                </span>
+                <span class="status-chip" id="combo" aria-label="Combo">
+                    <span class="status-label">Combo</span>
+                    <span class="status-value">0</span>
+                </span>
+            </div>
             <div id="dash-cooldown">
                 <div id="dash-bar"></div>
             </div>
-            <div id="lives">Lives: 3</div>
-            <div id="level">Level: 1</div>
-            <div id="combo">Combo: 0</div>
             <div id="controls">
                 <div>Use ← → ↑ ↓ (or WASD) to Move | Double-Tap to Dash (2s CD)</div>
                 <div>SPACE to Shoot (Hold for Charge)</div>
             </div>
             <div id="touch-controls" aria-hidden="true">
-                <div class="joystick" id="joystick">
+                <div class="joystick touch-haptic" id="joystick">
                     <div class="joystick-knob" id="knob"></div>
                 </div>
-                <button type="button" id="fire-button" class="touch-fire-button" aria-label="Fire">Fire</button>
+                <button type="button" id="fire-button" class="touch-fire-button touch-haptic" aria-label="Fire">Fire</button>
             </div>
             <div id="start-menu" class="overlay">
                 <div class="menu-panel xp-window xp-modal">
