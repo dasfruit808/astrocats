@@ -888,11 +888,11 @@ const SOLANA_RPC_CONFIG_STORAGE_KEY = 'astro_invaders_rpc_config';
 const RATE_LIMITED_PUBLIC_RPC_ENDPOINTS = [
     // Prefer CORS-friendly community endpoints first to reduce browser failures
     // for players loading the game from static hosts (e.g. GitHub Pages).
-    'https://solana-mainnet.public.blastapi.io',
-    'https://rpc.ankr.com/solana',
-    'https://solana-api.projectserum.com',
     'https://api.mainnet-beta.solana.com',
-    'https://rpc.publicnode.com/solana'
+    'https://solana.public-rpc.com',
+    'https://solana-api.projectserum.com',
+    'https://rpc.publicnode.com/solana',
+    'https://solana-mainnet.public.blastapi.io'
 ].filter(Boolean);
 const BLOCKED_RPC_PATTERNS = [];
 const SOLANA_RPC_FAILURE_COOLDOWN_MS = 3 * 60 * 1000;
