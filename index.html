@@ -385,7 +385,15 @@
     </div>
     <script>
         const isStaticHost = typeof window !== 'undefined' && /\.github\.io$/.test(window.location.hostname);
-        window.ASTROCATS_API_BASE_URL = isStaticHost ? '' : '/api';
+        const query = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        const apiBaseOverride = query?.get('apiBase') || query?.get('api');
+        const allowApiOnStaticHost = query?.get('enableApi') === '1';
+
+        const resolvedApiBase = apiBaseOverride
+            ? apiBaseOverride.replace(/\/$/, '')
+            : (!isStaticHost || allowApiOnStaticHost ? '/api' : '');
+
+        window.ASTROCATS_API_BASE_URL = resolvedApiBase;
         window.ASTROCATS_LEADERBOARD_API_BASE_URL = window.ASTROCATS_API_BASE_URL
             ? `${window.ASTROCATS_API_BASE_URL}/leaderboard`
             : '';
