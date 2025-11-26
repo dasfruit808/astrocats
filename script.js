@@ -56,6 +56,11 @@ const creditsEl = document.getElementById('credits');
 const livesEl = document.getElementById('lives');
 const levelEl = document.getElementById('level');
 const comboEl = document.getElementById('combo');
+const scoreValueEl = scoreEl?.querySelector('.status-value') || scoreEl;
+const creditsValueEl = creditsEl?.querySelector('.status-value') || creditsEl;
+const livesValueEl = livesEl?.querySelector('.status-value') || livesEl;
+const levelValueEl = levelEl?.querySelector('.status-value') || levelEl;
+const comboValueEl = comboEl?.querySelector('.status-value') || comboEl;
 const dashCooldownEl = document.getElementById('dash-cooldown');
 const dashBarEl = document.getElementById('dash-bar');
 const joystick = document.getElementById('joystick');
@@ -336,6 +341,7 @@ function configureTouchControls(forceTouch = null) {
 
     if (fireButton) {
         fireButton.classList.remove('active');
+        fireButton.classList.remove('haptic-active');
         fireButton.tabIndex = supportsTouch ? 0 : -1;
         if (!supportsTouch && typeof fireButton.blur === 'function') {
             fireButton.blur();
@@ -387,6 +393,7 @@ function setupFireButtonControls() {
         if (!touchControlsEnabled) return;
         event.preventDefault();
         fireButton.classList.add('active');
+        fireButton.classList.add('haptic-active');
         if (typeof event.pointerId === 'number' && typeof fireButton.setPointerCapture === 'function') {
             try {
                 fireButton.setPointerCapture(event.pointerId);
@@ -401,6 +408,7 @@ function setupFireButtonControls() {
         if (!touchControlsEnabled) return;
         event.preventDefault();
         fireButton.classList.remove('active');
+        fireButton.classList.remove('haptic-active');
         if (typeof event.pointerId === 'number' && typeof fireButton.releasePointerCapture === 'function') {
             try {
                 fireButton.releasePointerCapture(event.pointerId);
@@ -442,6 +450,7 @@ function handleJoystickStart(event) {
     event.preventDefault();
     joystickActive = true;
     joystick.classList.add('active');
+    joystick.classList.add('haptic-active');
 
     if (isTouchEvent) {
         const touch = event.changedTouches?.[0];
@@ -558,6 +567,7 @@ function resetJoystickState() {
 
     if (joystick) {
         joystick.classList.remove('active');
+        joystick.classList.remove('haptic-active');
     }
 
     if (knob) {
@@ -3278,31 +3288,30 @@ function updateStarfield() {
 }
 
 function updateUI() {
-    if (scoreEl && uiCache.score !== score) {
+    if (scoreValueEl && uiCache.score !== score) {
         uiCache.score = score;
-        scoreEl.textContent = `Score: ${score}`;
+        scoreValueEl.textContent = score;
     }
-    if (creditsEl && uiCache.credits !== credits) {
+    if (creditsValueEl && uiCache.credits !== credits) {
         uiCache.credits = credits;
-        creditsEl.textContent = `Credits: ${credits}`;
+        creditsValueEl.textContent = credits;
     }
-    if (livesEl && uiCache.lives !== lives) {
+    if (livesValueEl && uiCache.lives !== lives) {
         uiCache.lives = lives;
-        livesEl.textContent = `Lives: ${lives}`;
+        livesValueEl.textContent = lives;
     }
     const nextLevelXP = getXPForNextLevel(playerData.level);
     const xpPortion = nextLevelXP === Infinity ? 'MAX' : `${playerData.currentXP}/${nextLevelXP}`;
-    const restedText = playerData.restedXP > 0 ? ` | Rested ${Math.floor(playerData.restedXP)}` : '';
     const levelText = nextLevelXP === Infinity
-        ? `Level: ${playerData.level} (MAX)${restedText}`
-        : `Level: ${playerData.level} (XP: ${xpPortion}${restedText})`;
-    if (levelEl && uiCache.levelText !== levelText) {
+        ? `${playerData.level}`
+        : `${playerData.level} • ${xpPortion}`;
+    if (levelValueEl && uiCache.levelText !== levelText) {
         uiCache.levelText = levelText;
-        levelEl.textContent = levelText;
+        levelValueEl.textContent = levelText;
     }
-    if (comboEl && uiCache.combo !== killStreak) {
+    if (comboValueEl && uiCache.combo !== killStreak) {
         uiCache.combo = killStreak;
-        comboEl.textContent = `Combo: ${killStreak}`;
+        comboValueEl.textContent = `x${killStreak}`;
     }
     if (shopCreditsEl && uiCache.shopCredits !== credits) {
         uiCache.shopCredits = credits;
@@ -4476,7 +4485,7 @@ function applyPowerup(type) {
             if (lives < MAX_LIVES) {
                 lives = Math.min(MAX_LIVES, lives + 1);
                 uiCache.lives = null;
-                if (livesEl) livesEl.textContent = `Lives: ${lives}`;
+                if (livesValueEl) livesValueEl.textContent = lives;
             }
             break;
         case 'spread':
@@ -5954,7 +5963,7 @@ function applyLifeDamage(amount) {
     }
     if (livesLost > 0) {
         uiCache.lives = null;
-        if (livesEl) livesEl.textContent = `Lives: ${lives}`;
+        if (livesValueEl) livesValueEl.textContent = lives;
         if (lives <= 0) {
             lives = 0;
             handleGameOver();
