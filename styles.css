@@ -412,6 +412,13 @@ button:disabled {
     overflow-y: auto;
 }
 
+.form-helper {
+    margin: 4px 0 10px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: rgba(12, 39, 96, 0.7);
+}
+
 .start-menu-content {
     gap: clamp(20px, 3vh, 28px);
 }
