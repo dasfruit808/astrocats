@@ -892,7 +892,14 @@ const RATE_LIMITED_PUBLIC_RPC_ENDPOINTS = [
     'https://solana.public-rpc.com',
     'https://rpc.publicnode.com/solana'
 ].filter(Boolean);
-const BLOCKED_RPC_PATTERNS = [];
+// Known endpoints that routinely fail for players (DNS failures, CORS blocks,
+// or API key requirements). Automatically filter these so persisted settings
+// from older sessions do not break on-chain lookups.
+const BLOCKED_RPC_PATTERNS = [
+    /solana-mainnet\.public\.blastapi\.io/i,
+    /rpc\.ankr\.com\/solana/i,
+    /solana-api\.projectserum\.com/i
+];
 const SOLANA_RPC_FAILURE_COOLDOWN_MS = 3 * 60 * 1000;
 
 const SOLANA_WEB3_SOURCES = [
