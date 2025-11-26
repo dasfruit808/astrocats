@@ -135,7 +135,7 @@ const shopHangarHelperEl = document.getElementById('shop-hangar-helper');
 const shopUpgradeResultsEl = document.getElementById('shop-upgrade-results');
 const shopSpriteGridEl = document.getElementById('shop-sprite-grid');
 const uiRibbonButtons = Array.from(document.querySelectorAll('.ui-ribbon-button[data-ui-target]'));
-const hubTabButtons = Array.from(document.querySelectorAll('.hub-tab-button[data-tab]'));
+const hubTabButtons = Array.from(document.querySelectorAll('.hub-bottom-button[data-tab]'));
 const hubTabPanels = Array.from(document.querySelectorAll('.hub-tab-panel[data-tab-panel]'));
 const statCloseBtn = document.getElementById('stat-close');
 const statReturnHubBtn = document.getElementById('stat-return-hub');
@@ -265,7 +265,7 @@ function initializeUIEvents() {
         bindButtonClick(button, () => setActiveStatTab(tab), { preventDefault: false });
     });
 
-    setActiveHubTab('missions');
+    setActiveHubTab('play');
     setActiveStatTab('overview');
     updateNavigationRibbon();
 

@@ -85,152 +85,135 @@
                             <button type="button" class="xp-control xp-close" id="hub-close" title="Back to Start">&#10005;</button>
                         </div>
                     </div>
-                    <div class="xp-window-content">
+                    <div class="xp-window-content hub-shell">
                         <div id="storage-warning" class="hub-warning" role="status" aria-live="polite" hidden>
                             Progress may not be saved: storage unavailable.
                         </div>
-                        <nav class="ui-ribbon" aria-label="Primary navigation">
-                            <button type="button" class="ui-ribbon-button" data-ui-target="start">Start</button>
-                            <button type="button" class="ui-ribbon-button" data-ui-target="hub">Player Hub</button>
-                            <button type="button" class="ui-ribbon-button" data-ui-target="shop">Upgrade Shop</button>
-                            <button type="button" class="ui-ribbon-button" data-ui-target="stat">Stat Allocation</button>
-                        </nav>
                         <div class="hub-header">
                             <h2>PLAYER HUB <span class="xp-subheading">Wallet: <span id="wallet-address">-</span></span></h2>
                             <button id="open-profile-modal" type="button">Create Pilot</button>
                         </div>
 
-                        <div class="hub-layout">
-                            <aside class="hub-rail" aria-label="Pilot summary">
-                                <div class="hub-rail-inner">
-                                    <div class="pilot-card xp-card">
-                                        <div class="pilot-card-header">
-                                            <div class="pilot-avatar-wrap">
-                                                <img id="pilot-avatar" src="https://placehold.co/80x80?text=Pilot" alt="Pilot avatar" loading="lazy" width="80" height="80" />
-                                            </div>
-                                            <div class="pilot-card-identity">
-                                                <span class="pilot-card-label">Registered Pilot</span>
-                                                <span class="pilot-name" id="pilot-name-display">Rookie Pilot</span>
-                                                <span class="pilot-title-badge" id="pilot-title-display">Cadet</span>
-                                            </div>
+                        <div class="hub-tab-panels">
+                            <div class="hub-tab-panel active" id="hub-tab-play" role="tabpanel" aria-hidden="false" data-tab-panel="play">
+                                <div class="pilot-card xp-card">
+                                    <div class="pilot-card-header">
+                                        <div class="pilot-avatar-wrap">
+                                            <img id="pilot-avatar" src="https://placehold.co/80x80?text=Pilot" alt="Pilot avatar" loading="lazy" width="80" height="80" />
                                         </div>
-                                        <div class="pilot-card-body">
-                                            <p id="pilot-bio-display" class="pilot-bio">Set your pilot bio to share your legend.</p>
-                                            <p class="pilot-card-helper">Update your dossier from the <strong>Create Pilot</strong> command.</p>
+                                        <div class="pilot-card-identity">
+                                            <span class="pilot-card-label">Registered Pilot</span>
+                                            <span class="pilot-name" id="pilot-name-display">Rookie Pilot</span>
+                                            <span class="pilot-title-badge" id="pilot-title-display">Cadet</span>
                                         </div>
                                     </div>
-                                    <div class="hub-controls xp-card">
-                                        <h3>Flight Console</h3>
-                                        <p class="hub-controls-helper">Quick actions for your next sortie.</p>
-                                        <div class="hub-controls-grid">
-                                            <button id="open-stat-allocation">View Specialization Tree</button>
-                                            <button id="hub-play-next">Play Next Round</button>
+                                    <div class="pilot-card-body">
+                                        <p id="pilot-bio-display" class="pilot-bio">Set your pilot bio to share your legend.</p>
+                                        <p class="pilot-card-helper">Update your dossier from the <strong>Create Pilot</strong> command.</p>
+                                    </div>
+                                </div>
+                                <div class="mission-card xp-card">
+                                    <div class="mission-card-header">
+                                        <div>
+                                            <h3>Mission Snapshot</h3>
+                                            <p class="mission-card-subtitle">Operational intel for your next deployment.</p>
+                                        </div>
+                                        <div class="mission-readiness" aria-live="polite">
+                                            <span class="mission-readiness-label">Credits Ready</span>
+                                            <span class="mission-readiness-value" id="hub-credits">0</span>
+                                        </div>
+                                    </div>
+                                    <div class="mission-card-body">
+                                        <div class="mission-level-callout">
+                                            <span class="mission-level-label">Current Level</span>
+                                            <span class="mission-level-value" id="stat-level-hub">1</span>
+                                            <span class="mission-level-caption">Maintain sortie streaks to advance.</span>
+                                        </div>
+                                        <div class="mission-stats">
+                                            <div class="mission-stat">
+                                                <span class="mission-stat-icon" aria-hidden="true">🏅</span>
+                                                <div class="mission-stat-text">
+                                                    <span class="mission-stat-label">Best Score</span>
+                                                    <span class="mission-stat-value" id="best-score">0</span>
+                                                </div>
+                                            </div>
+                                            <div class="mission-stat">
+                                                <span class="mission-stat-icon" aria-hidden="true">🛸</span>
+                                                <div class="mission-stat-text">
+                                                    <span class="mission-stat-label">Active Sprite</span>
+                                                    <span class="mission-stat-value" id="active-sprite">Astro Pioneer</span>
+                                                </div>
+                                            </div>
+                                            <div class="mission-stat">
+                                                <span class="mission-stat-icon" aria-hidden="true">📡</span>
+                                                <div class="mission-stat-text">
+                                                    <span class="mission-stat-label">Comms Status</span>
+                                                    <span class="mission-stat-value">Link Stable</span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </aside>
-                            <div class="hub-main" aria-label="Player hub content">
-                                <div class="hub-tabs" role="tablist" aria-label="Hub sections">
-                                    <button type="button" class="hub-tab-button active" role="tab" aria-selected="true" aria-controls="hub-tab-missions" data-tab="missions">Missions</button>
-                                    <button type="button" class="hub-tab-button" role="tab" aria-selected="false" aria-controls="hub-tab-progression" data-tab="progression">Progression</button>
-                                    <button type="button" class="hub-tab-button" role="tab" aria-selected="false" aria-controls="hub-tab-social" data-tab="social">Social</button>
-                                    <button type="button" class="hub-tab-button" role="tab" aria-selected="false" aria-controls="hub-tab-leaderboard" data-tab="leaderboard">Leaderboard</button>
-                                </div>
-                                <div class="hub-tab-panels">
-                                    <div class="hub-tab-panel active" id="hub-tab-missions" role="tabpanel" data-tab-panel="missions">
-                                        <div class="mission-card xp-card">
-                                            <div class="mission-card-header">
-                                                <div>
-                                                    <h3>Mission Snapshot</h3>
-                                                    <p class="mission-card-subtitle">Operational intel for your next deployment.</p>
-                                                </div>
-                                                <div class="mission-readiness" aria-live="polite">
-                                                    <span class="mission-readiness-label">Credits Ready</span>
-                                                    <span class="mission-readiness-value" id="hub-credits">0</span>
-                                                </div>
-                                            </div>
-                                            <div class="mission-card-body">
-                                                <div class="mission-level-callout">
-                                                    <span class="mission-level-label">Current Level</span>
-                                                    <span class="mission-level-value" id="stat-level-hub">1</span>
-                                                    <span class="mission-level-caption">Maintain sortie streaks to advance.</span>
-                                                </div>
-                                                <div class="mission-stats">
-                                                    <div class="mission-stat">
-                                                        <span class="mission-stat-icon" aria-hidden="true">🏅</span>
-                                                        <div class="mission-stat-text">
-                                                            <span class="mission-stat-label">Best Score</span>
-                                                            <span class="mission-stat-value" id="best-score">0</span>
-                                                        </div>
-                                                    </div>
-                                                    <div class="mission-stat">
-                                                        <span class="mission-stat-icon" aria-hidden="true">🛸</span>
-                                                        <div class="mission-stat-text">
-                                                            <span class="mission-stat-label">Active Sprite</span>
-                                                            <span class="mission-stat-value" id="active-sprite">Astro Pioneer</span>
-                                                        </div>
-                                                    </div>
-                                                    <div class="mission-stat">
-                                                        <span class="mission-stat-icon" aria-hidden="true">📡</span>
-                                                        <div class="mission-stat-text">
-                                                            <span class="mission-stat-label">Comms Status</span>
-                                                            <span class="mission-stat-value">Link Stable</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <section class="xp-card">
-                                            <h3>Daily Missions</h3>
-                                            <div id="daily-quests" class="quest-list">
-                                                <p>Loading missions...</p>
-                                            </div>
-                                        </section>
-                                    </div>
-                                    <div class="hub-tab-panel" id="hub-tab-progression" role="tabpanel" data-tab-panel="progression" aria-hidden="true">
-                                        <section class="xp-card">
-                                            <h3>Resources &amp; Progression</h3>
-                                            <div class="resource-grid">
-                                                <p>Pilot: <span id="pilot-name-stat">Rookie Pilot</span></p>
-                                                <p>Callsign: <span id="pilot-title-stat">Cadet</span></p>
-                                                <p>Items: <span id="items">-</span></p>
-                                                <p>Spacecraft Owned: <span id="owned-sprites">Astro Pioneer</span></p>
-                                            </div>
-                                        </section>
-                                        <section class="xp-card">
-                                            <h3>Lifetime Stats</h3>
-                                            <div class="stat-grid">
-                                                <p>Pilot: <span id="pilot-name-stats-panel">Rookie Pilot</span></p>
-                                                <p>Callsign: <span id="pilot-title-stats-panel">Cadet</span></p>
-                                                <p>Games Played: <span id="games-played">0</span></p>
-                                                <p>Wins: <span id="wins">0</span></p>
-                                                <p>Losses: <span id="losses">0</span></p>
-                                                <p>&nbsp;</p>
-                                            </div>
-                                        </section>
-                                    </div>
-                                    <div class="hub-tab-panel" id="hub-tab-social" role="tabpanel" data-tab-panel="social" aria-hidden="true">
-                                        <section class="xp-card">
-                                            <h3>Squad Comms</h3>
-                                            <p>Share your pilot dossier and squad updates as social integrations come online.</p>
-                                            <ul class="hub-social-list">
-                                                <li><strong>Callsign:</strong> <span id="pilot-title-display-social">Cadet</span></li>
-                                                <li><strong>Bio:</strong> <span id="pilot-bio-display-social">Set your pilot bio to share your legend.</span></li>
-                                            </ul>
-                                        </section>
-                                    </div>
-                                    <div class="hub-tab-panel" id="hub-tab-leaderboard" role="tabpanel" data-tab-panel="leaderboard" aria-hidden="true">
-                                        <section class="xp-card">
-                                            <h3>Leaderboard</h3>
-                                            <div class="leaderboard" data-leaderboard>
-                                                <p>No leaderboard data yet.</p>
-                                            </div>
-                                        </section>
+                                <div class="hub-controls xp-card">
+                                    <h3>Flight Console</h3>
+                                    <p class="hub-controls-helper">Quick actions for your next sortie.</p>
+                                    <div class="hub-controls-grid">
+                                        <button id="open-stat-allocation">View Specialization Tree</button>
+                                        <button id="hub-play-next">Play Next Round</button>
                                     </div>
                                 </div>
                             </div>
+                            <div class="hub-tab-panel" id="hub-tab-missions" role="tabpanel" aria-hidden="true" data-tab-panel="missions">
+                                <section class="xp-card">
+                                    <h3>Daily Missions</h3>
+                                    <div id="daily-quests" class="quest-list">
+                                        <p>Loading missions...</p>
+                                    </div>
+                                </section>
+                                <section class="xp-card">
+                                    <h3>Leaderboard</h3>
+                                    <div class="leaderboard" data-leaderboard>
+                                        <p>No leaderboard data yet.</p>
+                                    </div>
+                                </section>
+                            </div>
+                            <div class="hub-tab-panel" id="hub-tab-profile" role="tabpanel" aria-hidden="true" data-tab-panel="profile">
+                                <section class="xp-card">
+                                    <h3>Resources &amp; Progression</h3>
+                                    <div class="resource-grid">
+                                        <p>Pilot: <span id="pilot-name-stat">Rookie Pilot</span></p>
+                                        <p>Callsign: <span id="pilot-title-stat">Cadet</span></p>
+                                        <p>Items: <span id="items">-</span></p>
+                                        <p>Spacecraft Owned: <span id="owned-sprites">Astro Pioneer</span></p>
+                                    </div>
+                                </section>
+                                <section class="xp-card">
+                                    <h3>Lifetime Stats</h3>
+                                    <div class="stat-grid">
+                                        <p>Pilot: <span id="pilot-name-stats-panel">Rookie Pilot</span></p>
+                                        <p>Callsign: <span id="pilot-title-stats-panel">Cadet</span></p>
+                                        <p>Games Played: <span id="games-played">0</span></p>
+                                        <p>Wins: <span id="wins">0</span></p>
+                                        <p>Losses: <span id="losses">0</span></p>
+                                        <p>&nbsp;</p>
+                                    </div>
+                                </section>
+                                <section class="xp-card">
+                                    <h3>Squad Comms</h3>
+                                    <p>Share your pilot dossier and squad updates as social integrations come online.</p>
+                                    <ul class="hub-social-list">
+                                        <li><strong>Callsign:</strong> <span id="pilot-title-display-social">Cadet</span></li>
+                                        <li><strong>Bio:</strong> <span id="pilot-bio-display-social">Set your pilot bio to share your legend.</span></li>
+                                    </ul>
+                                </section>
+                            </div>
                         </div>
 
+                        <nav class="hub-bottom-nav" role="tablist" aria-label="Hub navigation">
+                            <button type="button" class="hub-bottom-button active" role="tab" aria-selected="true" aria-controls="hub-tab-play" data-tab="play">Play</button>
+                            <button type="button" class="hub-bottom-button" role="tab" aria-selected="false" aria-controls="hub-tab-missions" data-tab="missions">Missions</button>
+                            <button type="button" class="hub-bottom-button" role="tab" aria-selected="false" aria-controls="hub-tab-profile" data-tab="profile">Profile</button>
+                        </nav>
                         <div id="profile-modal" class="profile-modal xp-window xp-modal" style="display: none;">
                             <div class="xp-titlebar">
                                 <div class="xp-title-group">
