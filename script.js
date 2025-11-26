@@ -1,5 +1,5 @@
 /**
- * Retro XP Anime Invaders - script.js (DEFINITIVE FINAL VERSION)
+ * X PAL: SPC TYP SHT - script.js (DEFINITIVE FINAL VERSION)
  * FIX: CRITICAL EXECUTION FIX - Implemented placeholder logic for loadAndDisplayLeaderboard
  * to resolve the startup failure and ensured all functions are properly ordered.
  * ----------------------------------------------------------------------------------
