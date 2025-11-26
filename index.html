@@ -242,20 +242,31 @@
                                 </div>
                             </div>
                             <div class="xp-window-content">
-                                <div class="profile-modal-body">
-                                    <form id="profile-form">
-                                        <label for="profile-name">Pilot Name</label>
-                                        <input id="profile-name" type="text" maxlength="12" placeholder="e.g., Nova" />
-                                        <p class="form-helper">Allowed: letters, numbers, spaces, underscores, and hyphens.</p>
+                                <form id="profile-form">
+                                    <label for="profile-name">Pilot Name</label>
+                                    <div class="xp-field">
+                                        <span class="xp-field-icon" aria-hidden="true">👤</span>
+                                        <input class="xp-input xp-with-icon" id="profile-name" type="text" maxlength="12" placeholder="e.g., Nova" />
+                                    </div>
+                                    <p class="form-helper">Allowed: letters, numbers, spaces, underscores, and hyphens.</p>
 
-                                        <label for="profile-title">Title / Callsign</label>
-                                        <input id="profile-title" type="text" maxlength="12" placeholder="e.g., Star Commander" />
+                                    <label for="profile-title">Title / Callsign</label>
+                                    <div class="xp-field">
+                                        <span class="xp-field-icon" aria-hidden="true">🏷️</span>
+                                        <input class="xp-input xp-with-icon" id="profile-title" type="text" maxlength="12" placeholder="e.g., Star Commander" />
+                                    </div>
 
-                                        <label for="profile-avatar">Avatar Image URL</label>
-                                        <input id="profile-avatar" type="text" placeholder="https://example.com/avatar.png" />
+                                    <label for="profile-avatar">Avatar Image URL</label>
+                                    <div class="xp-field">
+                                        <span class="xp-field-icon" aria-hidden="true">🖼️</span>
+                                        <input class="xp-input xp-with-icon" id="profile-avatar" type="text" placeholder="https://example.com/avatar.png" />
+                                    </div>
 
-                                        <label for="profile-bio">Pilot Bio</label>
-                                        <textarea id="profile-bio" rows="3" maxlength="280" placeholder="Share your origin story..."></textarea>
+                                    <label for="profile-bio">Pilot Bio</label>
+                                    <div class="xp-field">
+                                        <span class="xp-field-icon" aria-hidden="true">✍️</span>
+                                        <textarea class="xp-textarea xp-with-icon" id="profile-bio" rows="3" maxlength="280" placeholder="Share your origin story..."></textarea>
+                                    </div>
 
                                         <p id="profile-error" class="form-error" role="alert"></p>
 
