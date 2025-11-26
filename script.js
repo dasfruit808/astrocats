@@ -18,6 +18,7 @@ const BASE_CANVAS_HEIGHT = 720;
 const MAX_DEVICE_PIXEL_RATIO = 2.5;
 const USERNAME_MAX_LENGTH = 12;
 const TITLE_MAX_LENGTH = 12;
+const USERNAME_ALLOWED_PATTERN = /^[A-Za-z0-9 _-]+$/;
 const USERNAME_CHANGE_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const USERNAME_REGISTRY_STORAGE_KEY = 'astro_invaders_usernames';
 
@@ -3754,6 +3755,8 @@ function createPilotProfile(input = {}, stats = {}, previousProfile = {}) {
         errors.push('Pilot name is required.');
     } else if (rawName.length > USERNAME_MAX_LENGTH) {
         errors.push(`Pilot name must be ${USERNAME_MAX_LENGTH} characters or fewer.`);
+    } else if (!USERNAME_ALLOWED_PATTERN.test(rawName)) {
+        errors.push('Pilot name may only include letters, numbers, spaces, underscores, and hyphens.');
     }
 
     if (rawTitle.length > TITLE_MAX_LENGTH) {
