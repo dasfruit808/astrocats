@@ -1085,6 +1085,7 @@ let solanaRpcPauseNotified = false;
 const PROGRESS_MEMO_PREFIX = 'ASTRO_INVADERS_PROGRESS:';
 const MEMO_PROGRAM_ID = 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr';
 const MEMO_MAX_BYTES = 566;
+let memoSizeWarningShown = false;
 const CHAIN_SYNC_THROTTLE_MS = 60 * 1000;
 
 let pendingChainSnapshot = null;
@@ -5056,21 +5057,25 @@ function sanitizePlayerDataForChain(data) {
 }
 
 function encodeSnapshotForChain(snapshot) {
-    if (!snapshot) return null;
+    if (!snapshot) return { memoText: null, status: 'empty' };
 
     try {
         const memoText = `${PROGRESS_MEMO_PREFIX}${JSON.stringify(snapshot)}`;
         const byteLength = new TextEncoder().encode(memoText).length;
 
         if (byteLength > MEMO_MAX_BYTES) {
-            console.warn('On-chain progress payload too large for memo; skipping sync.');
-            return null;
+            if (!memoSizeWarningShown) {
+                memoSizeWarningShown = true;
+                console.warn('On-chain progress payload too large for memo; skipping sync.');
+            }
+            return { memoText: null, status: 'too_large' };
         }
 
-        return memoText;
+        memoSizeWarningShown = false;
+        return { memoText, status: 'ok' };
     } catch (err) {
         console.error('Failed to encode snapshot for chain sync:', err);
-        return null;
+        return { memoText: null, status: 'error' };
     }
 }
 
@@ -5095,7 +5100,10 @@ async function syncProgressToChain(snapshot) {
     const connection = getSolanaConnection();
     if (!connection) return false;
 
-    const memoText = encodeSnapshotForChain(snapshot);
+    const { memoText, status } = encodeSnapshotForChain(snapshot);
+    if (status === 'too_large') {
+        return true;
+    }
     if (!memoText) return false;
 
     try {
