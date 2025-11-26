@@ -2187,8 +2187,31 @@ function createSkillNodeElement(node, depth = 0) {
     const header = document.createElement('div');
     header.className = 'skill-node-header';
 
+    const titleGroup = document.createElement('div');
+    titleGroup.className = 'skill-node-title-group';
+
+    const title = document.createElement('strong');
+    title.textContent = node.name;
+    titleGroup.appendChild(title);
+
+    const nodeMeta = document.createElement('div');
+    nodeMeta.className = 'skill-node-meta';
+
+    const cost = document.createElement('span');
+    cost.className = 'skill-node-cost';
+    cost.textContent = `Cost: ${node.cost} pt${node.cost > 1 ? 's' : ''}`;
+    nodeMeta.appendChild(cost);
+
+    const statusPill = document.createElement('span');
+    statusPill.className = `skill-node-status ${unlocked ? 'unlocked' : 'locked'}`;
+    statusPill.textContent = unlocked ? 'Unlocked' : 'Locked';
+    nodeMeta.appendChild(statusPill);
+
+    titleGroup.appendChild(nodeMeta);
+    header.appendChild(titleGroup);
+
     const button = document.createElement('button');
-    button.textContent = unlocked ? `${node.name} ✓` : `${node.name} (-${node.cost})`;
+    button.textContent = unlocked ? 'Equipped' : `Unlock (-${node.cost})`;
     button.disabled = unlocked || !canUnlockNode(node);
     if (!unlocked) {
         button.addEventListener('click', () => unlockSpecializationNode(node.id));
@@ -2219,14 +2242,22 @@ function createSkillNodeElement(node, depth = 0) {
             .join(', ');
         requirementEl.textContent = `Requires: ${names}`;
     } else {
-        requirementEl.textContent = 'Requires: None';
+        requirementEl.textContent = 'Requires: None (starting node)';
     }
 
-    header.appendChild(button);
+    const actions = document.createElement('div');
+    actions.className = 'skill-node-actions';
+    actions.appendChild(button);
+
+    header.appendChild(actions);
     container.appendChild(header);
-    container.appendChild(description);
-    if (bonusesText) container.appendChild(bonusesEl);
-    container.appendChild(requirementEl);
+
+    const details = document.createElement('div');
+    details.className = 'skill-node-details';
+    details.appendChild(description);
+    if (bonusesText) details.appendChild(bonusesEl);
+    details.appendChild(requirementEl);
+    container.appendChild(details);
 
     if (Array.isArray(node.children) && node.children.length) {
         const childrenWrapper = document.createElement('div');
@@ -2254,6 +2285,17 @@ function renderSkillTree() {
     const { totals, masteries, levelBase } = recomputeSpecializationTotals();
     const summaryWrapper = document.createElement('div');
     summaryWrapper.className = 'skill-summary';
+
+    const legend = document.createElement('div');
+    legend.className = 'skill-legend';
+    legend.innerHTML = `
+        <div class="skill-legend-row">
+            <span class="skill-node-status unlocked">Unlocked</span>
+            <span class="skill-node-status locked">Locked</span>
+            <span class="skill-node-cost">Cost: n pts</span>
+        </div>
+        <p class="skill-legend-copy">Spend specialization points to unlock nodes. Unlock every node within a branch to activate its Mastery bonus.</p>
+    `;
 
     CORE_STATS.forEach(key => {
         const total = totals[key] || 0;
@@ -2288,6 +2330,10 @@ function renderSkillTree() {
         statOptionsEl.appendChild(summaryWrapper);
     }
 
+    if (statOptionsEl) {
+        statOptionsEl.appendChild(legend);
+    }
+
     const unlockedNodes = Array.isArray(playerData.unlockedNodes) ? playerData.unlockedNodes : [];
     const masteryListFragment = document.createDocumentFragment();
 
@@ -2295,43 +2341,74 @@ function renderSkillTree() {
         const branchEl = document.createElement('div');
         branchEl.className = 'skill-branch';
 
+        const branchHeader = document.createElement('div');
+        branchHeader.className = 'skill-branch-header';
+
+        const titleGroup = document.createElement('div');
+        titleGroup.className = 'skill-branch-title-group';
+
         const title = document.createElement('h4');
         title.textContent = branch.label;
-        branchEl.appendChild(title);
+        titleGroup.appendChild(title);
 
         if (branch.description) {
             const desc = document.createElement('p');
             desc.className = 'skill-branch-description';
             desc.textContent = branch.description;
-            branchEl.appendChild(desc);
+            titleGroup.appendChild(desc);
         }
+
+        branchHeader.appendChild(titleGroup);
+        branchEl.appendChild(branchHeader);
 
         const branchTotals = aggregateBranchBonuses(branchKey);
         const statSummaries = summarizeStats(branchTotals.stats);
         const perkSummaries = summarizePerks(branchTotals.perks);
-        if (statSummaries.length || perkSummaries.length) {
-            const summaryList = document.createElement('ul');
-            summaryList.className = 'skill-branch-summary';
 
-            if (statSummaries.length) {
-                const item = document.createElement('li');
-                const strong = document.createElement('strong');
-                strong.textContent = 'Stats:';
-                item.appendChild(strong);
-                item.appendChild(document.createTextNode(` ${statSummaries.join(', ')}`));
-                summaryList.appendChild(item);
-            }
+        if (branch.mastery) {
+            const nodeIds = branchNodeIds[branchKey] || [];
+            const unlockedCount = nodeIds.filter(id => unlockedNodes.includes(id)).length;
+            const required = branch.mastery.requiredUnlocked || nodeIds.length;
+            const masteryBadge = document.createElement('span');
+            masteryBadge.className = `skill-mastery-pill ${masteries?.[branchKey] ? 'active' : 'inactive'}`;
+            masteryBadge.textContent = masteries?.[branchKey]
+                ? `Mastery Active · ${branch.mastery.name}`
+                : `Mastery Progress ${unlockedCount}/${required}`;
+            masteryBadge.title = branch.mastery.description || 'Complete this branch to activate its mastery bonus.';
+            branchHeader.appendChild(masteryBadge);
+        }
 
-            if (perkSummaries.length) {
-                const item = document.createElement('li');
-                const strong = document.createElement('strong');
-                strong.textContent = 'Perks:';
-                item.appendChild(strong);
-                item.appendChild(document.createTextNode(` ${perkSummaries.join(', ')}`));
-                summaryList.appendChild(item);
-            }
+        const branchMeta = document.createElement('div');
+        branchMeta.className = 'skill-branch-meta';
 
-            branchEl.appendChild(summaryList);
+        if (statSummaries.length) {
+            const statHighlight = document.createElement('div');
+            statHighlight.className = 'skill-highlight';
+            const statTitle = document.createElement('p');
+            statTitle.className = 'skill-highlight-title';
+            statTitle.textContent = 'Stat Gains';
+            const statBody = document.createElement('p');
+            statBody.className = 'skill-highlight-body';
+            statBody.textContent = statSummaries.join(', ');
+            statHighlight.append(statTitle, statBody);
+            branchMeta.appendChild(statHighlight);
+        }
+
+        if (perkSummaries.length) {
+            const perkHighlight = document.createElement('div');
+            perkHighlight.className = 'skill-highlight';
+            const perkTitle = document.createElement('p');
+            perkTitle.className = 'skill-highlight-title';
+            perkTitle.textContent = 'Perks & Effects';
+            const perkBody = document.createElement('p');
+            perkBody.className = 'skill-highlight-body';
+            perkBody.textContent = perkSummaries.join(', ');
+            perkHighlight.append(perkTitle, perkBody);
+            branchMeta.appendChild(perkHighlight);
+        }
+
+        if (branchMeta.childNodes.length) {
+            branchEl.appendChild(branchMeta);
         }
 
         const nodesContainer = document.createElement('div');
@@ -2344,12 +2421,12 @@ function renderSkillTree() {
         if (branch.mastery) {
             const masteryInfo = document.createElement('p');
             masteryInfo.className = `skill-branch-mastery ${masteries?.[branchKey] ? 'active' : 'inactive'}`;
-            const nodeIds = branchNodeIds[branchKey] || [];
-            const unlockedCount = nodeIds.filter(id => unlockedNodes.includes(id)).length;
-            const required = branch.mastery.requiredUnlocked || nodeIds.length;
             if (masteries?.[branchKey]) {
                 masteryInfo.textContent = `Mastery Active: ${branch.mastery.name} — ${branch.mastery.description}`;
             } else {
+                const nodeIds = branchNodeIds[branchKey] || [];
+                const unlockedCount = nodeIds.filter(id => unlockedNodes.includes(id)).length;
+                const required = branch.mastery.requiredUnlocked || nodeIds.length;
                 masteryInfo.textContent = `Mastery Progress ${unlockedCount}/${required}: ${branch.mastery.description}`;
             }
             branchEl.appendChild(masteryInfo);
