@@ -1078,6 +1078,9 @@ const { solanaRpcEndpoints: SOLANA_RPC_ENDPOINTS, solanaRpcHeaders: SOLANA_RPC_D
 let solanaEndpointIndex = 0;
 let solanaLibraryLoadPromise = null;
 const solanaEndpointFailures = new Map();
+let solanaRpcPausedUntil = 0;
+let solanaRpcPauseReason = null;
+let solanaRpcPauseNotified = false;
 
 const PROGRESS_MEMO_PREFIX = 'ASTRO_INVADERS_PROGRESS:';
 const MEMO_PROGRAM_ID = 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr';
@@ -4820,6 +4823,29 @@ function markSolanaEndpointAsFailed(endpointUrl, reason) {
     solanaEndpointFailures.set(endpointUrl, { lastFailure: Date.now(), reason: reason || null });
 }
 
+function isSolanaRpcPaused() {
+    return solanaRpcPausedUntil && Date.now() < solanaRpcPausedUntil;
+}
+
+function hasAvailableSolanaEndpoint() {
+    if (SOLANA_RPC_ENDPOINTS.length === 0) return false;
+    return SOLANA_RPC_ENDPOINTS.some(endpoint => endpoint?.url && !shouldSkipSolanaEndpoint(endpoint.url));
+}
+
+function pauseSolanaRpc(reason) {
+    solanaRpcPausedUntil = Date.now() + SOLANA_RPC_FAILURE_COOLDOWN_MS;
+    solanaRpcPauseReason = reason || null;
+    solanaRpcPauseNotified = false;
+}
+
+function logSolanaRpcPauseIfNeeded() {
+    if (!isSolanaRpcPaused() || solanaRpcPauseNotified) return;
+    const remainingMs = Math.max(0, solanaRpcPausedUntil - Date.now());
+    const seconds = Math.ceil(remainingMs / 1000);
+    console.warn(`All Solana RPC endpoints unavailable; pausing on-chain lookups for ${seconds}s.`, solanaRpcPauseReason || '');
+    solanaRpcPauseNotified = true;
+}
+
 function shouldSkipSolanaEndpoint(endpointUrl) {
     if (!endpointUrl) return false;
     const failure = solanaEndpointFailures.get(endpointUrl);
@@ -4834,6 +4860,10 @@ function shouldSkipSolanaEndpoint(endpointUrl) {
 }
 
 function getCurrentSolanaEndpoint() {
+    if (isSolanaRpcPaused() || !hasAvailableSolanaEndpoint()) {
+        return null;
+    }
+
     if (SOLANA_RPC_ENDPOINTS.length > 0) {
         const endpoint = SOLANA_RPC_ENDPOINTS[solanaEndpointIndex % SOLANA_RPC_ENDPOINTS.length];
         if (endpoint?.url) return endpoint;
@@ -4881,6 +4911,34 @@ function advanceSolanaEndpoint(reason, { banCurrent = false } = {}) {
             console.info(`Switching to fallback Solana RPC endpoint: ${nextEndpoint.url}`);
         }
     }
+
+    if (!hasAvailableSolanaEndpoint()) {
+        pauseSolanaRpc(reason || 'All configured RPC endpoints failed.');
+        logSolanaRpcPauseIfNeeded();
+    }
+}
+
+function ensureSolanaRpcAvailability(context = 'Solana RPC calls') {
+    if (SOLANA_RPC_ENDPOINTS.length === 0) {
+        return false;
+    }
+
+    if (isSolanaRpcPaused()) {
+        logSolanaRpcPauseIfNeeded();
+        return false;
+    }
+
+    if (!hasAvailableSolanaEndpoint()) {
+        pauseSolanaRpc(`No healthy RPC endpoint available for ${context}.`);
+        logSolanaRpcPauseIfNeeded();
+        return false;
+    }
+
+    // Clear any prior pause metadata once an endpoint is usable again.
+    solanaRpcPausedUntil = 0;
+    solanaRpcPauseReason = null;
+    solanaRpcPauseNotified = false;
+    return true;
 }
 
 function handleSolanaRpcError(err) {
@@ -4913,10 +4971,19 @@ function handleSolanaRpcError(err) {
     } else if (networkIssue) {
         advanceSolanaEndpoint(err);
     }
+
+    if (!hasAvailableSolanaEndpoint()) {
+        pauseSolanaRpc(err || 'Solana RPC unavailable');
+        logSolanaRpcPauseIfNeeded();
+    }
 }
 
 function getSolanaConnection() {
     if (typeof solanaWeb3 === 'undefined') return null;
+
+    if (!ensureSolanaRpcAvailability('connection setup')) {
+        return null;
+    }
 
     if (!solanaConnection) {
         const attempted = new Set();
@@ -5021,6 +5088,10 @@ async function syncProgressToChain(snapshot) {
         return false;
     }
 
+    if (!ensureSolanaRpcAvailability('on-chain progress sync')) {
+        return false;
+    }
+
     const connection = getSolanaConnection();
     if (!connection) return false;
 
@@ -5114,6 +5185,10 @@ function queueOnChainSync(snapshot) {
 async function fetchLatestOnChainSnapshot(publicKey) {
     const librariesReady = await ensureSolanaLibrariesLoaded();
     if (!librariesReady) return null;
+
+    if (!ensureSolanaRpcAvailability('on-chain progress lookup')) {
+        return null;
+    }
 
     const maxAttempts = Math.max(1, SOLANA_RPC_ENDPOINTS.length || 1);
 
