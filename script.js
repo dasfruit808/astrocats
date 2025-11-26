@@ -5056,12 +5056,110 @@ function sanitizePlayerDataForChain(data) {
     return snapshot;
 }
 
+function stripNullishFields(obj) {
+    if (!obj || typeof obj !== 'object') return obj;
+
+    const entries = Object.entries(obj)
+        .filter(([_, value]) => value !== undefined && value !== null)
+        .map(([key, value]) => {
+            if (Array.isArray(value)) {
+                return [key, value];
+            }
+
+            if (typeof value === 'object') {
+                return [key, stripNullishFields(value)];
+            }
+
+            return [key, value];
+        })
+        .filter(([_, value]) => {
+            if (Array.isArray(value)) return value.length > 0;
+            if (typeof value === 'object') return Object.keys(value).length > 0;
+            return true;
+        });
+
+    return Object.fromEntries(entries);
+}
+
+function toCompactSnapshot(snapshot, { allowTruncation = false } = {}) {
+    const compact = {
+        v: snapshot.version,
+        t: snapshot.timestamp,
+        gp: snapshot.gamesPlayed,
+        w: snapshot.wins,
+        l: snapshot.losses,
+        bs: snapshot.bestScore,
+        c: snapshot.credits,
+        it: Array.isArray(snapshot.items) ? snapshot.items : undefined,
+        os: Array.isArray(snapshot.ownedSprites) ? snapshot.ownedSprites : undefined,
+        a: snapshot.activeSpriteId,
+        lv: snapshot.level,
+        xp: snapshot.currentXP,
+        sp: snapshot.specializationPoints,
+        st: snapshot.stats,
+        un: Array.isArray(snapshot.unlockedNodes) ? snapshot.unlockedNodes : undefined,
+        d: snapshot.daily,
+        p: snapshot.profile
+    };
+
+    if (allowTruncation) {
+        compact.it = compact.it ? compact.it.slice(0, 12) : undefined;
+        compact.os = compact.os ? compact.os.slice(0, 12) : undefined;
+        compact.un = compact.un ? compact.un.slice(0, 48) : undefined;
+
+        if (compact.p) {
+            compact.p = {
+                n: compact.p.name ? String(compact.p.name).slice(0, 32) : undefined,
+                a: compact.p.avatar,
+                b: compact.p.bio ? String(compact.p.bio).slice(0, 80) : undefined
+            };
+        }
+    }
+
+    return stripNullishFields(compact);
+}
+
+function fromCompactSnapshot(payload) {
+    if (!payload || typeof payload !== 'object') return payload;
+
+    if (payload.version || payload.gamesPlayed || payload.profile || payload.unlockedNodes) {
+        return payload;
+    }
+
+    return {
+        version: payload.v,
+        timestamp: payload.t,
+        gamesPlayed: payload.gp,
+        wins: payload.w,
+        losses: payload.l,
+        bestScore: payload.bs,
+        credits: payload.c,
+        items: payload.it,
+        ownedSprites: payload.os,
+        activeSpriteId: payload.a,
+        level: payload.lv,
+        currentXP: payload.xp,
+        specializationPoints: payload.sp,
+        stats: payload.st,
+        unlockedNodes: payload.un,
+        daily: payload.d,
+        profile: payload.p
+    };
+}
+
 function encodeSnapshotForChain(snapshot) {
     if (!snapshot) return { memoText: null, status: 'empty' };
 
     try {
-        const memoText = `${PROGRESS_MEMO_PREFIX}${JSON.stringify(snapshot)}`;
-        const byteLength = new TextEncoder().encode(memoText).length;
+        const compactSnapshot = toCompactSnapshot(snapshot);
+        let memoText = `${PROGRESS_MEMO_PREFIX}${JSON.stringify(compactSnapshot)}`;
+        let byteLength = new TextEncoder().encode(memoText).length;
+
+        if (byteLength > MEMO_MAX_BYTES) {
+            const truncatedSnapshot = toCompactSnapshot(snapshot, { allowTruncation: true });
+            memoText = `${PROGRESS_MEMO_PREFIX}${JSON.stringify(truncatedSnapshot)}`;
+            byteLength = new TextEncoder().encode(memoText).length;
+        }
 
         if (byteLength > MEMO_MAX_BYTES) {
             if (!memoSizeWarningShown) {
@@ -5235,7 +5333,8 @@ async function fetchLatestOnChainSnapshot(publicKey) {
 
                         const payload = memoText.slice(PROGRESS_MEMO_PREFIX.length);
                         try {
-                            return JSON.parse(payload);
+                            const parsed = JSON.parse(payload);
+                            return fromCompactSnapshot(parsed);
                         } catch (parseErr) {
                             console.warn('Failed to parse on-chain progress payload:', parseErr);
                         }
