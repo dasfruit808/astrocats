@@ -128,8 +128,6 @@ const pilotNameStatEl = document.getElementById('pilot-name-stat');
 const pilotTitleStatEl = document.getElementById('pilot-title-stat');
 const pilotNameStatsPanelEl = document.getElementById('pilot-name-stats-panel');
 const pilotTitleStatsPanelEl = document.getElementById('pilot-title-stats-panel');
-const windowShowDesktopBtn = document.getElementById('window-show-desktop');
-const windowOpenHubBtn = document.getElementById('window-open-hub');
 const windowBackToStartBtn = document.getElementById('window-back-to-start');
 const hubCloseBtn = document.getElementById('hub-close');
 const hubPlayNextBtn = document.getElementById('hub-play-next');
@@ -204,8 +202,6 @@ function setNavigationUnlocked(unlocked) {
     document.body.classList.toggle('controls-locked', !navigationUnlocked);
 
     const lockableButtons = [
-        windowShowDesktopBtn,
-        windowOpenHubBtn,
         windowBackToStartBtn,
         ...uiRibbonButtons
     ];
@@ -218,14 +214,6 @@ function setNavigationUnlocked(unlocked) {
 }
 
 setNavigationUnlocked(false);
-
-function hideOverlaysAndResumeGame() {
-    resumeGameFromFocusLoss({ triggeredByUser: true });
-    hideAllOverlays();
-    if (gameRunning) {
-        gamePaused = false;
-    }
-}
 
 function startFreePlaySession() {
     freePlaySessionActive = true;
@@ -246,9 +234,7 @@ function initializeUIEvents() {
     bindButtonClick(playBtn, startFreePlaySession);
     bindButtonClick(connectBtn, handleConnectButtonClick);
 
-    bindButtonClick(windowOpenHubBtn, showHub);
     bindButtonClick(windowBackToStartBtn, showStartMenu);
-    bindButtonClick(windowShowDesktopBtn, hideOverlaysAndResumeGame);
 
     bindButtonClick(hubCloseBtn, showStartMenu);
     bindButtonClick(hubPlayNextBtn, () => startGame(true));

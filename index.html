@@ -15,22 +15,17 @@
 <body class="ui-locked">
     <div class="xp-desktop">
             <div id="crt-frame" class="xp-window xp-primary-window">
-            <div id="bezel-top" class="xp-titlebar">
-                <div class="xp-title-group">
-                    <span class="xp-title-icon">🐱‍🚀</span>
-                    <div class="xp-title-text">
-                        <span class="xp-app-name">Retro XP Anime Invaders</span>
-                        <span class="xp-app-caption">Astrocats Arcade Cabinet</span>
-                    </div>
+            <div id="bezel-top" class="xp-titlebar xp-navbar">
+                <button type="button" class="nav-action" id="window-back-to-start" title="Back to Start" aria-label="Back to Start">
+                    <span aria-hidden="true">⌂</span>
+                </button>
+                <div class="xp-title-text xp-nav-title" aria-live="polite">
+                    <span class="xp-app-caption">Astrocats Arcade Cabinet</span>
+                    <span class="xp-app-name">Retro XP Anime Invaders</span>
                 </div>
                 <div class="wallet-badge" id="connected-wallet" aria-live="polite" aria-label="No wallet connected">
                     <span class="wallet-badge-label">Wallet</span>
                     <span class="wallet-badge-address" id="connected-wallet-address">Not Connected</span>
-                </div>
-                <div class="xp-window-controls">
-                    <button type="button" class="xp-control xp-min" id="window-show-desktop" title="Show Desktop">&#95;</button>
-                    <button type="button" class="xp-control xp-max" id="window-open-hub" title="Open Player Hub">&#9633;</button>
-                    <button type="button" class="xp-control xp-close" id="window-back-to-start" title="Back to Start">&#10005;</button>
                 </div>
             </div>
             <div id="game-container">
