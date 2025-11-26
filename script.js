@@ -130,9 +130,6 @@ const hubCloseBtn = document.getElementById('hub-close');
 const hubPlayNextBtn = document.getElementById('hub-play-next');
 const shopCloseBtn = document.getElementById('shop-close');
 const shopSkipBtn = document.getElementById('shop-skip');
-const shopRollBasicBtn = document.getElementById('shop-roll-basic');
-const shopRollPremiumBtn = document.getElementById('shop-roll-premium');
-const shopRollHelperEl = document.getElementById('shop-roll-helper');
 const shopUpgradeHelperEl = document.getElementById('shop-upgrade-helper');
 const shopHangarHelperEl = document.getElementById('shop-hangar-helper');
 const shopUpgradeResultsEl = document.getElementById('shop-upgrade-results');
@@ -253,8 +250,6 @@ function initializeUIEvents() {
 
     bindButtonClick(shopCloseBtn, showHub);
     bindButtonClick(shopSkipBtn, skipShop);
-    bindButtonClick(shopRollBasicBtn, () => rollUpgrade('basic'));
-    bindButtonClick(shopRollPremiumBtn, () => rollUpgrade('premium'));
 
     uiRibbonButtons.forEach((button) => {
         bindButtonClick(button, () => setUiMode(button.dataset.uiTarget));
@@ -1334,16 +1329,6 @@ function buildEnemyTemplate() {
     };
 }
 
-const upgradePools = {
-    common: ['speed', 'rapid'], rare: ['spread', 'homing'],
-    epic: ['pierce', 'shield'], legendary: ['ultra_dash']
-};
-
-const SHOP_ROLL_CONFIG = {
-    basic: { cost: 50, rolls: 3, rarityWeights: { common: 0.7, rare: 0.3 } },
-    premium: { cost: 200, rolls: 3, rarityWeights: { rare: 0.5, epic: 0.35, legendary: 0.15 } }
-};
-
 const SHOP_RARITY_COSTS = { common: 75, rare: 125, epic: 200, legendary: 350 };
 const SHOP_RARITY_COLORS = {
     common: '#278027',
@@ -1362,6 +1347,29 @@ const UPGRADE_DETAILS = {
     pierce: { name: 'Piercing Rounds', description: 'Bullets pass through enemies, damaging multiple targets.' },
     ultra_dash: { name: 'Ultra Dash', description: 'Reduce dash cooldown dramatically for rapid repositioning.' }
 };
+
+const UPGRADE_RARITIES = {
+    speed: 'common',
+    rapid: 'common',
+    life: 'common',
+    spread: 'rare',
+    homing: 'rare',
+    pierce: 'epic',
+    shield: 'epic',
+    ultra_dash: 'legendary'
+};
+
+const UPGRADE_CATALOG = Object.entries(UPGRADE_DETAILS).map(([type, detail]) => {
+    const rarity = UPGRADE_RARITIES[type] || 'common';
+    return {
+        id: type,
+        type,
+        rarity,
+        cost: SHOP_RARITY_COSTS[rarity] || SHOP_RARITY_COSTS.common,
+        label: detail.name,
+        description: detail.description
+    };
+});
 
 const CORE_STATS = ['strength', 'speed', 'vitality', 'focus'];
 
@@ -2786,9 +2794,6 @@ function initializeSpriteSystem() {
     setActiveSprite(playerData.activeSpriteId, { skipSave: true });
 }
 
-let currentShopOptions = [];
-let shopRollHistory = [];
-
 const DASH_WINDOW = 300; const DASH_DURATION = 500;
 const DASH_SPEED_MULTIPLIER = 2.6;
 const DASH_CONTROL_BLEND = 0.6;
@@ -4206,7 +4211,6 @@ function startGame(isNewSession = true) {
         playerData.gamesPlayed = (playerData.gamesPlayed || 0) + 1;
     }
 
-    currentShopOptions = [];
     renderShopOptions();
 
     const playQuest = playerData.daily?.quests?.find(q => q.id === 'playRounds');
@@ -4230,53 +4234,7 @@ function openShop() {
     setUiMode(UI_MODES.SHOP);
 }
 
-function recordRollHistory(tier, options = []) {
-    const timestamp = Date.now();
-    const snapshot = (options || []).map(opt => ({ label: opt.label, rarity: opt.rarity }));
-    shopRollHistory.push({ id: `${timestamp}-${Math.random().toString(16).slice(2)}`, tier, options: snapshot, timestamp });
-    if (shopRollHistory.length > SHOP_HISTORY_LIMIT * 2) {
-        shopRollHistory = shopRollHistory.slice(-SHOP_HISTORY_LIMIT * 2);
-    }
-}
-
-function rollUpgrade(tier) {
-    const config = SHOP_ROLL_CONFIG[tier];
-    if (!config) return;
-    if (credits < config.cost) { return; }
-
-    credits -= config.cost;
-    playerData.credits = credits;
-    uiCache.credits = null;
-    uiCache.shopCredits = null;
-
-    currentShopOptions = [];
-    for (let i = 0; i < config.rolls; i++) {
-        const rarity = pickRarity(config.rarityWeights);
-        const pool = upgradePools[rarity] || [];
-        if (pool.length === 0) continue;
-        const type = pool[Math.floor(Math.random() * pool.length)];
-        const detail = UPGRADE_DETAILS[type] || { name: type, description: 'Temporary boost.' };
-        currentShopOptions.push({
-            id: `${type}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-            type,
-            rarity,
-            cost: SHOP_RARITY_COSTS[rarity] || SHOP_RARITY_COSTS.common,
-            label: detail.name,
-            description: detail.description
-        });
-    }
-
-    recordRollHistory(tier, currentShopOptions);
-    renderShopOptions();
-    updateUI();
-    updateHubUI();
-    savePlayerData();
-    loadAndDisplayLeaderboard();
-}
-
 function skipShop() {
-    currentShopOptions = [];
-    renderShopOptions();
     showHub();
 }
 
@@ -4323,10 +4281,8 @@ function handleGameOver() {
 }
 
 function purchaseUpgrade(optionId) {
-    const optionIndex = currentShopOptions.findIndex(option => option.id === optionId);
-    if (optionIndex === -1) return;
-
-    const option = currentShopOptions[optionIndex];
+    const option = UPGRADE_CATALOG.find(entry => entry.id === optionId);
+    if (!option) return;
     if (credits < option.cost) return;
 
     credits -= option.cost;
@@ -4334,7 +4290,6 @@ function purchaseUpgrade(optionId) {
     uiCache.credits = null;
     uiCache.shopCredits = null;
 
-    currentShopOptions.splice(optionIndex, 1);
     playerData.items.push(option.type);
     applyPowerup(option.type);
 
@@ -6056,31 +6011,18 @@ function grantRestedXP(days = 1) {
     return newTotal - previous;
 }
 
-const SHOP_HISTORY_LIMIT = 5;
-
-function formatRarityOdds(weights) {
-    const entries = Object.entries(weights || {});
-    const total = entries.reduce((sum, [, weight]) => sum + weight, 0) || 1;
-    return entries.map(([rarity, weight]) => {
-        const percentage = Math.round((weight / total) * 100);
-        return `${rarity.toUpperCase()} ${percentage}%`;
-    }).join(', ');
-}
-
 function ensureShopTabLayout() {
     if (!shopOptionsEl) return {};
 
     const existingWrapper = shopOptionsEl.querySelector('.shop-tab-wrapper');
-    const rollSection = shopOptionsEl.querySelector('.roll-section');
     const upgradesSection = shopOptionsEl.querySelector('.upgrades-section');
     const hangarSection = shopOptionsEl.querySelector('.hangar-section');
 
     if (existingWrapper) {
         const panels = existingWrapper.querySelector('.shop-tab-panels');
-        const activeTab = shopOptionsEl.dataset.activeTab || 'shop-tab-rolls';
+        const activeTab = shopOptionsEl.dataset.activeTab || 'shop-tab-upgrades';
         const tabButtons = Array.from(existingWrapper.querySelectorAll('.shop-tab-button'));
         const tabPanels = [
-            panels?.querySelector('#shop-tab-rolls') || rollSection,
             panels?.querySelector('#shop-tab-upgrades') || upgradesSection,
             panels?.querySelector('#shop-tab-hangar') || hangarSection
         ].filter(Boolean);
@@ -6099,7 +6041,6 @@ function ensureShopTabLayout() {
 
         return {
             tabWrapper: existingWrapper,
-            rollSection: panels?.querySelector('#shop-tab-rolls') || rollSection,
             upgradesSection: panels?.querySelector('#shop-tab-upgrades') || upgradesSection,
             hangarSection: panels?.querySelector('#shop-tab-hangar') || hangarSection
         };
@@ -6115,7 +6056,6 @@ function ensureShopTabLayout() {
     panels.className = 'shop-tab-panels';
 
     const sectionDefs = [
-        { id: 'shop-tab-rolls', label: 'Rolls', node: rollSection, description: 'Roll odds and pull history' },
         { id: 'shop-tab-upgrades', label: 'Upgrades', node: upgradesSection, description: 'Pick your favorite perks' },
         { id: 'shop-tab-hangar', label: 'Hangar', node: hangarSection, description: 'Ships and loadouts' }
     ];
@@ -6168,124 +6108,11 @@ function ensureShopTabLayout() {
 
     return {
         tabWrapper,
-        rollSection: sectionDefs[0].node,
-        upgradesSection: sectionDefs[1].node,
-        hangarSection: sectionDefs[2].node
+        upgradesSection: sectionDefs[0].node,
+        hangarSection: sectionDefs[1].node
     };
 }
 
-function renderRollSection(rollSection) {
-    if (!rollSection) return;
-
-    const basicConfig = SHOP_ROLL_CONFIG.basic;
-    const premiumConfig = SHOP_ROLL_CONFIG.premium;
-
-    const rollHelper = shopRollHelperEl || rollSection.querySelector('#shop-roll-helper');
-    if (rollHelper) {
-        rollHelper.textContent = `Basic costs ${basicConfig.cost} credits for ${basicConfig.rolls} pulls (${formatRarityOdds(basicConfig.rarityWeights)}). Premium costs ${premiumConfig.cost} credits for ${premiumConfig.rolls} pulls (${formatRarityOdds(premiumConfig.rarityWeights)}) and leans toward rarer drops.`;
-    }
-
-    const basicRoll = rollSection.querySelector('#shop-roll-basic') || shopRollBasicBtn;
-    const premiumRoll = rollSection.querySelector('#shop-roll-premium') || shopRollPremiumBtn;
-    if (basicRoll) basicRoll.disabled = credits < SHOP_ROLL_CONFIG.basic.cost;
-    if (premiumRoll) premiumRoll.disabled = credits < SHOP_ROLL_CONFIG.premium.cost;
-
-    let rollMeta = rollSection.querySelector('.shop-roll-meta');
-    if (!rollMeta) {
-        rollMeta = document.createElement('div');
-        rollMeta.className = 'shop-roll-meta';
-        rollSection.appendChild(rollMeta);
-    }
-
-    let oddsLegend = rollMeta.querySelector('.shop-roll-odds');
-    if (!oddsLegend) {
-        oddsLegend = document.createElement('div');
-        oddsLegend.className = 'shop-roll-odds';
-        rollMeta.appendChild(oddsLegend);
-    }
-    oddsLegend.innerHTML = '';
-    const oddsTitle = document.createElement('h4');
-    oddsTitle.textContent = 'Roll Odds';
-    oddsLegend.appendChild(oddsTitle);
-
-    [
-        { label: 'Basic', config: basicConfig },
-        { label: 'Premium', config: premiumConfig }
-    ].forEach(({ label, config }) => {
-        const entry = document.createElement('div');
-        entry.className = 'roll-odds-entry';
-        entry.textContent = `${label}: ${config.rolls} pulls · ${formatRarityOdds(config.rarityWeights)}`;
-        oddsLegend.appendChild(entry);
-    });
-
-    let rarityKey = rollMeta.querySelector('.shop-rarity-key');
-    if (!rarityKey) {
-        rarityKey = document.createElement('div');
-        rarityKey.className = 'shop-rarity-key';
-        rollMeta.appendChild(rarityKey);
-    }
-    rarityKey.innerHTML = '';
-    const keyTitle = document.createElement('h4');
-    keyTitle.textContent = 'Rarity Color Key';
-    rarityKey.appendChild(keyTitle);
-
-    const keyList = document.createElement('div');
-    keyList.className = 'rarity-key-list';
-    Object.keys(SHOP_RARITY_COSTS).forEach(rarity => {
-        const pill = document.createElement('div');
-        pill.className = 'rarity-pill';
-        pill.style.setProperty('--rarity-color', SHOP_RARITY_COLORS[rarity] || '#2b3f63');
-        pill.textContent = `${rarity.charAt(0).toUpperCase()}${rarity.slice(1)}`;
-        keyList.appendChild(pill);
-    });
-    rarityKey.appendChild(keyList);
-
-    let history = rollSection.querySelector('.shop-roll-history');
-    if (!history) {
-        history = document.createElement('div');
-        history.className = 'shop-roll-history';
-        rollSection.appendChild(history);
-    }
-    history.innerHTML = '';
-    const historyTitle = document.createElement('h4');
-    historyTitle.textContent = 'Recent Pulls';
-    history.appendChild(historyTitle);
-
-    const historyList = document.createElement('ol');
-    historyList.className = 'shop-history-list';
-    const recentHistory = shopRollHistory.slice(-SHOP_HISTORY_LIMIT).reverse();
-    if (recentHistory.length === 0) {
-        const emptyState = document.createElement('li');
-        emptyState.className = 'shop-history-empty';
-        emptyState.textContent = 'No pulls yet. Roll to reveal upgrades and log them here.';
-        historyList.appendChild(emptyState);
-    } else {
-        recentHistory.forEach(entry => {
-            const item = document.createElement('li');
-            item.className = 'shop-history-entry';
-
-            const meta = document.createElement('div');
-            meta.className = 'shop-history-meta';
-            const tierLabel = entry.tier === 'premium' ? 'Premium Roll' : 'Basic Roll';
-            meta.textContent = `${tierLabel} • ${new Date(entry.timestamp).toLocaleTimeString()}`;
-            item.appendChild(meta);
-
-            const results = document.createElement('div');
-            results.className = 'shop-history-results';
-            if (entry.options.length === 0) {
-                results.textContent = 'No upgrades pulled.';
-            } else {
-                results.textContent = entry.options
-                    .map(opt => `${opt.label} (${opt.rarity.toUpperCase()})`)
-                    .join(' • ');
-            }
-            item.appendChild(results);
-
-            historyList.appendChild(item);
-        });
-    }
-    history.appendChild(historyList);
-}
 
 function renderUpgradeSection(upgradesSection) {
     if (!upgradesSection) return;
@@ -6295,27 +6122,15 @@ function renderUpgradeSection(upgradesSection) {
 
     upgradeContainer.innerHTML = '';
 
-    const rarityCosts = Object.values(SHOP_RARITY_COSTS || {});
-    const minUpgradeCost = rarityCosts.length ? Math.min(...rarityCosts) : 0;
-    const maxUpgradeCost = rarityCosts.length ? Math.max(...rarityCosts) : 0;
-
     const helper = shopUpgradeHelperEl || upgradesSection.querySelector('#shop-upgrade-helper');
     if (helper) {
-        helper.textContent = `Each roll reveals up to ${SHOP_ROLL_CONFIG.basic.rolls} upgrades. Purchase your pick (${minUpgradeCost}-${maxUpgradeCost} credits by rarity) to lock it in for the next sortie.`;
-    }
-
-    if (currentShopOptions.length === 0) {
-        const hint = document.createElement('p');
-        hint.className = 'shop-hint';
-        hint.textContent = 'Roll above to reveal options. Your next step is to purchase a favorite or skip back to the hub.';
-        upgradeContainer.appendChild(hint);
-        return;
+        helper.textContent = 'Choose any upgrade below to purchase it directly. Costs scale by rarity.';
     }
 
     const list = document.createElement('div');
     list.className = 'shop-option-list';
 
-    currentShopOptions.forEach(option => {
+    UPGRADE_CATALOG.forEach(option => {
         const optionEl = document.createElement('div');
         optionEl.className = `shop-option ${option.rarity}`;
 
@@ -6427,25 +6242,9 @@ function renderShopOptions() {
 
     ensureSpriteProgression();
 
-    const { rollSection, upgradesSection, hangarSection } = ensureShopTabLayout();
-    renderRollSection(rollSection);
+    const { upgradesSection, hangarSection } = ensureShopTabLayout();
     renderUpgradeSection(upgradesSection);
     renderHangarSection(hangarSection);
-}
-
-function pickRarity(weights) {
-    const entries = Object.entries(weights);
-    const totalWeight = entries.reduce((sum, [, weight]) => sum + weight, 0);
-    let roll = Math.random() * totalWeight;
-
-    for (const [rarity, weight] of entries) {
-        roll -= weight;
-        if (roll <= 0) {
-            return rarity;
-        }
-    }
-
-    return entries[entries.length - 1][0];
 }
 
 function showStatAllocation() {
@@ -7335,7 +7134,6 @@ window.disconnectWallet = disconnectWallet;
 window.showStartMenu = showStartMenu;
 window.showHub = showHub;
 window.openShop = openShop;
-window.rollUpgrade = rollUpgrade;
 window.skipShop = skipShop;
 window.purchaseUpgrade = purchaseUpgrade;
 window.purchaseSprite = purchaseSprite;
