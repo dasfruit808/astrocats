@@ -3559,6 +3559,12 @@ function normalizePilotField(value) {
     return value.replace(/\s+/g, ' ').trim();
 }
 
+function normalizePilotHandle(value) {
+    const normalized = normalizePilotField(value);
+    // Registry lookups are case-insensitive to prevent duplicate claims with different casing.
+    return normalized.toLowerCase();
+}
+
 function normalizePilotBio(value) {
     if (typeof value !== 'string') return '';
     return value
@@ -3582,7 +3588,7 @@ function sanitizePilotAvatar(value) {
 
 function sanitizeUsernameClaim(entry) {
     if (!entry || typeof entry !== 'object') return null;
-    const name = normalizePilotField(entry.name);
+    const name = normalizePilotHandle(entry.name);
     const ownerId = typeof entry.ownerId === 'string' ? entry.ownerId.trim() : '';
     if (!name || !ownerId) return null;
     const claimedAt = Number.isFinite(entry.claimedAt) ? entry.claimedAt : Date.now();
@@ -3625,13 +3631,13 @@ function writeUsernameRegistry(entries) {
 }
 
 function findUsernameClaim(name) {
-    const normalized = normalizePilotField(name);
+    const normalized = normalizePilotHandle(name);
     if (!normalized) return null;
     return readUsernameRegistry().find(entry => entry && entry.name === normalized) || null;
 }
 
 function ensureUsernameClaimed(name, ownerId) {
-    const normalized = normalizePilotField(name);
+    const normalized = normalizePilotHandle(name);
     if (!normalized || !ownerId) {
         return { ok: true };
     }
@@ -3731,6 +3737,7 @@ function generatePilotSummary(profile = {}, stats = {}) {
 
 function createPilotProfile(input = {}, stats = {}, previousProfile = {}) {
     const rawName = normalizePilotField(input.name);
+    const normalizedName = normalizePilotHandle(input.name);
     const rawTitle = normalizePilotField(input.title);
     const rawBio = normalizePilotBio(input.bio);
     const avatarValue = sanitizePilotAvatar(typeof input.avatar === 'string' ? input.avatar : '');
@@ -3769,7 +3776,7 @@ function createPilotProfile(input = {}, stats = {}, previousProfile = {}) {
         errors.push('Pilot name cannot be claimed because storage is unavailable.');
     }
 
-    const existingClaim = rawName ? findUsernameClaim(rawName) : null;
+    const existingClaim = normalizedName ? findUsernameClaim(normalizedName) : null;
     if (existingClaim && existingClaim.ownerId !== ownerId) {
         errors.push('Pilot name is already claimed.');
     }
@@ -3836,7 +3843,7 @@ function createPilotProfile(input = {}, stats = {}, previousProfile = {}) {
         ok: true,
         profile: nextProfile,
         status: hasExistingProfile ? 'updated' : 'created',
-        claimedName: rawName,
+        claimedName: normalizedName,
         ownerId
     };
 }
