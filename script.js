@@ -3640,6 +3640,28 @@ function writeUsernameRegistry(entries) {
     }
 }
 
+function deleteUsernameClaimByOwnerId(ownerId, options = {}) {
+    const trimmedOwnerId = typeof ownerId === 'string' ? ownerId.trim() : '';
+    if (!trimmedOwnerId) {
+        return { ok: true, registry: readUsernameRegistry() };
+    }
+
+    const targetName = normalizePilotHandle(options.name || '');
+    const registry = readUsernameRegistry();
+    const nextRegistry = registry.filter(entry => {
+        if (!entry || entry.ownerId !== trimmedOwnerId) return true;
+        if (targetName && entry.name !== targetName) return true;
+        return false;
+    });
+
+    if (nextRegistry.length === registry.length) {
+        return { ok: true, registry };
+    }
+
+    const saved = writeUsernameRegistry(nextRegistry);
+    return { ok: saved, registry: saved ? nextRegistry : registry };
+}
+
 function findUsernameClaim(name) {
     const normalized = normalizePilotHandle(name);
     if (!normalized) return null;
@@ -3864,6 +3886,8 @@ function handleProfileFormSubmit(event) {
     if (event) event.preventDefault();
     if (!profileForm) return;
 
+    const previousClaimedName = normalizePilotHandle(playerData?.profile?.name);
+
     const result = createPilotProfile({
         name: profileNameInput ? profileNameInput.value : '',
         title: profileTitleInput ? profileTitleInput.value : '',
@@ -3882,6 +3906,9 @@ function handleProfileFormSubmit(event) {
     if (!claimResult.ok) {
         if (profileErrorEl) profileErrorEl.textContent = claimResult.error;
         return;
+    }
+    if (previousClaimedName && previousClaimedName !== result.claimedName) {
+        deleteUsernameClaimByOwnerId(result.ownerId, { name: previousClaimedName });
     }
     if (profileErrorEl) profileErrorEl.textContent = '';
     updateHubUI();
