@@ -2314,13 +2314,17 @@ function renderSkillTree() {
 
     const masterySummary = document.createElement('div');
     masterySummary.className = 'skill-masteries';
-    const activeMasteries = Object.entries(skillTree)
+    const masteryBranches = Object.entries(skillTree).filter(([, branch]) => Boolean(branch.mastery));
+    const activeMasteries = masteryBranches
         .filter(([branchKey]) => masteries?.[branchKey])
-        .map(([branchKey, branch]) => branch.mastery?.name || branch.label);
-    if (activeMasteries.length) {
-        masterySummary.textContent = `Active Masteries: ${activeMasteries.join(', ')}`;
+        .map(([, branch]) => branch.mastery?.name || branch.label);
+    const masteredCount = activeMasteries.length;
+    const totalMasteries = masteryBranches.length;
+
+    if (masteredCount) {
+        masterySummary.textContent = `Masteries Active (${masteredCount}/${totalMasteries}): ${activeMasteries.join(', ')}`;
     } else {
-        masterySummary.textContent = 'No masteries active yet. Unlock every node in a branch to activate its mastery bonus.';
+        masterySummary.textContent = `Masteries are unlocked by completing a branch. 0/${totalMasteries} active so far.`;
     }
     summaryWrapper.appendChild(masterySummary);
 
@@ -2336,6 +2340,7 @@ function renderSkillTree() {
 
     const unlockedNodes = Array.isArray(playerData.unlockedNodes) ? playerData.unlockedNodes : [];
     const masteryListFragment = document.createDocumentFragment();
+    const masteryCardFragment = document.createDocumentFragment();
 
     Object.entries(skillTree).forEach(([branchKey, branch]) => {
         const branchEl = document.createElement('div');
@@ -2421,12 +2426,15 @@ function renderSkillTree() {
         if (branch.mastery) {
             const masteryInfo = document.createElement('p');
             masteryInfo.className = `skill-branch-mastery ${masteries?.[branchKey] ? 'active' : 'inactive'}`;
-            if (masteries?.[branchKey]) {
+
+            const nodeIds = branchNodeIds[branchKey] || [];
+            const unlockedCount = nodeIds.filter(id => unlockedNodes.includes(id)).length;
+            const required = branch.mastery.requiredUnlocked || nodeIds.length;
+            const masteryActive = Boolean(masteries?.[branchKey]);
+
+            if (masteryActive) {
                 masteryInfo.textContent = `Mastery Active: ${branch.mastery.name} — ${branch.mastery.description}`;
             } else {
-                const nodeIds = branchNodeIds[branchKey] || [];
-                const unlockedCount = nodeIds.filter(id => unlockedNodes.includes(id)).length;
-                const required = branch.mastery.requiredUnlocked || nodeIds.length;
                 masteryInfo.textContent = `Mastery Progress ${unlockedCount}/${required}: ${branch.mastery.description}`;
             }
             branchEl.appendChild(masteryInfo);
@@ -2435,22 +2443,74 @@ function renderSkillTree() {
             masteryListItem.className = masteryInfo.className;
             masteryListItem.textContent = masteryInfo.textContent;
             masteryListFragment.appendChild(masteryListItem);
+
+            const masteryCard = document.createElement('article');
+            masteryCard.className = `mastery-card ${masteryActive ? 'active' : 'inactive'}`;
+
+            const cardHeader = document.createElement('div');
+            cardHeader.className = 'mastery-card-header';
+
+            const cardTitleGroup = document.createElement('div');
+            cardTitleGroup.className = 'mastery-card-title-group';
+
+            const cardTitle = document.createElement('h5');
+            cardTitle.textContent = branch.mastery.name || `${branch.label} Mastery`;
+            cardTitleGroup.appendChild(cardTitle);
+
+            const cardSubtitle = document.createElement('p');
+            cardSubtitle.className = 'mastery-card-branch';
+            cardSubtitle.textContent = `${branch.label} branch`;
+            cardTitleGroup.appendChild(cardSubtitle);
+
+            const statusBadge = document.createElement('span');
+            statusBadge.className = `mastery-card-status ${masteryActive ? 'active' : 'inactive'}`;
+            statusBadge.textContent = masteryActive ? 'Active' : 'Locked';
+
+            cardHeader.append(cardTitleGroup, statusBadge);
+
+            const progress = document.createElement('p');
+            progress.className = 'mastery-card-progress';
+            progress.textContent = masteryActive
+                ? 'All nodes unlocked—bonus active.'
+                : `Progress ${unlockedCount}/${required}: unlock all nodes in ${branch.label} to activate this mastery.`;
+
+            const bonus = document.createElement('p');
+            bonus.className = 'mastery-card-bonus';
+            bonus.textContent = branch.mastery.description || 'Complete the branch to earn its unique bonus.';
+
+            masteryCard.append(cardHeader, progress, bonus);
+            masteryCardFragment.appendChild(masteryCard);
         }
         if (statOptionsEl) {
             statOptionsEl.appendChild(branchEl);
         }
     });
 
-    if (statMasteryListEl && masteryListFragment.childNodes.length) {
-        const masteryList = document.createElement('ul');
-        masteryList.className = 'skill-branch-summary';
-        masteryList.appendChild(masteryListFragment);
-        statMasteryListEl.appendChild(masteryList);
-    } else if (statMasteryListEl) {
-        const emptyState = document.createElement('p');
-        emptyState.className = 'skill-hint';
-        emptyState.textContent = 'Unlock nodes within a branch to activate its mastery bonus.';
-        statMasteryListEl.appendChild(emptyState);
+    if (statMasteryListEl) {
+        const masteryHeader = document.createElement('div');
+        masteryHeader.className = 'mastery-panel-header';
+        masteryHeader.innerHTML = `
+            <h3>Mastery Bonuses</h3>
+            <p class="mastery-panel-copy">Clear each branch to activate its mastery. Each mastery grants a permanent bonus for your runs.</p>
+        `;
+        statMasteryListEl.appendChild(masteryHeader);
+
+        if (masteryCardFragment.childNodes.length) {
+            const masteryGrid = document.createElement('div');
+            masteryGrid.className = 'mastery-card-grid';
+            masteryGrid.appendChild(masteryCardFragment);
+            statMasteryListEl.appendChild(masteryGrid);
+
+            const quickList = document.createElement('ul');
+            quickList.className = 'skill-branch-summary';
+            quickList.appendChild(masteryListFragment);
+            statMasteryListEl.appendChild(quickList);
+        } else {
+            const emptyState = document.createElement('p');
+            emptyState.className = 'skill-hint';
+            emptyState.textContent = 'Unlock nodes within a branch to activate its mastery bonus.';
+            statMasteryListEl.appendChild(emptyState);
+        }
     }
 
     if (playerData.specializationPoints <= 0 && statOptionsEl) {
