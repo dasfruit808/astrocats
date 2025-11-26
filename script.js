@@ -3876,13 +3876,16 @@ function handleProfileFormSubmit(event) {
         return;
     }
 
-    playerData.profile = result.profile;
-    ensurePlayerIdentifier(playerData);
-    const claimResult = ensureUsernameClaimed(result.claimedName, result.ownerId || ensurePlayerIdentifier(playerData));
+    const validatedProfile = result.profile;
+    const ownerId = result.ownerId || ensurePlayerIdentifier(playerData);
+
+    const claimResult = ensureUsernameClaimed(result.claimedName, ownerId);
     if (!claimResult.ok) {
         if (profileErrorEl) profileErrorEl.textContent = claimResult.error;
         return;
     }
+    playerData.profile = validatedProfile;
+    ensurePlayerIdentifier(playerData);
     if (profileErrorEl) profileErrorEl.textContent = '';
     updateHubUI();
     savePlayerData();
