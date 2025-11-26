@@ -2342,7 +2342,7 @@ function renderSkillTree() {
     const masteryListFragment = document.createDocumentFragment();
     const masteryCardFragment = document.createDocumentFragment();
 
-    Object.entries(skillTree).forEach(([branchKey, branch]) => {
+    Object.entries(skillTree).forEach(([branchKey, branch], branchIndex) => {
         const branchEl = document.createElement('div');
         branchEl.className = 'skill-branch';
 
@@ -2394,36 +2394,54 @@ function renderSkillTree() {
         }
 
         const branchOverview = document.createElement('div');
-        branchOverview.className = 'skill-branch-overview';
+        branchOverview.className = 'skill-branch-overview compact';
 
-        const summaryItems = [];
+        const quickMeta = document.createElement('div');
+        quickMeta.className = 'branch-quick-meta';
+
+        const progressTag = document.createElement('span');
+        progressTag.className = 'branch-pill';
+        progressTag.textContent = branch.mastery ? `Progress ${masteryProgressText}` : 'Explore to view bonuses';
+        quickMeta.appendChild(progressTag);
+
         if (statSummaries.length) {
-            summaryItems.push({ label: 'Stat focus', value: statSummaries.join(', ') });
+            const statTag = document.createElement('span');
+            statTag.className = 'branch-pill secondary';
+            statTag.textContent = `Focus: ${statSummaries.join(', ')}`;
+            quickMeta.appendChild(statTag);
         }
+
         if (perkSummaries.length) {
-            summaryItems.push({ label: 'Perks', value: perkSummaries.join(', ') });
+            const perkTag = document.createElement('span');
+            perkTag.className = 'branch-pill secondary';
+            perkTag.textContent = `Perks: ${perkSummaries.join(', ')}`;
+            quickMeta.appendChild(perkTag);
         }
+
+        branchOverview.appendChild(quickMeta);
+
+        const focusList = document.createElement('ul');
+        focusList.className = 'branch-focus-list';
+
+        const focusLine = document.createElement('li');
+        focusLine.textContent = statSummaries.length
+            ? `Stat path: ${statSummaries.join(', ')}`
+            : 'Stat path: Balanced gains across the tree.';
+        focusList.appendChild(focusLine);
+
+        const perkLine = document.createElement('li');
+        perkLine.textContent = perkSummaries.length
+            ? `Perks unlocked as you invest: ${perkSummaries.join(', ')}`
+            : 'Perks unlock as you progress through this branch.';
+        focusList.appendChild(perkLine);
+
         if (branch.mastery) {
-            summaryItems.push({ label: 'Mastery', value: masteryProgressText });
+            const masteryLine = document.createElement('li');
+            masteryLine.textContent = `Mastery: ${branch.mastery.name} — ${branch.mastery.description || 'Complete the branch to unlock the bonus.'}`;
+            focusList.appendChild(masteryLine);
         }
 
-        if (summaryItems.length === 0) {
-            summaryItems.push({ label: 'Overview', value: 'Balanced gains across the tree.' });
-        }
-
-        summaryItems.forEach(item => {
-            const chip = document.createElement('div');
-            chip.className = 'skill-branch-chip';
-            const chipLabel = document.createElement('span');
-            chipLabel.className = 'skill-branch-chip-label';
-            chipLabel.textContent = item.label;
-            const chipValue = document.createElement('span');
-            chipValue.className = 'skill-branch-chip-value';
-            chipValue.textContent = item.value;
-            chip.append(chipLabel, chipValue);
-            branchOverview.appendChild(chip);
-        });
-
+        branchOverview.appendChild(focusList);
         branchEl.appendChild(branchOverview);
 
         const nodesContainer = document.createElement('div');
@@ -2431,6 +2449,32 @@ function renderSkillTree() {
         (branch.nodes || []).forEach(node => {
             nodesContainer.appendChild(createSkillNodeElement(node));
         });
+
+        const toggleButton = document.createElement('button');
+        toggleButton.type = 'button';
+        toggleButton.className = 'branch-toggle';
+        toggleButton.setAttribute('aria-expanded', 'false');
+        toggleButton.textContent = 'View nodes';
+
+        const setExpanded = (expanded) => {
+            branchEl.classList.toggle('expanded', expanded);
+            nodesContainer.hidden = !expanded;
+            toggleButton.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            toggleButton.textContent = expanded ? 'Hide nodes' : 'View nodes';
+        };
+
+        toggleButton.addEventListener('click', () => {
+            const isExpanded = branchEl.classList.contains('expanded');
+            setExpanded(!isExpanded);
+        });
+
+        const controlsBar = document.createElement('div');
+        controlsBar.className = 'branch-controls';
+        controlsBar.appendChild(toggleButton);
+        branchEl.appendChild(controlsBar);
+
+        const defaultExpanded = branchIndex === 0;
+        setExpanded(defaultExpanded);
 
         branchEl.appendChild(nodesContainer);
         if (branch.mastery) {
