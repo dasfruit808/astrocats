@@ -6417,6 +6417,14 @@ async function connectWallet() {
 }
 
 async function disconnectWallet() {
+    if (walletProvider && typeof walletProvider.disconnect === 'function') {
+        try {
+            await walletProvider.disconnect();
+        } catch (err) {
+            console.error('Wallet disconnect error:', err);
+        }
+    }
+
     if (walletPublicKey) {
         savePlayerData();
         if (chainSyncTimeoutId) {
