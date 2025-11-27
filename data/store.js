@@ -81,14 +81,18 @@ async function loadStore() {
 
 export const storeReady = loadStore();
 
-export async function getTopLeaderboard(limit = 50) {
-    await storeReady;
-    return Array.from(leaderboardEntries.values())
+export function getSortedLeaderboardSnapshot(limit) {
+    const sorted = Array.from(leaderboardEntries.values())
         .sort((a, b) => {
             if (b.level !== a.level) return b.level - a.level;
             return b.bestScore - a.bestScore;
-        })
-        .slice(0, limit);
+        });
+    return Number.isFinite(limit) ? sorted.slice(0, limit) : sorted;
+}
+
+export async function getTopLeaderboard(limit = 50) {
+    await storeReady;
+    return getSortedLeaderboardSnapshot(limit);
 }
 
 export async function upsertLeaderboardEntry(entry) {
