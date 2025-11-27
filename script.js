@@ -122,6 +122,10 @@ const pilotAvatarEl = document.getElementById('pilot-avatar');
 const pilotNameDisplayEl = document.getElementById('pilot-name-display');
 const pilotTitleDisplayEl = document.getElementById('pilot-title-display');
 const pilotBioDisplayEl = document.getElementById('pilot-bio-display');
+const profileTabAvatarEl = document.getElementById('profile-tab-avatar');
+const profileTabNameEl = document.getElementById('profile-tab-name');
+const profileTabTitleEl = document.getElementById('profile-tab-title');
+const profileTabBioEl = document.getElementById('profile-tab-bio');
 const pilotTitleDisplaySocialEl = document.getElementById('pilot-title-display-social');
 const pilotBioDisplaySocialEl = document.getElementById('pilot-bio-display-social');
 const pilotNameStatEl = document.getElementById('pilot-name-stat');
@@ -3426,6 +3430,13 @@ function updateHubUI() {
         pilotAvatarEl.src = avatarSrc;
         pilotAvatarEl.alt = `${nameText} avatar`;
     }
+    if (profileTabAvatarEl) {
+        profileTabAvatarEl.src = avatarSrc;
+        profileTabAvatarEl.alt = `${nameText} avatar`;
+    }
+    if (profileTabNameEl) profileTabNameEl.textContent = nameText;
+    if (profileTabTitleEl) profileTabTitleEl.textContent = titleText;
+    if (profileTabBioEl) profileTabBioEl.textContent = bioText;
     if (pilotNameStatEl) pilotNameStatEl.textContent = nameText;
     if (pilotTitleStatEl) pilotTitleStatEl.textContent = titleText;
     if (pilotNameStatsPanelEl) pilotNameStatsPanelEl.textContent = nameText;
