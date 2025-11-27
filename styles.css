@@ -301,20 +301,31 @@ body.ui-locked .xp-window-controls {
     z-index: 10;
 }
 
-#status-bar {
+#hud-bar {
     position: absolute;
     top: 12px;
     left: 50%;
     transform: translateX(-50%);
+    width: min(96%, 780px);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+    z-index: 12;
+}
+
+#status-bar {
+    width: 100%;
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
     gap: clamp(6px, 1.5vw, 10px);
     padding: clamp(6px, 1.6vw, 10px) clamp(10px, 2vw, 14px);
     background: linear-gradient(145deg, rgba(12, 18, 44, 0.9), rgba(26, 44, 86, 0.95));
     border: 1px solid rgba(255, 233, 171, 0.35);
-    border-radius: 999px;
+    border-radius: 16px;
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35), var(--xp-glow-soft);
-    z-index: 12;
 }
 
 .status-chip {
@@ -345,28 +356,49 @@ body.ui-locked .xp-window-controls {
 }
 
 #dash-cooldown {
-    position: absolute;
-    top: 104px;
-    left: 14px;
-    width: 140px;
-    height: 10px;
-    background: rgba(12, 18, 44, 0.78);
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: linear-gradient(145deg, rgba(12, 18, 44, 0.9), rgba(26, 44, 86, 0.95));
     border: 1px solid rgba(255, 233, 171, 0.35);
-    border-radius: 8px;
+    border-radius: 12px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.32), var(--xp-glow-soft);
+}
+
+.dash-track {
+    flex: 1;
+    height: 12px;
+    border-radius: 999px;
+    background: rgba(7, 12, 28, 0.7);
+    border: 1px solid rgba(255, 233, 171, 0.3);
     overflow: hidden;
-    display: none;
-    z-index: 10;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
 }
 
 #dash-bar {
     height: 100%;
+    width: 0;
     background: linear-gradient(90deg, #ff9bd0 0%, #7ad6ff 60%, #7df59c 100%);
     transition: width 0.2s ease;
     box-shadow: 0 0 12px rgba(128, 225, 255, 0.5);
 }
 
+.dash-state {
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    font-size: clamp(11px, 2.5vw, 13px);
+    color: rgba(255, 233, 171, 0.9);
+    text-transform: uppercase;
+}
+
 #dash-cooldown.ready #dash-bar {
     background: linear-gradient(90deg, #64d664 0%, #bdf08c 100%);
+}
+
+#dash-cooldown.ready .dash-state {
+    color: var(--xp-success);
 }
 
 button {
@@ -627,6 +659,24 @@ button:disabled {
     border-radius: 8px;
     padding: clamp(12px, 2vh, 18px);
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.modal-lede {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+    color: rgba(214, 230, 255, 0.88);
+}
+
+.modal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+}
+
+.modal-actions button {
+    min-width: 180px;
 }
 
 .start-menu-primary {
@@ -2217,16 +2267,9 @@ body.controls-locked #bezel-top .xp-window-controls {
         align-items: flex-start;
     }
 
-    #status-bar {
+    #hud-bar {
+        width: calc(100% - 20px);
         top: 10px;
-        max-width: calc(100% - 20px);
-        flex-wrap: wrap;
-        justify-content: center;
-    }
-
-    #dash-cooldown {
-        left: 14px;
-        width: calc(100% - 28px);
     }
 
     .joystick {
@@ -2301,10 +2344,8 @@ body.controls-locked #bezel-top .xp-window-controls {
         max-height: min(72vh, 520px);
     }
 
-    #dash-cooldown {
-        top: 96px;
-        width: calc(100% - 24px);
-        left: 12px;
+    #hud-bar {
+        width: calc(100% - 16px);
     }
 
     .hub-panel,
@@ -2332,19 +2373,22 @@ body.controls-locked #bezel-top .xp-window-controls {
         gap: 6px;
     }
 
-    #status-bar {
+    #hud-bar {
         position: static;
         transform: none;
-        margin: 6px auto 0;
+        width: 100%;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    #status-bar {
+        margin: 0;
         justify-content: center;
         flex-wrap: wrap;
     }
 
     #dash-cooldown {
-        top: 82px;
-        left: 12px;
-        right: 12px;
-        width: auto;
+        width: 100%;
     }
 
     .pilot-card-header {

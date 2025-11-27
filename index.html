@@ -30,30 +30,36 @@
             </div>
             <div id="game-container">
             <canvas id="canvas" width="1280" height="720"></canvas>
-            <div id="status-bar" role="status" aria-live="polite">
-                <span class="status-chip" id="score" aria-label="Score">
-                    <span class="status-label">Score</span>
-                    <span class="status-value">0</span>
-                </span>
-                <span class="status-chip" id="credits" aria-label="Credits">
-                    <span class="status-label">Credits</span>
-                    <span class="status-value">0</span>
-                </span>
-                <span class="status-chip" id="lives" aria-label="Lives">
-                    <span class="status-label">Lives</span>
-                    <span class="status-value">3</span>
-                </span>
-                <span class="status-chip" id="level" aria-label="Level">
-                    <span class="status-label">Lv</span>
-                    <span class="status-value">1</span>
-                </span>
-                <span class="status-chip" id="combo" aria-label="Combo">
-                    <span class="status-label">Combo</span>
-                    <span class="status-value">0</span>
-                </span>
-            </div>
-            <div id="dash-cooldown">
-                <div id="dash-bar"></div>
+            <div id="hud-bar">
+                <div id="status-bar" role="status" aria-live="polite">
+                    <span class="status-chip" id="score" aria-label="Score">
+                        <span class="status-label">Score</span>
+                        <span class="status-value">0</span>
+                    </span>
+                    <span class="status-chip" id="credits" aria-label="Credits">
+                        <span class="status-label">Credits</span>
+                        <span class="status-value">0</span>
+                    </span>
+                    <span class="status-chip" id="lives" aria-label="Lives">
+                        <span class="status-label">Lives</span>
+                        <span class="status-value">3</span>
+                    </span>
+                    <span class="status-chip" id="level" aria-label="Level">
+                        <span class="status-label">Lv</span>
+                        <span class="status-value">1</span>
+                    </span>
+                    <span class="status-chip" id="combo" aria-label="Combo">
+                        <span class="status-label">Combo</span>
+                        <span class="status-value">0</span>
+                    </span>
+                </div>
+                <div id="dash-cooldown" aria-live="polite">
+                    <span class="status-label dash-label">Dash</span>
+                    <div class="dash-track" aria-hidden="true">
+                        <div id="dash-bar"></div>
+                    </div>
+                    <span class="dash-state" id="dash-state">Ready</span>
+                </div>
             </div>
             <div id="controls">
                 <div>Use ← → ↑ ↓ (or WASD) to Move | Double-Tap to Dash (2s CD)</div>
@@ -73,13 +79,13 @@
                             <span class="xp-app-name">Start Menu</span>
                         </div>
                     </div>
-                    <div class="xp-window-content start-menu-content">
+                            <div class="xp-window-content start-menu-content">
                         <div class="start-menu-intro">
-                            <h2>Welcome Pilot</h2>
-                            <p class="xp-intro">Connect your wallet to sync progress or jump straight into the action.</p>
+                            <h2>Welcome, Pilot</h2>
+                            <p class="xp-intro modal-lede">Sync your pilot data or dive straight into freeplay.</p>
                             <div class="start-menu-primary">
                                 <button id="connect-wallet">Connect Wallet</button>
-                                <button id="play-btn">Freeplay</button>
+                                <button id="play-btn">Start Freeplay</button>
                             </div>
                         </div>
                     </div>
@@ -391,8 +397,10 @@
                         </div>
                     </div>
                     <div class="xp-window-content">
-                        <p id="focus-pause-message">The game paused because the window lost focus. Resume when you're ready.</p>
-                        <button id="focus-pause-resume" type="button">Resume Game</button>
+                        <p id="focus-pause-message" class="modal-lede">Play paused while the window lost focus. Resume when you're ready.</p>
+                        <div class="modal-actions">
+                            <button id="focus-pause-resume" type="button">Resume Game</button>
+                        </div>
                     </div>
                 </div>
             </div>

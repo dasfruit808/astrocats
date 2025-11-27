@@ -63,6 +63,7 @@ const levelValueEl = levelEl?.querySelector('.status-value') || levelEl;
 const comboValueEl = comboEl?.querySelector('.status-value') || comboEl;
 const dashCooldownEl = document.getElementById('dash-cooldown');
 const dashBarEl = document.getElementById('dash-bar');
+const dashStateEl = document.getElementById('dash-state');
 const joystick = document.getElementById('joystick');
 const knob = document.getElementById('knob');
 const touchControlsContainer = document.getElementById('touch-controls');
@@ -4347,15 +4348,19 @@ function updateDashCooldown() {
     const finalDashDuration = ultraDashActive ? perkAdjusted / 2 : perkAdjusted;
 
 
+    if (!dashCooldownEl || !dashBarEl) return;
+    dashCooldownEl.style.display = 'flex';
+
     if (dashCooldown > now) {
-        if (dashCooldownEl) dashCooldownEl.style.display = 'block';
         const dashWindow = finalDashDuration || 1;
-        const progress = Math.max(0, (now - (dashCooldown - dashWindow)) / dashWindow);
-        if (dashBarEl) dashBarEl.style.width = `${progress * 100}%`;
-        if (dashCooldownEl) dashCooldownEl.classList.remove('ready');
+        const progress = Math.min(1, Math.max(0, (now - (dashCooldown - dashWindow)) / dashWindow));
+        dashBarEl.style.width = `${progress * 100}%`;
+        dashCooldownEl.classList.remove('ready');
+        if (dashStateEl) dashStateEl.textContent = 'Charging';
     } else {
-        if (dashCooldownEl) dashCooldownEl.style.display = 'none';
-        if (dashCooldownEl) dashCooldownEl.classList.add('ready');
+        dashBarEl.style.width = '100%';
+        dashCooldownEl.classList.add('ready');
+        if (dashStateEl) dashStateEl.textContent = 'Ready';
     }
 }
 
