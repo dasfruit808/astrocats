@@ -4,6 +4,7 @@ import { WebSocketServer } from 'ws';
 import http from 'http';
 import {
     getProfile,
+    getSortedLeaderboardSnapshot,
     getTopLeaderboard,
     saveProfile,
     storeReady,
@@ -50,7 +51,8 @@ app.post('/api/leaderboard', async (req, res) => {
     }
 
     await upsertLeaderboardEntry(sanitized);
-    broadcastLeaderboard(server.wss);
+    const snapshot = getSortedLeaderboardSnapshot();
+    broadcastLeaderboard(server.wss, snapshot);
     res.json({ ok: true });
 });
 
