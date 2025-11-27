@@ -883,8 +883,8 @@ const SOLANA_RPC_CONFIG_STORAGE_KEY = 'astro_invaders_rpc_config';
 const RATE_LIMITED_PUBLIC_RPC_ENDPOINTS = [
     // Prefer CORS-friendly community endpoints first to reduce browser failures
     // for players loading the game from static hosts (e.g. GitHub Pages).
+    'https://solana.public-rpc.com',
     'https://api.mainnet-beta.solana.com',
-    'https://rpc.ankr.com/solana',
     // Alchemy exposes a demo key that responds with permissive CORS headers.
     'https://solana-mainnet.g.alchemy.com/v2/demo'
 ].filter(Boolean);
@@ -893,7 +893,8 @@ const RATE_LIMITED_PUBLIC_RPC_ENDPOINTS = [
 // from older sessions do not break on-chain lookups.
 const BLOCKED_RPC_PATTERNS = [
     /solana-mainnet\.public\.blastapi\.io/i,
-    /solana-api\.projectserum\.com/i
+    /solana-api\.projectserum\.com/i,
+    /rpc\.ankr\.com\/solana/i
 ];
 const SOLANA_RPC_FAILURE_COOLDOWN_MS = 3 * 60 * 1000;
 
