@@ -919,6 +919,21 @@ button:disabled {
     letter-spacing: 0.02em;
 }
 
+.profile-identity-card {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.profile-identity-card .pilot-card-header {
+    padding: 2px 0;
+}
+
+.profile-identity-card .pilot-avatar-wrap.profile-tab-avatar {
+    width: 110px;
+    height: 110px;
+}
+
 .pilot-card-body {
     position: relative;
     display: flex;
@@ -2340,6 +2355,11 @@ body.controls-locked #bezel-top .xp-window-controls {
     .pilot-avatar-wrap {
         width: 76px;
         height: 76px;
+    }
+
+    .profile-identity-card .pilot-avatar-wrap.profile-tab-avatar {
+        width: 90px;
+        height: 90px;
     }
 
     .mission-card-header {
