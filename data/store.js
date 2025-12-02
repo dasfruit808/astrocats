@@ -3,14 +3,15 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const leaderboardFile = path.join(__dirname, 'leaderboard.json');
-const profilesFile = path.join(__dirname, 'profiles.json');
+const dataRoot = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : __dirname;
+const leaderboardFile = path.join(dataRoot, 'leaderboard.json');
+const profilesFile = path.join(dataRoot, 'profiles.json');
 
 let leaderboardEntries = new Map();
 let profiles = new Map();
 
 async function ensureDataDir() {
-    await mkdir(__dirname, { recursive: true });
+    await mkdir(dataRoot, { recursive: true });
 }
 
 async function loadJsonArray(filePath, description) {
@@ -108,6 +109,20 @@ export async function getProfile(owner) {
 
 export async function saveProfile(owner, profile) {
     await storeReady;
-    profiles.set(owner, profile || {});
+    const sanitizedProfile = profile && typeof profile === 'object' && !Array.isArray(profile)
+        ? JSON.parse(JSON.stringify(profile))
+        : {};
+    profiles.set(owner, sanitizedProfile);
     await persistProfiles();
+}
+
+export async function resetStoreForTest() {
+    if (process.env.NODE_ENV !== 'test') {
+        throw new Error('resetStoreForTest should only be used during tests');
+    }
+    leaderboardEntries = new Map();
+    profiles = new Map();
+    await ensureDataDir();
+    await saveJsonArray(leaderboardFile, [], 'leaderboard');
+    await saveJsonArray(profilesFile, [], 'profiles');
 }
