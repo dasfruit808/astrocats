@@ -6,8 +6,37 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const leaderboardFile = path.join(__dirname, 'leaderboard.json');
 const profilesFile = path.join(__dirname, 'profiles.json');
 
+const MIN_LEADERBOARD_CAP = 100;
+const MAX_LEADERBOARD_CAP = 500;
+const leaderboardMaxEntries = Math.max(
+    MIN_LEADERBOARD_CAP,
+    Math.min(
+        MAX_LEADERBOARD_CAP,
+        Number.isFinite(Number(process.env.LEADERBOARD_MAX_ENTRIES))
+            ? Number(process.env.LEADERBOARD_MAX_ENTRIES)
+            : MAX_LEADERBOARD_CAP,
+    ),
+);
+
 let leaderboardEntries = new Map();
 let profiles = new Map();
+
+function compareLeaderboardEntries(a, b) {
+    if (b.level !== a.level) return b.level - a.level;
+    return b.bestScore - a.bestScore;
+}
+
+function sortLeaderboardEntries() {
+    return Array.from(leaderboardEntries.values()).sort(compareLeaderboardEntries);
+}
+
+function trimLeaderboardEntries(sortedEntries) {
+    return sortedEntries.slice(0, leaderboardMaxEntries);
+}
+
+function refreshLeaderboardCache(sortedEntries) {
+    leaderboardEntries = new Map(sortedEntries.map((entry) => [entry.publicKey, entry]));
+}
 
 async function ensureDataDir() {
     await mkdir(__dirname, { recursive: true });
@@ -76,17 +105,18 @@ async function persistProfiles() {
 async function loadStore() {
     await ensureDataDir();
     leaderboardEntries = await loadLeaderboard();
+    const trimmed = trimLeaderboardEntries(sortLeaderboardEntries());
+    refreshLeaderboardCache(trimmed);
     profiles = await loadProfiles();
 }
 
 export const storeReady = loadStore();
 
 export function getSortedLeaderboardSnapshot(limit) {
-    const sorted = Array.from(leaderboardEntries.values())
-        .sort((a, b) => {
-            if (b.level !== a.level) return b.level - a.level;
-            return b.bestScore - a.bestScore;
-        });
+    const sorted = trimLeaderboardEntries(sortLeaderboardEntries());
+    if (leaderboardEntries.size > sorted.length) {
+        refreshLeaderboardCache(sorted);
+    }
     return Number.isFinite(limit) ? sorted.slice(0, limit) : sorted;
 }
 
@@ -98,6 +128,8 @@ export async function getTopLeaderboard(limit = 50) {
 export async function upsertLeaderboardEntry(entry) {
     await storeReady;
     leaderboardEntries.set(entry.publicKey, entry);
+    const sorted = trimLeaderboardEntries(sortLeaderboardEntries());
+    refreshLeaderboardCache(sorted);
     await persistLeaderboard();
 }
 
