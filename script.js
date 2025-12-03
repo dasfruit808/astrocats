@@ -64,6 +64,9 @@ const comboValueEl = comboEl?.querySelector('.status-value') || comboEl;
 const dashCooldownEl = document.getElementById('dash-cooldown');
 const dashBarEl = document.getElementById('dash-bar');
 const dashStateEl = document.getElementById('dash-state');
+const notificationPanelEl = document.getElementById('notification-panel') || document.querySelector('[data-notification-panel]');
+const notificationListEl = document.getElementById('notification-list') || document.querySelector('[data-notification-list]');
+const notificationEmptyEl = document.getElementById('notification-empty') || document.querySelector('[data-notification-empty]');
 const joystick = document.getElementById('joystick');
 const knob = document.getElementById('knob');
 const touchControlsContainer = document.getElementById('touch-controls');
@@ -176,6 +179,7 @@ let pointerCapabilityQuery = null;
 let guestStorageAvailable = false;
 let navigationUnlocked = false;
 let freePlaySessionActive = false;
+const notificationManager = createNotificationManager();
 
 function setInterfaceLocked(isLocked) {
     if (!bodyEl) return;
@@ -200,6 +204,174 @@ function bindButtonClick(element, handler, { preventDefault = true } = {}) {
         if (target.disabled) return;
         handler(event);
     });
+}
+
+function sanitizeNotificationText(value, fallback = '') {
+    if (typeof value !== 'string') return fallback;
+    const trimmed = value.replace(/\s+/g, ' ').trim();
+    if (!trimmed) return fallback;
+    return trimmed.slice(0, 240);
+}
+
+function createNotificationManager({ maxItems = 50 } = {}) {
+    const queue = [];
+
+    function renderQueue() {
+        if (!notificationListEl) return;
+        notificationListEl.textContent = '';
+        const fragment = document.createDocumentFragment();
+        queue.forEach((entry) => {
+            const item = document.createElement('li');
+            item.className = `notification-item notification-${entry.type}`;
+
+            const titleEl = document.createElement('p');
+            titleEl.className = 'notification-title';
+            titleEl.textContent = entry.title;
+
+            const messageEl = document.createElement('p');
+            messageEl.className = 'notification-message';
+            messageEl.textContent = entry.message;
+
+            const timeEl = document.createElement('time');
+            timeEl.className = 'notification-timestamp';
+            timeEl.dateTime = new Date(entry.timestamp).toISOString();
+            timeEl.textContent = new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            item.appendChild(titleEl);
+            item.appendChild(messageEl);
+            item.appendChild(timeEl);
+            fragment.appendChild(item);
+        });
+
+        notificationListEl.appendChild(fragment);
+
+        const hasItems = queue.length > 0;
+        if (notificationPanelEl) {
+            notificationPanelEl.classList.toggle('has-items', hasItems);
+        }
+        if (notificationEmptyEl) {
+            notificationEmptyEl.hidden = hasItems;
+        }
+    }
+
+    function normalize(entry) {
+        if (!entry) return null;
+        const type = typeof entry.type === 'string' && entry.type.trim() ? entry.type.trim().toLowerCase() : 'info';
+        const title = sanitizeNotificationText(entry.title || entry.name || 'Update', 'Update');
+        const message = sanitizeNotificationText(entry.message || entry.description || '', '');
+        const timestamp = Number.isFinite(entry.timestamp) ? entry.timestamp : Date.now();
+
+        return {
+            type,
+            title,
+            message,
+            timestamp
+        };
+    }
+
+    function push(entry) {
+        const normalized = normalize(entry);
+        if (!normalized) return null;
+
+        queue.unshift(normalized);
+        if (queue.length > maxItems) {
+            queue.length = maxItems;
+        }
+        renderQueue();
+        return normalized;
+    }
+
+    renderQueue();
+
+    return {
+        push,
+        render: renderQueue
+    };
+}
+
+function notifyCreditsGain(amount, context = '') {
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    const suffix = context ? ` · ${sanitizeNotificationText(context)}` : '';
+    notificationManager.push({
+        type: 'credits',
+        title: 'Credits Acquired',
+        message: `+${Math.floor(amount)} Credits${suffix}`
+    });
+}
+
+function notifyXPGain(amount, context = '') {
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    const suffix = context ? ` · ${sanitizeNotificationText(context)}` : '';
+    notificationManager.push({
+        type: 'xp',
+        title: 'XP Gained',
+        message: `+${Math.floor(amount)} XP${suffix}`
+    });
+}
+
+function notifyItemUnlock(name, description = '') {
+    const safeName = sanitizeNotificationText(name || 'Unlock');
+    const safeDescription = sanitizeNotificationText(description, 'Unlocked a new item.');
+    notificationManager.push({
+        type: 'unlock',
+        title: safeName,
+        message: safeDescription
+    });
+}
+
+function handleRealtimeNotificationPayload(payload = {}) {
+    const title = sanitizeNotificationText(payload.title || payload.name || 'Update', 'Update');
+    const message = sanitizeNotificationText(payload.message || payload.description || payload.detail || '', '');
+    const type = sanitizeNotificationText(payload.variant || payload.subtype || payload.type || 'info', 'info').toLowerCase();
+    const timestamp = Number.isFinite(payload.timestamp) ? payload.timestamp : Date.now();
+
+    notificationManager.push({ type, title, message, timestamp });
+}
+
+function handleRealtimeEventPayload(payload) {
+    if (!payload?.type) return false;
+    if (payload.type === 'leaderboard_update') {
+        if (Array.isArray(payload.entries) && payload.entries.length) {
+            applyLeaderboardRealtimeUpdate(payload.entries);
+        } else {
+            markLeaderboardDirty();
+            loadAndDisplayLeaderboard({ force: true });
+        }
+        return true;
+    }
+
+    switch (payload.type) {
+        case 'notification':
+        case 'event_notification':
+            handleRealtimeNotificationPayload(payload);
+            return true;
+        case 'quest_completed':
+            handleRealtimeNotificationPayload({
+                type: 'quest',
+                title: 'Quest Completed',
+                message: sanitizeNotificationText(payload.detail || payload.message || payload.description || 'A quest was completed.')
+            });
+            return true;
+        case 'item_unlocked':
+            notifyItemUnlock(payload.name || payload.item || 'New Unlock', payload.description || payload.message || 'New item available.');
+            return true;
+        case 'xp_gain':
+            notifyXPGain(Number(payload.amount) || 0, payload.source || 'Realtime bonus');
+            return true;
+        case 'credit_gain':
+        case 'credits_awarded':
+            notifyCreditsGain(Number(payload.amount) || 0, payload.source || 'Realtime bonus');
+            return true;
+        case 'level_up':
+            notificationManager.push({
+                type: 'level',
+                title: 'Level Up',
+                message: `Reached Level ${sanitizeNotificationText(String(payload.level || ''), '').trim() || 'upgraded!'}`
+            });
+            return true;
+        default:
+            return false;
+    }
 }
 
 function setNavigationUnlocked(unlocked) {
@@ -1296,6 +1468,11 @@ function updateDifficultyProgress(elapsedSeconds) {
     if (nextLevel !== level) {
         level = nextLevel;
         showAnnounce(waveAnnounceEl, `Threat Level ${level}!`);
+        notificationManager.push({
+            type: 'level',
+            title: 'Threat Level Increased',
+            message: `Reached Threat Level ${level}.`
+        });
 
         if (playerData && playerData.daily && Array.isArray(playerData.daily.quests)) {
             const reachThreatQuest = playerData.daily.quests.find(q => q.id === 'defeatBoss');
@@ -2122,6 +2299,8 @@ function unlockSpecializationNode(nodeId) {
     if (!playerData.unlockedNodes.includes(nodeId)) {
         playerData.unlockedNodes.push(nodeId);
     }
+
+    notifyItemUnlock(node.name || node.id, node.description || 'New specialization unlocked.');
 
     applyStatEffects();
     refreshStatAllocationOverlay({ forceRender: true });
@@ -4262,6 +4441,7 @@ function handleGameOver() {
     if (adjustedCredits > 0) {
         credits += adjustedCredits;
         uiCache.credits = null;
+        notifyCreditsGain(adjustedCredits, 'Sortie complete');
     }
 
     playerData.credits = credits;
@@ -4694,14 +4874,7 @@ function connectRealtimeChannel() {
         realtimeSocket.addEventListener('message', (event) => {
             try {
                 const payload = JSON.parse(event.data);
-                if (payload?.type === 'leaderboard_update') {
-                    if (Array.isArray(payload.entries) && payload.entries.length) {
-                        applyLeaderboardRealtimeUpdate(payload.entries);
-                    } else {
-                        markLeaderboardDirty();
-                        loadAndDisplayLeaderboard({ force: true });
-                    }
-                }
+                handleRealtimeEventPayload(payload);
             } catch (err) {
                 console.warn('Realtime message parse failed:', err);
             }
@@ -5943,8 +6116,19 @@ function gainXP(amount, options = {}) {
         }
     }
 
+    const shouldNotifyXP = options.notify !== false && (options.notify === true || (options.source && options.source !== 'combat'));
+    if (finalAmount > 0 && shouldNotifyXP) {
+        const sourceLabel = sanitizeNotificationText(options.source || '', '');
+        notifyXPGain(finalAmount, sourceLabel ? `Source: ${sourceLabel}` : '');
+    }
+
     if (levelsGained > 0) {
         showAnnounce(waveAnnounceEl, `LEVEL UP! Lv.${playerData.level}! (+${levelsGained * 3} Spec Points)`);
+        notificationManager.push({
+            type: 'level',
+            title: 'Level Up',
+            message: `Reached Level ${playerData.level}! +${levelsGained * 3} specialization points.`
+        });
         applyStatEffects();
     }
 
@@ -6299,10 +6483,11 @@ function checkDailyLogin() {
 
     // Grant Daily Login Reward
     if (!playerData.daily.claimedLogin) {
-        credits += 25; 
+        credits += 25;
         playerData.credits = credits;
         playerData.daily.claimedLogin = true;
-        
+        notifyCreditsGain(25, 'Daily login bonus');
+
         showAnnounce(document.getElementById('hub-announcement') || document.getElementById('wave-announce'), 'Daily Login Bonus: +25 Credits!');
         savePlayerData();
         updateUI();
@@ -6327,6 +6512,12 @@ function claimQuestReward(questId) {
 
         playerData.credits = credits;
         quest.completed = true;
+
+        notificationManager.push({
+            type: 'quest',
+            title: 'Quest Completed',
+            message: `${sanitizeNotificationText(quest.desc || quest.id, 'Quest')} reward: ${rewardMsg}`
+        });
 
         showAnnounce(document.getElementById('hub-announcement') || document.getElementById('wave-announce'), `Quest Complete! ${rewardMsg}`);
 
