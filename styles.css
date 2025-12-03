@@ -314,6 +314,161 @@ body.ui-locked .xp-window-controls {
     z-index: 12;
 }
 
+#notification-center.notification-stack {
+    position: absolute;
+    top: 14px;
+    right: clamp(10px, 3vw, 22px);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+    width: min(360px, 32vw);
+    max-width: 92%;
+    pointer-events: none;
+    z-index: 14;
+}
+
+.notification-toast {
+    --toast-life: 6s;
+    position: relative;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 12px;
+    background: linear-gradient(135deg, rgba(12, 18, 44, 0.94), rgba(21, 34, 70, 0.96));
+    color: var(--xp-text);
+    border: 1px solid rgba(255, 233, 171, 0.36);
+    border-radius: 12px;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45), var(--xp-glow-soft);
+    overflow: hidden;
+    pointer-events: auto;
+    max-height: 220px;
+    animation: toast-enter 220ms ease, toast-hide 260ms ease var(--toast-life) forwards;
+    backdrop-filter: blur(6px);
+}
+
+.notification-toast::before {
+    content: "";
+    position: absolute;
+    inset: -40% auto -40% 0;
+    width: 5px;
+    background: linear-gradient(180deg, #ffc06d, #84d8ff);
+    filter: drop-shadow(0 0 8px rgba(132, 216, 255, 0.35));
+}
+
+.notification-toast .toast-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: radial-gradient(circle at 30% 30%, rgba(255, 233, 171, 0.2), rgba(132, 216, 255, 0.14));
+    border: 1px solid rgba(255, 233, 171, 0.36);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffe6a7;
+    box-shadow: inset 0 0 8px rgba(255, 233, 171, 0.16);
+}
+
+.notification-toast .toast-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.notification-toast .toast-title {
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 12px;
+    color: rgba(255, 233, 171, 0.9);
+}
+
+.notification-toast .toast-message {
+    font-size: 13px;
+    color: #f4f6ff;
+    line-height: 1.35;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+}
+
+.notification-toast .toast-dismiss {
+    inline-size: 32px;
+    block-size: 32px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 233, 171, 0.3);
+    background: linear-gradient(145deg, rgba(7, 12, 28, 0.9), rgba(12, 18, 44, 0.95));
+    color: rgba(255, 233, 171, 0.9);
+    box-shadow: inset 0 0 0 1px rgba(132, 216, 255, 0.18), 0 6px 14px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+    transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+
+.notification-toast .toast-dismiss:hover,
+.notification-toast .toast-dismiss:focus-visible {
+    border-color: rgba(132, 216, 255, 0.8);
+    box-shadow: inset 0 0 0 1px rgba(132, 216, 255, 0.4), 0 10px 18px rgba(0, 0, 0, 0.5);
+    transform: translateY(-1px);
+}
+
+.notification-toast .toast-dismiss:active {
+    transform: translateY(0);
+    box-shadow: inset 0 0 0 1px rgba(255, 233, 171, 0.32), 0 3px 8px rgba(0, 0, 0, 0.4);
+}
+
+.notification-stack > .notification-toast:nth-last-of-type(n + 4) {
+    display: none;
+}
+
+.notification-toast.is-persistent {
+    animation: toast-enter 220ms ease;
+}
+
+.notification-toast.is-dismissed {
+    animation: toast-out 240ms ease forwards;
+}
+
+@keyframes toast-enter {
+    from {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes toast-hide {
+    to {
+        opacity: 0;
+        transform: translateY(-6px) scale(0.98);
+        max-height: 0;
+        margin: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        border-width: 0;
+    }
+}
+
+@keyframes toast-out {
+    to {
+        opacity: 0;
+        transform: translateY(-6px) scale(0.98);
+        max-height: 0;
+        margin: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        border-width: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .notification-toast {
+        animation: none;
+    }
+}
+
 #status-bar {
     width: 100%;
     display: flex;
@@ -2346,6 +2501,11 @@ body.controls-locked #bezel-top .xp-window-controls {
 
     #hud-bar {
         width: calc(100% - 16px);
+    }
+
+    #notification-center.notification-stack {
+        width: calc(100% - 20px);
+        right: 10px;
     }
 
     .hub-panel,
