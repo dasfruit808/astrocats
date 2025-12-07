@@ -158,26 +158,121 @@ export function validateProfileInput(body) {
     return { ok: true, profile: sanitized };
 }
 
-function sanitizeEntry(entry) {
-    if (!entry || typeof entry !== 'object') return null;
-    const publicKey = typeof entry.publicKey === 'string' && entry.publicKey.trim()
-        ? entry.publicKey.trim()
+const LEADERBOARD_LIMITS = {
+    maxLevel: 500,
+    maxBestScore: 1_000_000_000,
+    maxStatValue: 10_000_000,
+    maxStatEntries: 50,
+    publicKeyMaxLength: 256,
+};
+
+const rateLimitState = new Map();
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX_REQUESTS = 10;
+
+function enforceRateLimit(identifier) {
+    if (!identifier) return { allowed: true };
+
+    const now = Date.now();
+    const current = rateLimitState.get(identifier) || { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS };
+
+    if (now > current.resetAt) {
+        rateLimitState.set(identifier, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+        return { allowed: true };
+    }
+
+    if (current.count >= RATE_LIMIT_MAX_REQUESTS) {
+        return { allowed: false, resetAt: current.resetAt };
+    }
+
+    current.count += 1;
+    rateLimitState.set(identifier, current);
+    return { allowed: true };
+}
+
+function clampNumber(value, { max = Number.MAX_SAFE_INTEGER, min = 0, rejectBelowMin = false } = {}) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return null;
+    if (rejectBelowMin && parsed < min) return null;
+    return Math.min(max, Math.max(min, Math.floor(parsed)));
+}
+
+function validateLeaderboardEntry(entry) {
+    const errors = [];
+
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+        return { ok: false, errors: ['Entry payload must be an object.'] };
+    }
+
+    const sanitized = {};
+    const publicKey = typeof entry.publicKey === 'string' ? entry.publicKey.trim() : '';
+    sanitized.publicKey = publicKey
+        ? publicKey.slice(0, LEADERBOARD_LIMITS.publicKeyMaxLength)
         : 'Unknown Player';
 
-    const level = Number.isFinite(entry.level) ? Math.max(0, Math.floor(entry.level)) : 0;
-    const bestScore = Number.isFinite(entry.bestScore) ? Math.max(0, Math.floor(entry.bestScore)) : 0;
-    const stats = entry.stats && typeof entry.stats === 'object' ? { ...entry.stats } : {};
-    return { publicKey, level, bestScore, stats };
+    const level = clampNumber(entry.level, { min: 0, max: LEADERBOARD_LIMITS.maxLevel });
+    if (level === null) {
+        errors.push('level must be a finite number.');
+    } else {
+        sanitized.level = level;
+    }
+
+    const bestScore = clampNumber(entry.bestScore, { min: 0, max: LEADERBOARD_LIMITS.maxBestScore });
+    if (bestScore === null) {
+        errors.push('bestScore must be a finite number.');
+    } else {
+        sanitized.bestScore = bestScore;
+    }
+
+    if (typeof entry.stats === 'undefined') {
+        sanitized.stats = {};
+    } else if (entry.stats && typeof entry.stats === 'object' && !Array.isArray(entry.stats)) {
+        const statEntries = Object.entries(entry.stats).slice(0, LEADERBOARD_LIMITS.maxStatEntries);
+        sanitized.stats = {};
+
+        for (const [key, value] of statEntries) {
+            const statValue = clampNumber(value, {
+                min: 0,
+                max: LEADERBOARD_LIMITS.maxStatValue,
+                rejectBelowMin: true,
+            });
+            if (statValue === null) {
+                errors.push(`stats.${key} must be a non-negative finite number.`);
+                continue;
+            }
+            sanitized.stats[key] = statValue;
+        }
+    } else {
+        errors.push('stats must be an object of numeric values.');
+    }
+
+    if (errors.length) {
+        return { ok: false, errors };
+    }
+
+    return { ok: true, entry: sanitized };
+}
+
+function broadcastPayload(wss, payload) {
+    if (!wss || wss.clients.size === 0) return;
+    const message = JSON.stringify(payload);
+    wss.clients.forEach((client) => {
+        if (client.readyState === 1) {
+            client.send(message);
+        }
+    });
 }
 
 function broadcastLeaderboard(wss, snapshot) {
-    if (!wss || wss.clients.size === 0) return;
-    const payload = JSON.stringify({ type: 'leaderboard_update', entries: snapshot || [] });
-    wss.clients.forEach((client) => {
-        if (client.readyState === 1) {
-            client.send(payload);
-        }
-    });
+    broadcastPayload(wss, { type: 'leaderboard_update', entries: snapshot || [] });
+}
+
+function broadcastValidationError(wss, details) {
+    broadcastPayload(wss, { type: 'leaderboard_error', ...details });
+}
+
+export function resetAbuseControls() {
+    rateLimitState.clear();
 }
 
 app.get('/api/leaderboard/top', async (req, res) => {
@@ -187,13 +282,28 @@ app.get('/api/leaderboard/top', async (req, res) => {
 });
 
 app.post('/api/leaderboard', async (req, res) => {
-    const sanitized = sanitizeEntry(req.body);
-    if (!sanitized) {
-        res.status(400).json({ error: 'invalid_entry' });
+    const apiKey = process.env.LEADERBOARD_API_KEY;
+    if (apiKey && req.header('x-api-key') !== apiKey) {
+        broadcastValidationError(server.wss, { error: 'unauthorized' });
+        res.status(401).json({ error: 'unauthorized' });
         return;
     }
 
-    await upsertLeaderboardEntry(sanitized);
+    const rateResult = enforceRateLimit(req.ip);
+    if (!rateResult.allowed) {
+        broadcastValidationError(server.wss, { error: 'rate_limited', resetAt: rateResult.resetAt });
+        res.status(429).json({ error: 'rate_limited', resetAt: rateResult.resetAt });
+        return;
+    }
+
+    const validation = validateLeaderboardEntry(req.body);
+    if (!validation.ok) {
+        broadcastValidationError(server.wss, { error: 'invalid_entry', details: validation.errors });
+        res.status(400).json({ error: 'invalid_entry', details: validation.errors });
+        return;
+    }
+
+    await upsertLeaderboardEntry(validation.entry);
     const snapshot = getSortedLeaderboardSnapshot();
     broadcastLeaderboard(server.wss, snapshot);
     res.json({ ok: true });
@@ -234,14 +344,18 @@ app.get('/api/profile/:owner', async (req, res) => {
 await storeReady;
 
 const server = http.createServer(app);
-server.wss = new WebSocketServer({ server, path: '/api/realtime' });
-server.wss.on('connection', (socket) => {
-    socket.send(JSON.stringify({ type: 'connected' }));
-    const snapshot = getSortedLeaderboardSnapshot();
-    if (snapshot.length && socket.readyState === 1) {
-        socket.send(JSON.stringify({ type: 'leaderboard_update', entries: snapshot }));
-    }
-});
+if (process.env.NODE_ENV !== 'test') {
+    server.wss = new WebSocketServer({ server, path: '/api/realtime' });
+    server.wss.on('connection', (socket) => {
+        socket.send(JSON.stringify({ type: 'connected' }));
+        const snapshot = getSortedLeaderboardSnapshot();
+        if (snapshot.length && socket.readyState === 1) {
+            socket.send(JSON.stringify({ type: 'leaderboard_update', entries: snapshot }));
+        }
+    });
+} else {
+    server.wss = { clients: new Set() };
+}
 
 const port = process.env.PORT || 3000;
 if (process.env.NODE_ENV !== 'test') {
