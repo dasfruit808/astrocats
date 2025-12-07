@@ -159,7 +159,9 @@ let freePlaySessionActive = false;
 const notificationManager = createNotificationManager();
 
 // Wallet & Blockchain
-let walletPublicKey = null;
+// Use `var` so the binding exists immediately during module evaluation, avoiding
+// temporal dead zone errors when early UI setup checks the key state.
+var walletPublicKey = null;
 let walletProvider = null;
 let hasAstroCatNFT = false;
 let solanaConnection = null;
