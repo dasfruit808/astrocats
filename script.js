@@ -82,6 +82,7 @@ const playBtn = document.getElementById('play-btn');
 const connectBtn = document.getElementById('connect-wallet');
 const returnHubBtn = document.getElementById('return-hub');
 const walletStatusEl = document.getElementById('wallet-status');
+const nftStatusEl = document.getElementById('nft-status');
 const walletAddressEl = document.getElementById('wallet-address');
 const walletBadgeEl = document.getElementById('connected-wallet');
 const walletBadgeAddressEl = document.getElementById('connected-wallet-address');
