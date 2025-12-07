@@ -78,22 +78,17 @@ const storageWarningEl = document.getElementById('storage-warning');
 const shopEl = document.getElementById('shop');
 const shopCreditsEl = document.getElementById('shop-credits');
 const shopOptionsEl = document.getElementById('shop-options');
-const walletStatusEl = document.getElementById('wallet-status');
-const nftStatusEl = document.getElementById('nft-status');
 const playBtn = document.getElementById('play-btn');
 const connectBtn = document.getElementById('connect-wallet');
 const returnHubBtn = document.getElementById('return-hub');
 const walletAddressEl = document.getElementById('wallet-address');
 const walletBadgeEl = document.getElementById('connected-wallet');
 const walletBadgeAddressEl = document.getElementById('connected-wallet-address');
-const gamesPlayedEl = document.getElementById('games-played');
-const winsEl = document.getElementById('wins');
-const lossesEl = document.getElementById('losses');
 const bestScoreEl = document.getElementById('best-score');
 const hubCreditsEl = document.getElementById('hub-credits');
-const itemsEl = document.getElementById('items');
 const activeSpriteEl = document.getElementById('active-sprite');
-const ownedSpritesEl = document.getElementById('owned-sprites');
+const ownedSpriteListEl = document.getElementById('owned-sprite-list');
+const hubStatPointsValueEl = document.getElementById('hub-stat-points');
 const dailyQuestsEl = document.getElementById('daily-quests');
 const leaderboardEls = Array.from(document.querySelectorAll('[data-leaderboard]'));
 const waveAnnounceEl = document.getElementById('wave-announce');
@@ -115,28 +110,9 @@ const closeProfileBtn = document.getElementById('close-profile-modal');
 const cancelProfileBtn = document.getElementById('cancel-profile');
 const profileForm = document.getElementById('profile-form');
 const profileNameInput = document.getElementById('profile-name');
-const profileTitleInput = document.getElementById('profile-title');
-const profileAvatarInput = document.getElementById('profile-avatar');
-const profileBioInput = document.getElementById('profile-bio');
 const profileErrorEl = document.getElementById('profile-error');
-const profilePreviewNameEl = document.getElementById('profile-preview-name');
-const profilePreviewTitleEl = document.getElementById('profile-preview-title');
-const profilePreviewBioEl = document.getElementById('profile-preview-bio');
-const profilePreviewAvatarEl = document.getElementById('profile-preview-avatar');
-const pilotAvatarEl = document.getElementById('pilot-avatar');
 const pilotNameDisplayEl = document.getElementById('pilot-name-display');
-const pilotTitleDisplayEl = document.getElementById('pilot-title-display');
 const pilotBioDisplayEl = document.getElementById('pilot-bio-display');
-const profileTabAvatarEl = document.getElementById('profile-tab-avatar');
-const profileTabNameEl = document.getElementById('profile-tab-name');
-const profileTabTitleEl = document.getElementById('profile-tab-title');
-const profileTabBioEl = document.getElementById('profile-tab-bio');
-const pilotTitleDisplaySocialEl = document.getElementById('pilot-title-display-social');
-const pilotBioDisplaySocialEl = document.getElementById('pilot-bio-display-social');
-const pilotNameStatEl = document.getElementById('pilot-name-stat');
-const pilotTitleStatEl = document.getElementById('pilot-title-stat');
-const pilotNameStatsPanelEl = document.getElementById('pilot-name-stats-panel');
-const pilotTitleStatsPanelEl = document.getElementById('pilot-title-stats-panel');
 const windowBackToStartBtn = document.getElementById('window-back-to-start');
 const hubCloseBtn = document.getElementById('hub-close');
 const hubPlayNextBtn = document.getElementById('hub-play-next');
@@ -1449,16 +1425,9 @@ if (openProfileBtn) openProfileBtn.addEventListener('click', showProfileModal);
 if (closeProfileBtn) closeProfileBtn.addEventListener('click', hideProfileModal);
 if (cancelProfileBtn) cancelProfileBtn.addEventListener('click', hideProfileModal);
 if (profileForm) profileForm.addEventListener('submit', handleProfileFormSubmit);
-[
-    profileNameInput,
-    profileTitleInput,
-    profileAvatarInput,
-    profileBioInput
-].forEach(input => {
-    if (input) {
-        input.addEventListener('input', updateProfilePreview);
-    }
-});
+if (profileNameInput) {
+    profileNameInput.addEventListener('input', updateProfilePreview);
+}
 
 function updateDifficultyProgress(elapsedSeconds) {
     if (!gameRunning || gamePaused) return;
@@ -3597,6 +3566,39 @@ function updateGuestStatTooltip(pointsAvailableOverride) {
     }
 }
 
+function renderOwnedCrafts() {
+    if (!ownedSpriteListEl) return;
+
+    ensureSpriteProgression();
+    const fragment = document.createDocumentFragment();
+
+    playerData.ownedSprites.forEach((spriteId) => {
+        const item = document.createElement('div');
+        item.className = 'craft-item';
+
+        const name = document.createElement('span');
+        name.textContent = getSpriteDisplayName(spriteId);
+
+        const button = document.createElement('button');
+        const isActive = playerData.activeSpriteId === spriteId;
+        button.type = 'button';
+        button.textContent = isActive ? 'Active' : 'Set Active Craft';
+        button.disabled = isActive;
+        button.addEventListener('click', () => setActiveSprite(spriteId));
+
+        item.append(name, button);
+        fragment.appendChild(item);
+    });
+
+    if (!playerData.ownedSprites.length) {
+        const empty = document.createElement('p');
+        empty.textContent = 'No spacecraft unlocked yet.';
+        fragment.appendChild(empty);
+    }
+
+    ownedSpriteListEl.replaceChildren(fragment);
+}
+
 function updateHubUI() {
     // This helper MUST be defined early as it's called immediately by loadPlayerData and checkNFT
     const profile = ensurePilotProfileMetadata(playerData.profile || {});
@@ -3607,33 +3609,11 @@ function updateHubUI() {
     playerData.profile = profile;
 
     const nameText = profile.name.trim() || 'Rookie Pilot';
-    const titleText = profile.title.trim() || 'Cadet';
-    const bioText = profile.bio.trim() || 'Set your pilot bio to share your legend.';
-    const avatarCandidate = profile.avatar.trim();
-    const isAvatarValid = avatarCandidate && (/^https?:\/\//i.test(avatarCandidate) || avatarCandidate.startsWith('data:'));
-    const avatarSrc = isAvatarValid ? avatarCandidate : DEFAULT_PILOT_AVATAR;
+    const bioText = profile.bio.trim() || 'Sync your wallet to personalize your dossier.';
 
-    if (openProfileBtn) openProfileBtn.textContent = profile.name.trim() ? 'Edit Pilot' : 'Create Pilot';
+    if (openProfileBtn) openProfileBtn.textContent = profile.name.trim() ? 'Edit Pilot' : 'Set Pilot Name';
     if (pilotNameDisplayEl) pilotNameDisplayEl.textContent = nameText;
-    if (pilotTitleDisplayEl) pilotTitleDisplayEl.textContent = titleText;
-    if (pilotBioDisplayEl) pilotBioDisplayEl.textContent = summaryText;
-    if (pilotTitleDisplaySocialEl) pilotTitleDisplaySocialEl.textContent = titleText;
-    if (pilotBioDisplaySocialEl) pilotBioDisplaySocialEl.textContent = bioText;
-    if (pilotAvatarEl) {
-        pilotAvatarEl.src = avatarSrc;
-        pilotAvatarEl.alt = `${nameText} avatar`;
-    }
-    if (profileTabAvatarEl) {
-        profileTabAvatarEl.src = avatarSrc;
-        profileTabAvatarEl.alt = `${nameText} avatar`;
-    }
-    if (profileTabNameEl) profileTabNameEl.textContent = nameText;
-    if (profileTabTitleEl) profileTabTitleEl.textContent = titleText;
-    if (profileTabBioEl) profileTabBioEl.textContent = bioText;
-    if (pilotNameStatEl) pilotNameStatEl.textContent = nameText;
-    if (pilotTitleStatEl) pilotTitleStatEl.textContent = titleText;
-    if (pilotNameStatsPanelEl) pilotNameStatsPanelEl.textContent = nameText;
-    if (pilotTitleStatsPanelEl) pilotTitleStatsPanelEl.textContent = titleText;
+    if (pilotBioDisplayEl) pilotBioDisplayEl.textContent = summaryText || bioText;
 
     if (openStatAllocationBtn) {
         const numericPoints = Number(playerData.specializationPoints);
@@ -3647,6 +3627,8 @@ function updateHubUI() {
         openStatAllocationBtn.removeAttribute('aria-disabled');
 
         updateGuestStatTooltip(pointsAvailable);
+
+        if (hubStatPointsValueEl) hubStatPointsValueEl.textContent = pointsAvailable;
     }
 
     refreshStatAllocationOverlay();
@@ -3658,19 +3640,12 @@ function updateHubUI() {
     updateQuestsUI();
 
     if (!walletPublicKey) return;
-    if (gamesPlayedEl) gamesPlayedEl.textContent = playerData.gamesPlayed;
-    if (winsEl) winsEl.textContent = playerData.wins;
-    if (lossesEl) lossesEl.textContent = playerData.losses;
     if (bestScoreEl) bestScoreEl.textContent = playerData.bestScore;
     if (hubCreditsEl) hubCreditsEl.textContent = playerData.credits;
     if (statLevelHubEl) statLevelHubEl.textContent = playerData.level;
-    if (itemsEl) itemsEl.textContent = playerData.items.length ? playerData.items.join(', ') : 'None';
     ensureSpriteProgression();
+    renderOwnedCrafts();
     if (activeSpriteEl) activeSpriteEl.textContent = getSpriteDisplayName(playerData.activeSpriteId);
-    if (ownedSpritesEl) {
-        const names = playerData.ownedSprites.map(getSpriteDisplayName);
-        ownedSpritesEl.textContent = names.length ? names.join(', ') : 'None';
-    }
     credits = playerData.credits;
     updateUI();
     loadAndDisplayLeaderboard();
@@ -3818,26 +3793,12 @@ function populateProfileForm() {
     const profile = ensurePilotProfileMetadata(playerData.profile || {});
     playerData.profile = profile;
     if (profileNameInput) profileNameInput.value = profile.name;
-    if (profileTitleInput) profileTitleInput.value = profile.title;
-    if (profileAvatarInput) profileAvatarInput.value = profile.avatar;
-    if (profileBioInput) profileBioInput.value = profile.bio;
     if (profileErrorEl) profileErrorEl.textContent = '';
     updateProfilePreview();
 }
 
 function updateProfilePreview() {
-    const nameText = profileNameInput && profileNameInput.value.trim() ? profileNameInput.value.trim() : 'Rookie Pilot';
-    const titleText = profileTitleInput && profileTitleInput.value.trim() ? profileTitleInput.value.trim() : 'Cadet';
-    const bioText = profileBioInput && profileBioInput.value.trim() ? profileBioInput.value.trim() : 'Set your pilot bio to share your legend.';
-    const avatarSource = profileAvatarInput && profileAvatarInput.value.trim() ? profileAvatarInput.value.trim() : DEFAULT_PILOT_AVATAR;
-
-    if (profilePreviewNameEl) profilePreviewNameEl.textContent = nameText;
-    if (profilePreviewTitleEl) profilePreviewTitleEl.textContent = titleText;
-    if (profilePreviewBioEl) profilePreviewBioEl.textContent = bioText;
-    if (profilePreviewAvatarEl) {
-        profilePreviewAvatarEl.src = avatarSource;
-        profilePreviewAvatarEl.alt = `${nameText} avatar preview`;
-    }
+    if (profileErrorEl) profileErrorEl.textContent = '';
 }
 
 function showProfileModal() {
@@ -4314,10 +4275,7 @@ function handleProfileFormSubmit(event) {
     const previousClaimedName = normalizePilotHandle(playerData?.profile?.name);
 
     const result = createPilotProfile({
-        name: profileNameInput ? profileNameInput.value : '',
-        title: profileTitleInput ? profileTitleInput.value : '',
-        avatar: profileAvatarInput ? profileAvatarInput.value : '',
-        bio: profileBioInput ? profileBioInput.value : ''
+        name: profileNameInput ? profileNameInput.value : ''
     }, playerData, playerData.profile);
 
     if (!result.ok) {

@@ -1172,12 +1172,60 @@ button:disabled {
     color: rgba(12, 39, 96, 0.64);
 }
 
-.hub-summary {
-    flex: 1 1 320px;
+.hub-summary-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: clamp(12px, 2vh, 18px);
     align-items: stretch;
+    margin-bottom: 12px;
+}
+
+.hub-summary-card h3 {
+    margin: 0 0 8px;
+    color: var(--xp-blue-dark);
+}
+
+.hub-stat-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(12, 39, 96, 0.08);
+    font-weight: 700;
+    color: #0c2760;
+    letter-spacing: 0.01em;
+}
+
+.hub-stat-line:last-child {
+    border-bottom: none;
+}
+
+.craft-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.craft-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid rgba(12, 39, 96, 0.1);
+    border-radius: 10px;
+    background: rgba(12, 39, 96, 0.04);
+}
+
+.craft-item button {
+    white-space: nowrap;
+}
+
+.hub-secondary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px;
 }
 
 .mission-card h3 {
