@@ -1413,15 +1413,16 @@ const starField = Array.from({ length: STAR_COUNT }, () => ({
 }));
 
 // LEVELING CONSTANTS
-const BASE_XP_TO_LEVEL = 240;
+const BASE_XP_TO_LEVEL = 240 * 3; // Increased to raise level thresholds
 const XP_MULTIPLIER = 1.2;
+const XP_GAIN_RATE_DIVISOR = 3; // Reduces XP gain rate to slow progression
 const MAX_PLAYER_LEVEL = 50;
 
 const XP_CURVE_SEGMENTS = [
     { minLevel: 1, maxLevel: 10, base: BASE_XP_TO_LEVEL, growth: 1.42, bonus: 0 },
-    { minLevel: 11, maxLevel: 25, base: BASE_XP_TO_LEVEL * 7.5, growth: 1.32, bonus: 900 },
-    { minLevel: 26, maxLevel: 40, base: BASE_XP_TO_LEVEL * 16, growth: 1.36, bonus: 2200 },
-    { minLevel: 41, maxLevel: MAX_PLAYER_LEVEL, base: BASE_XP_TO_LEVEL * 30, growth: 1.45, bonus: 4500 }
+    { minLevel: 11, maxLevel: 25, base: BASE_XP_TO_LEVEL * 7.5, growth: 1.32, bonus: 900 * 3 },
+    { minLevel: 26, maxLevel: 40, base: BASE_XP_TO_LEVEL * 16, growth: 1.36, bonus: 2200 * 3 },
+    { minLevel: 41, maxLevel: MAX_PLAYER_LEVEL, base: BASE_XP_TO_LEVEL * 30, growth: 1.45, bonus: 4500 * 3 }
 ];
 
 const LEVEL_BASELINE_STATS = { strength: 3, speed: 2, vitality: 3, focus: 1 };
@@ -6088,7 +6089,7 @@ function gainXP(amount, options = {}) {
         bonusMultiplier = 1
     } = options;
 
-    let finalAmount = Math.max(0, amount);
+    let finalAmount = Math.max(0, amount) / XP_GAIN_RATE_DIVISOR;
     if (applyMultipliers && finalAmount > 0) {
         const statMultiplier = Math.max(0.1, player.xpGainMultiplier || 1);
         const perkBonus = 1 + Math.max(0, player.specialPerks?.xpBonus || 0);
