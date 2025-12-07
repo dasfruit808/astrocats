@@ -34,7 +34,8 @@ server is running to sync progress and scores through the backend.
   production (e.g., Docker bind mount or Kubernetes `PersistentVolumeClaim`) so
   `leaderboard.json` and `profiles.json` survive restarts.
 - `LEADERBOARD_MAX_ENTRIES`: Limits the number of leaderboard rows stored and
-  returned. Tune this down for memory-constrained deployments.
+  returned (default `500`, range `1-500`). Tune this down for
+  memory-constrained deployments.
 - File outputs:
   - `leaderboard.json`: Stored under `DATA_DIR`, contains the current sorted
     leaderboard state.
