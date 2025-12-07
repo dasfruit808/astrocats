@@ -170,6 +170,11 @@ const rateLimitState = new Map();
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 10;
 
+const OWNER_RULES = {
+    maxLength: 64,
+    pattern: /^[A-Za-z0-9_-]+$/,
+};
+
 function enforceRateLimit(identifier) {
     if (!identifier) return { allowed: true };
 
@@ -195,6 +200,23 @@ function clampNumber(value, { max = Number.MAX_SAFE_INTEGER, min = 0, rejectBelo
     if (!Number.isFinite(parsed)) return null;
     if (rejectBelowMin && parsed < min) return null;
     return Math.min(max, Math.max(min, Math.floor(parsed)));
+}
+
+function validateOwner(rawOwner) {
+    if (typeof rawOwner !== 'string') {
+        return { ok: false, error: 'owner_required' };
+    }
+    const owner = rawOwner.trim();
+    if (!owner) {
+        return { ok: false, error: 'owner_required' };
+    }
+    if (owner.length > OWNER_RULES.maxLength) {
+        return { ok: false, error: 'owner_too_long' };
+    }
+    if (!OWNER_RULES.pattern.test(owner)) {
+        return { ok: false, error: 'owner_invalid_chars' };
+    }
+    return { ok: true, owner };
 }
 
 function validateLeaderboardEntry(entry) {
@@ -310,11 +332,12 @@ app.post('/api/leaderboard', async (req, res) => {
 });
 
 app.put('/api/profile/:owner', async (req, res) => {
-    const owner = req.params.owner;
-    if (!owner) {
-        res.status(400).json({ error: 'missing_owner' });
+    const ownerValidation = validateOwner(req.params.owner);
+    if (!ownerValidation.ok) {
+        res.status(400).json({ error: 'invalid_owner' });
         return;
     }
+    const owner = ownerValidation.owner;
 
     const validation = validateProfileInput(req.body);
     if (!validation.ok) {
@@ -327,11 +350,12 @@ app.put('/api/profile/:owner', async (req, res) => {
 });
 
 app.get('/api/profile/:owner', async (req, res) => {
-    const owner = req.params.owner;
-    if (!owner) {
-        res.status(404).json({ error: 'not_found' });
+    const ownerValidation = validateOwner(req.params.owner);
+    if (!ownerValidation.ok) {
+        res.status(400).json({ error: 'invalid_owner' });
         return;
     }
+    const owner = ownerValidation.owner;
 
     const profile = await getProfile(owner);
     if (!profile) {

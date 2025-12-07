@@ -141,3 +141,34 @@ test('rejects invalid profile payloads', async () => {
   const storedProfile = await store.getProfile('test-owner');
   assert.strictEqual(storedProfile, undefined);
 });
+
+test('rejects invalid owners for profile routes', async () => {
+  const invalidOwners = [
+    '   ',
+    'owner with spaces',
+    'owner!',
+    'a'.repeat(65),
+  ];
+
+  for (const owner of invalidOwners) {
+    const encodedOwner = encodeURIComponent(owner);
+
+    const putResponse = await apiRequest(`/api/profile/${encodedOwner}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Nova' }),
+    });
+
+    assert.strictEqual(putResponse.status, 400);
+    const putPayload = await putResponse.json();
+    assert.strictEqual(putPayload.error, 'invalid_owner');
+
+    const getResponse = await apiRequest(`/api/profile/${encodedOwner}`);
+    assert.strictEqual(getResponse.status, 400);
+    const getPayload = await getResponse.json();
+    assert.strictEqual(getPayload.error, 'invalid_owner');
+
+    const storedProfile = await store.getProfile(owner.trim());
+    assert.strictEqual(storedProfile, undefined);
+  }
+});
