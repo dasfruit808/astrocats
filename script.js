@@ -3302,6 +3302,15 @@ function isElementVisible(element) {
     return element.style ? element.style.display !== 'none' : false;
 }
 
+function updatePageScrollLock() {
+    if (!bodyEl) return;
+
+    const overlayElements = [startMenuEl, hubEl, shopEl, statAllocationEl, profileModalEl];
+    const shouldLockScroll = overlayElements.some(isElementVisible);
+
+    bodyEl.classList.toggle('scroll-locked', shouldLockScroll);
+}
+
 function handleKeyDown(event) {
     const { code } = event;
 
@@ -3690,6 +3699,8 @@ function hideAllOverlays() {
         if (statusTipEl) statusTipEl.textContent = DEFAULT_STATUS_TIP_TEXT;
     }
     if (profileErrorEl) profileErrorEl.textContent = '';
+
+    updatePageScrollLock();
 }
 
 function updateNavigationRibbon() {
@@ -3752,6 +3763,7 @@ function setUiMode(nextMode) {
             if (playBtn && playBtn.dataset.walletLocked === 'true') {
                 playBtn.disabled = false;
             }
+            updatePageScrollLock();
             break;
         case UI_MODES.HUB:
             gameRunning = false;
@@ -3764,6 +3776,7 @@ function setUiMode(nextMode) {
             updateUI();
             updateHubUI();
             loadAndDisplayLeaderboard({ force: true });
+            updatePageScrollLock();
             break;
         case UI_MODES.SHOP:
             gameRunning = false;
@@ -3776,6 +3789,7 @@ function setUiMode(nextMode) {
             renderShopOptions();
             updateUI();
             updateHubUI();
+            updatePageScrollLock();
             break;
         case UI_MODES.STAT:
             gamePaused = true;
@@ -3785,6 +3799,7 @@ function setUiMode(nextMode) {
                 activateFocusTrap(statAllocationEl, { initialFocus });
             }
             refreshStatAllocationOverlay({ forceRender: true });
+            updatePageScrollLock();
             break;
         default:
             break;
@@ -3829,6 +3844,7 @@ function showProfileModal() {
     profileModalEl.style.overflow = 'visible';
     const firstFormControl = profileForm ? profileForm.querySelector("input, select, textarea, button, [tabindex]:not([tabindex='-1'])") : null;
     activateFocusTrap(profileModalEl, { initialFocus: firstFormControl });
+    updatePageScrollLock();
 }
 
 // Queue callbacks (audio replays, particle effects, etc.) so that they execute
@@ -3965,6 +3981,7 @@ function hideProfileModal() {
     profileModalEl.style.overflow = '';
     deactivateFocusTrap(profileModalEl);
     if (profileErrorEl) profileErrorEl.textContent = '';
+    updatePageScrollLock();
 }
 
 function normalizePilotField(value) {
