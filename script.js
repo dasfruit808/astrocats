@@ -82,6 +82,7 @@ const walletStatusEl = document.getElementById('wallet-status');
 const nftStatusEl = document.getElementById('nft-status');
 const playBtn = document.getElementById('play-btn');
 const connectBtn = document.getElementById('connect-wallet');
+const returnHubBtn = document.getElementById('return-hub');
 const walletAddressEl = document.getElementById('wallet-address');
 const walletBadgeEl = document.getElementById('connected-wallet');
 const walletBadgeAddressEl = document.getElementById('connected-wallet-address');
@@ -380,6 +381,7 @@ function setNavigationUnlocked(unlocked) {
 
     const lockableButtons = [
         windowBackToStartBtn,
+        returnHubBtn,
         ...uiRibbonButtons
     ];
 
@@ -388,6 +390,8 @@ function setNavigationUnlocked(unlocked) {
         btn.disabled = !navigationUnlocked;
         btn.setAttribute('aria-disabled', navigationUnlocked ? 'false' : 'true');
     });
+
+    updateStartMenuActions();
 }
 
 setNavigationUnlocked(false);
@@ -410,6 +414,7 @@ function handleConnectButtonClick() {
 function initializeUIEvents() {
     bindButtonClick(playBtn, startFreePlaySession);
     bindButtonClick(connectBtn, handleConnectButtonClick);
+    bindButtonClick(returnHubBtn, showHub);
 
     bindButtonClick(windowBackToStartBtn, showStartMenu);
 
@@ -6557,6 +6562,26 @@ function formatWalletDisplay(key) {
     return { snippet, full: trimmed };
 }
 
+function updateStartMenuActions() {
+    const hasWallet = Boolean(walletPublicKey);
+    const canNavigate = navigationUnlocked;
+
+    if (returnHubBtn) {
+        const shouldShow = hasWallet;
+        returnHubBtn.hidden = !shouldShow;
+        returnHubBtn.setAttribute('aria-hidden', (!shouldShow).toString());
+        returnHubBtn.disabled = !shouldShow || !canNavigate;
+        returnHubBtn.setAttribute('aria-disabled', returnHubBtn.disabled ? 'true' : 'false');
+    }
+
+    if (connectBtn) {
+        const label = hasWallet ? 'Disconnect' : 'Connect Wallet';
+        if (connectBtn.textContent !== label) {
+            connectBtn.textContent = label;
+        }
+    }
+}
+
 function updateConnectedWalletDisplay(key = walletPublicKey) {
     const hasWallet = Boolean(key);
     const { snippet } = formatWalletDisplay(key || '');
@@ -6574,6 +6599,8 @@ function updateConnectedWalletDisplay(key = walletPublicKey) {
     if (walletAddressEl) {
         walletAddressEl.textContent = hasWallet ? `${key.slice(0, 8)}...` : '-';
     }
+
+    updateStartMenuActions();
 }
 
 function openPhantomInstallGuide() {
