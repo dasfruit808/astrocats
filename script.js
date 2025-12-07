@@ -4572,15 +4572,20 @@ function drawEnemy(x, y, w, h, variant = 'basic', hp = 1) {
 }
 
 function drawTail() {
-    tail.forEach((segment, index) => {
-        const alpha = (index / tail.length) * 0.8 + 0.2;
+    const visibleCount = tail.length - 1;
+    if (visibleCount <= 0) return;
+
+    for (let i = 1; i < tail.length; i++) {
+        const segment = tail[i];
+        const progress = (tail.length > 1) ? (i / (tail.length - 1)) : 0;
+        const alpha = progress * 0.8 + 0.2;
         gameCtx.save();
         gameCtx.globalAlpha = alpha;
         gameCtx.fillStyle = '#00ff00';
-        const size = player.width * (1 - index / tail.length * 0.5);
+        const size = player.width * (1 - progress * 0.5);
         gameCtx.fillRect(segment.x, segment.y, size, size);
         gameCtx.restore();
-    });
+    }
 }
 
 function drawPowerup(x, y, w, h, visuals) {
