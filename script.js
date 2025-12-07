@@ -158,6 +158,12 @@ let navigationUnlocked = false;
 let freePlaySessionActive = false;
 const notificationManager = createNotificationManager();
 
+// Wallet & Blockchain
+let walletPublicKey = null;
+let walletProvider = null;
+let hasAstroCatNFT = false;
+let solanaConnection = null;
+
 function setInterfaceLocked(isLocked) {
     if (!bodyEl) return;
     bodyEl.classList.toggle('ui-locked', Boolean(isLocked));
@@ -1027,12 +1033,6 @@ const FRAME_MS = 1000 / TARGET_FPS;
 let lastFrameTimestamp = null;
 let deltaTime = FRAME_TIME;
 let deltaMultiplier = 1;
-
-// Wallet & Blockchain
-let walletPublicKey = null;
-let walletProvider = null;
-let hasAstroCatNFT = false;
-let solanaConnection = null;
 
 const SOLANA_RPC_CONFIG_STORAGE_KEY = 'astro_invaders_rpc_config';
 // Prefer endpoints that do not require an API key and respond with CORS headers to
