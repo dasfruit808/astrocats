@@ -2915,24 +2915,21 @@ function applySpriteImage(meta) {
         });
         return;
     }
+
+    if (!playerImg || playerImg.isFallback) {
+        playerImg = null;
+        updatePlayerSpriteMetrics(null);
+    }
+
     const fallbackSrc = getSpriteFallback(meta);
-    if (fallbackSrc) {
+    if (fallbackSrc && (!cached || !cached.isFallback)) {
         const fallbackImage = new Image();
         fallbackImage.isFallback = true;
         fallbackImage.onload = () => {
             spriteImageCache[meta.id] = fallbackImage;
-            if (playerData.activeSpriteId === meta.id) {
-                playerImg = fallbackImage;
-                updatePlayerSpriteMetrics(fallbackImage);
-                updateTailLength();
-            }
         };
         fallbackImage.src = fallbackSrc;
         spriteImageCache[meta.id] = fallbackImage;
-        playerImg = fallbackImage;
-    } else {
-        playerImg = null;
-        updatePlayerSpriteMetrics(null);
     }
 
     if (meta.fileName) {
@@ -4624,6 +4621,7 @@ function drawImageOrProcedural(img, x, y, w, h, isPlayer = false, extra = {}) {
 
     const usingCustomPlayerSprite = Boolean(isPlayer && img && img.isFallback === false);
     const allowGlow = applyGlow !== undefined ? applyGlow : !usingCustomPlayerSprite;
+    const playerSpriteUnavailable = Boolean(isPlayer && (!img || img.isFallback));
 
     let glowApplied = false;
     if (glowColor && allowGlow) {
@@ -4633,6 +4631,13 @@ function drawImageOrProcedural(img, x, y, w, h, isPlayer = false, extra = {}) {
             gameCtx.shadowBlur = glowBlur;
         }
         glowApplied = true;
+    }
+
+    if (playerSpriteUnavailable) {
+        if (glowApplied) {
+            gameCtx.restore();
+        }
+        return;
     }
 
     if (img) {
