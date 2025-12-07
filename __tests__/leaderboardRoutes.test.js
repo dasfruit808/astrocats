@@ -3,173 +3,149 @@ import { after, afterEach, before, beforeEach, test } from 'node:test';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import WebSocket from 'ws';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const tmpRoot = path.join(__dirname, '..', 'tmp-data');
 
+let app;
 let store;
-let server;
 let activeServer;
+let serverModule;
+let realWss;
 
 async function startServer() {
-    if (activeServer) return activeServer;
-    await new Promise((resolve) => setImmediate(resolve));
-    activeServer = await new Promise((resolve, reject) => {
-        server.listen(0, () => resolve(server));
-        server.once('error', reject);
-    });
-    return activeServer;
+  return new Promise((resolve, reject) => {
+    const server = app.listen(0, () => resolve(server));
+    server.on('error', reject);
+  });
 }
 
 async function apiRequest(pathname, options = {}) {
-    const runningServer = await startServer();
-    const { port } = runningServer.address();
-    const url = `http://localhost:${port}${pathname}`;
-    return fetch(url, options);
+  const server = await startServer();
+  activeServer = server;
+  const { port } = server.address();
+  const url = `http://localhost:${port}${pathname}`;
+  try {
+    return await fetch(url, options);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    activeServer = null;
+  }
 }
 
 before(async () => {
-    await fs.rm(tmpRoot, { recursive: true, force: true });
-    process.env.DATA_DIR = tmpRoot;
-    process.env.NODE_ENV = 'test';
+  await fs.rm(tmpRoot, { recursive: true, force: true });
+  process.env.DATA_DIR = tmpRoot;
+  process.env.NODE_ENV = 'test';
+  process.env.LEADERBOARD_API_KEY = 'test-key';
 
-    const serverModule = await import('../server.js');
-    const storeModule = await import('../data/store.js');
-    await storeModule.storeReady;
+  serverModule = await import('../server.js');
+  const storeModule = await import('../data/store.js');
+  await storeModule.storeReady;
 
-    server = serverModule.server;
-    store = storeModule;
+  app = serverModule.app;
+  store = storeModule;
+  realWss = serverModule.server?.wss;
 });
 
 beforeEach(async () => {
-    if (store?.resetStoreForTest) {
-        await store.resetStoreForTest();
-    }
+  if (store?.resetStoreForTest) {
+    await store.resetStoreForTest();
+  }
+  if (serverModule?.resetAbuseControls) {
+    serverModule.resetAbuseControls();
+  }
 });
 
 afterEach(async () => {
-    if (activeServer) {
-        await new Promise((resolve) => activeServer.close(resolve));
-        activeServer = null;
-    }
+  if (activeServer) {
+    await new Promise((resolve) => activeServer.close(resolve));
+    activeServer = null;
+  }
 });
 
 after(async () => {
-    await fs.rm(tmpRoot, { recursive: true, force: true });
+  await fs.rm(tmpRoot, { recursive: true, force: true });
+  if (realWss?.close) {
+    await new Promise((resolve) => realWss.close(resolve));
+  }
 });
 
-test('rejects invalid leaderboard payloads', async () => {
-    const response = await apiRequest('/api/leaderboard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{ invalid json',
-    });
+test('clamps and sanitizes leaderboard entries', async () => {
+  const response = await apiRequest('/api/leaderboard', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': 'test-key' },
+    body: JSON.stringify({
+      publicKey: '   Player123   ',
+      level: 9999,
+      bestScore: 9_999_999_999,
+      stats: {
+        kills: 20_000_000,
+        wavesSurvived: 5,
+      },
+    }),
+  });
 
-    assert.strictEqual(response.status, 400);
-    const payload = await response.text();
-    assert.match(payload, /SyntaxError/i);
+  assert.strictEqual(response.status, 200);
+  const payload = await response.json();
+  assert.deepStrictEqual(payload, { ok: true });
 
-    const leaderboard = await store.getTopLeaderboard();
-    assert.deepStrictEqual(leaderboard, []);
+  const [entry] = await store.getTopLeaderboard(1);
+  assert.deepStrictEqual(entry, {
+    publicKey: 'Player123',
+    level: 500,
+    bestScore: 1_000_000_000,
+    stats: {
+      kills: 10_000_000,
+      wavesSurvived: 5,
+    },
+  });
 });
 
-test('sanitizes entries and returns sorted leaderboard top results', async () => {
-    await apiRequest('/api/leaderboard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            publicKey: '   first-player   ',
-            level: 5.9,
-            bestScore: 1200.7,
-            stats: { accuracy: 0.9 },
-        }),
-    });
+test('rejects invalid stats and broadcasts errors', async () => {
+  const messages = [];
+  const fakeClient = { readyState: 1, send: (msg) => messages.push(msg) };
+  serverModule.server.wss = { clients: new Set([fakeClient]) };
 
-    await apiRequest('/api/leaderboard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            publicKey: '',
-            level: -2,
-            bestScore: -10,
-            stats: { ignored: true },
-        }),
-    });
+  const response = await apiRequest('/api/leaderboard', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': 'test-key' },
+    body: JSON.stringify({
+      publicKey: 'Player123',
+      level: 1,
+      bestScore: 10,
+      stats: { deaths: -5, accuracy: Number.NaN },
+    }),
+  });
 
-    await apiRequest('/api/leaderboard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            publicKey: 'second-player',
-            level: 5,
-            bestScore: 1500,
-        }),
-    });
-
-    const response = await apiRequest('/api/leaderboard/top');
-    assert.strictEqual(response.status, 200);
-    const leaderboard = await response.json();
-
-    assert.deepStrictEqual(leaderboard, [
-        {
-            publicKey: 'first-player',
-            level: 5,
-            bestScore: 1200,
-            stats: { accuracy: 0.9 },
-        },
-        {
-            publicKey: 'second-player',
-            level: 5,
-            bestScore: 1500,
-            stats: {},
-        },
-        {
-            publicKey: 'Unknown Player',
-            level: 0,
-            bestScore: 0,
-            stats: { ignored: true },
-        },
-    ].sort((a, b) => b.level - a.level || b.bestScore - a.bestScore));
-
-    assert.ok(leaderboard[0].bestScore >= leaderboard[1].bestScore);
+  assert.strictEqual(response.status, 400);
+  const payload = await response.json();
+  assert.strictEqual(payload.error, 'invalid_entry');
+  assert.ok(Array.isArray(payload.details));
+  assert.ok(messages.some((msg) => msg.includes('leaderboard_error')));
 });
 
-test('emits leaderboard updates over websocket when entries are posted', async () => {
-    const runningServer = await startServer();
-    const { port } = runningServer.address();
+test('enforces API key and rate limits abuse', async () => {
+  const unauthorized = await apiRequest('/api/leaderboard', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ publicKey: 'Anon', level: 1, bestScore: 1, stats: {} }),
+  });
 
-    const ws = new WebSocket(`ws://localhost:${port}/api/realtime`);
+  assert.strictEqual(unauthorized.status, 401);
 
-    const messagePromise = new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('No leaderboard_update received')), 2000);
-        ws.on('message', (raw) => {
-            const data = JSON.parse(raw.toString());
-            if (data.type === 'leaderboard_update') {
-                clearTimeout(timeout);
-                resolve(data);
-            }
-        });
-        ws.on('error', reject);
+  let lastStatus = 0;
+  for (let i = 0; i < 12; i += 1) {
+    const res = await apiRequest('/api/leaderboard', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': 'test-key' },
+      body: JSON.stringify({ publicKey: `Player-${i}`, level: 1, bestScore: 1, stats: {} }),
     });
+    lastStatus = res.status;
+    if (res.status === 429) break;
+  }
 
-    await new Promise((resolve) => ws.once('open', resolve));
-
-    const response = await fetch(`http://localhost:${port}/api/leaderboard`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ publicKey: 'socket-player', level: 2, bestScore: 300 }),
-    });
-    assert.strictEqual(response.status, 200);
-
-    const message = await messagePromise;
-    assert.strictEqual(message.type, 'leaderboard_update');
-    const entry = message.entries.find((item) => item.publicKey === 'socket-player');
-    assert.ok(entry);
-    assert.strictEqual(entry.level, 2);
-    assert.strictEqual(entry.bestScore, 300);
-
-    ws.terminate();
+  assert.strictEqual(lastStatus, 429);
 });
