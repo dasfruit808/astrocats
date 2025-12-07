@@ -1318,7 +1318,6 @@ function createBasePlayerData() {
             vitality: 0,
             focus: 0
         },
-        unlockedNodes: [],
         daily: {
             lastLogin: 0,
             claimedLogin: false,
@@ -1527,422 +1526,11 @@ const UPGRADE_CATALOG = Object.entries(UPGRADE_DETAILS).map(([type, detail]) => 
 
 const CORE_STATS = ['strength', 'speed', 'vitality', 'focus'];
 
-const skillTree = {
-    strength: {
-        label: 'Strength Specialization',
-        description: 'Channel raw reactor power to amplify offensive output and crushing barrages.',
-        mastery: {
-            id: 'strength_mastery',
-            name: 'Starbreaker Commander',
-            description: 'Unlock every Strength node to unleash unstoppable ordnance.',
-            bonuses: {
-                stats: { strength: 1 },
-                perks: { damageMultiplier: 0.12, critMultiplierBonus: 0.25, extraPierce: 1 }
-            }
-        },
-        nodes: [
-            {
-                id: 'strength_core',
-                name: 'Power Calibrators',
-                description: '+1 Strength and +5% weapon damage to prime heavy ordnance.',
-                cost: 1,
-                prerequisites: [],
-                bonuses: {
-                    stats: { strength: 1 },
-                    perks: { damageMultiplier: 0.05 }
-                },
-                children: [
-                    {
-                        id: 'strength_payload',
-                        name: 'Payload Magnifiers',
-                        description: '+1 Strength, +7% damage, and +5% projectile size.',
-                        cost: 2,
-                        prerequisites: ['strength_core'],
-                        bonuses: {
-                            stats: { strength: 1 },
-                            perks: { damageMultiplier: 0.07, projectileSize: 0.05 }
-                        },
-                        children: [
-                            {
-                                id: 'strength_barrage',
-                                name: 'Barrage Syncs',
-                                description: '+1 Strength, +5% damage, and +4% fire rate for concentrated volleys.',
-                                cost: 2,
-                                prerequisites: ['strength_payload'],
-                                bonuses: {
-                                    stats: { strength: 1 },
-                                    perks: { damageMultiplier: 0.05, fireRateBonus: 0.04 }
-                                },
-                                children: []
-                            },
-                            {
-                                id: 'strength_overdrive',
-                                name: 'Siege Overdrive',
-                                description: '+1 Strength, +8% weapon damage, and +1 pierce.',
-                                cost: 2,
-                                prerequisites: ['strength_payload'],
-                                bonuses: {
-                                    stats: { strength: 1 },
-                                    perks: { damageMultiplier: 0.08, extraPierce: 1 }
-                                },
-                                children: [
-                                    {
-                                        id: 'strength_armory',
-                                        name: 'Orbital Armory',
-                                        description: '+1 Strength, +10% damage, +10% projectile size, and +0.15x crit multiplier.',
-                                        cost: 3,
-                                        prerequisites: ['strength_overdrive'],
-                                        bonuses: {
-                                            stats: { strength: 1 },
-                                            perks: { damageMultiplier: 0.1, projectileSize: 0.1, critMultiplierBonus: 0.15 }
-                                        },
-                                        children: [
-                                            {
-                                                id: 'strength_plasma_forge',
-                                                name: 'Plasma Colossus',
-                                                description: '+1 Strength, +12% damage, +1 pierce, +15% projectile size, and +0.2x crit multiplier.',
-                                                cost: 3,
-                                                prerequisites: ['strength_armory'],
-                                                bonuses: {
-                                                    stats: { strength: 1 },
-                                                    perks: { projectileSize: 0.15, extraPierce: 1, damageMultiplier: 0.12, critMultiplierBonus: 0.2 }
-                                                },
-                                                children: []
-                                            }
-                                        ]
-                                    },
-                                    {
-                                        id: 'strength_warpath',
-                                        name: 'Warpath Algorithms',
-                                        description: '+1 Strength, +7% damage, +3% crit chance, and +1 pierce for elite barrages.',
-                                        cost: 3,
-                                        prerequisites: ['strength_overdrive'],
-                                        bonuses: {
-                                            stats: { strength: 1 },
-                                            perks: { damageMultiplier: 0.07, critChanceBonus: 0.03, extraPierce: 1 }
-                                        },
-                                        children: []
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            }
-        ]
-    },
-    vitality: {
-        label: 'Vitality Specialization',
-        description: 'Fortify hull plating, shields, and emergency systems for long sorties.',
-        mastery: {
-            id: 'vitality_mastery',
-            name: 'Celestial Bulwark',
-            description: 'Complete the Vitality tree to unlock elite safeguarding protocols.',
-            bonuses: {
-                stats: { vitality: 1 },
-                perks: { damageReduction: 0.12, shieldDurationBonus: 800, guardChance: 0.15 }
-            }
-        },
-        nodes: [
-            {
-                id: 'vitality_core',
-                name: 'Reinforced Bioframe',
-                description: '+1 Vitality with +250ms shield uptime and 2% mitigation.',
-                cost: 1,
-                prerequisites: [],
-                bonuses: {
-                    stats: { vitality: 1 },
-                    perks: { shieldDurationBonus: 250, damageReduction: 0.02 }
-                },
-                children: [
-                    {
-                        id: 'vitality_relay',
-                        name: 'Stability Relays',
-                        description: '+1 Vitality, +350ms shields, 4% mitigation, and 4% guard chance.',
-                        cost: 2,
-                        prerequisites: ['vitality_core'],
-                        bonuses: {
-                            stats: { vitality: 1 },
-                            perks: { shieldDurationBonus: 350, damageReduction: 0.04, guardChance: 0.04 }
-                        },
-                        children: [
-                            {
-                                id: 'vitality_bastion',
-                                name: 'Adaptive Bastion',
-                                description: '+1 Vitality, +450ms shields, 5% mitigation, and 6% guard.',
-                                cost: 2,
-                                prerequisites: ['vitality_relay'],
-                                bonuses: {
-                                    stats: { vitality: 1 },
-                                    perks: { shieldDurationBonus: 450, damageReduction: 0.05, guardChance: 0.06 }
-                                },
-                                children: [
-                                    {
-                                        id: 'vitality_phalanx',
-                                        name: 'Phalanx Projectors',
-                                        description: '+1 Vitality, +500ms shields, 6% mitigation, 8% guard, and 2% evasion.',
-                                        cost: 2,
-                                        prerequisites: ['vitality_bastion'],
-                                        bonuses: {
-                                            stats: { vitality: 1 },
-                                            perks: { shieldDurationBonus: 500, damageReduction: 0.06, guardChance: 0.08, evasionBonus: 0.02 }
-                                        },
-                                        children: [
-                                            {
-                                                id: 'vitality_safeguard',
-                                                name: 'Safeguard Nexus',
-                                                description: '+1 Vitality, +550ms shields, 7% mitigation, 10% guard, and 2% evasion.',
-                                                cost: 3,
-                                                prerequisites: ['vitality_phalanx'],
-                                                bonuses: {
-                                                    stats: { vitality: 1 },
-                                                    perks: { shieldDurationBonus: 550, damageReduction: 0.07, guardChance: 0.1, evasionBonus: 0.02 }
-                                                },
-                                                children: [
-                                                    {
-                                                        id: 'vitality_guardian',
-                                                        name: 'Guardian Ward',
-                                                        description: '+1 Vitality, +650ms shields, 8% mitigation, 12% guard, and 3% evasion.',
-                                                        cost: 3,
-                                                        prerequisites: ['vitality_safeguard'],
-                                                        bonuses: {
-                                                            stats: { vitality: 1 },
-                                                            perks: { guardChance: 0.12, damageReduction: 0.08, shieldDurationBonus: 650, evasionBonus: 0.03 }
-                                                        },
-                                                        children: []
-                                                    }
-                                                ]
-                                            }
-                                        ]
-                                    }
-                                ]
-                            },
-                            {
-                                id: 'vitality_reinforce',
-                                name: 'Bulwark Reinforcements',
-                                description: '+1 Vitality, +380ms shields, 4% mitigation, and 5% guard to steady the line.',
-                                cost: 2,
-                                prerequisites: ['vitality_relay'],
-                                bonuses: {
-                                    stats: { vitality: 1 },
-                                    perks: { shieldDurationBonus: 380, damageReduction: 0.04, guardChance: 0.05 }
-                                },
-                                children: []
-                            }
-                        ]
-                    }
-                ]
-            }
-        ]
-    },
-    speed: {
-        label: 'Speed Specialization',
-        description: 'Increase mobility, fire cadence, and dash responsiveness.',
-        mastery: {
-            id: 'speed_mastery',
-            name: 'Slipstream Virtuoso',
-            description: 'Unlock every Speed node to master evasive maneuvers.',
-            bonuses: {
-                stats: { speed: 1 },
-                perks: { movementSpeed: 0.12, fireRateBonus: 0.08, evasionBonus: 0.1, dashCooldownMultiplier: -0.2 }
-            }
-        },
-        nodes: [
-            {
-                id: 'speed_core',
-                name: 'Thruster Tuning',
-                description: '+1 Speed with +8% dash recovery, +4% movement, and +2% evasion.',
-                cost: 1,
-                prerequisites: [],
-                bonuses: {
-                    stats: { speed: 1 },
-                    perks: { dashCooldownMultiplier: -0.08, evasionBonus: 0.02, movementSpeed: 0.04 }
-                },
-                children: [
-                    {
-                        id: 'speed_vector',
-                        name: 'Vector Thrusters',
-                        description: '+1 Speed, +10% dash recovery, +5% movement, and +3% fire rate.',
-                        cost: 2,
-                        prerequisites: ['speed_core'],
-                        bonuses: {
-                            stats: { speed: 1 },
-                            perks: { dashCooldownMultiplier: -0.1, movementSpeed: 0.05, fireRateBonus: 0.03 }
-                        },
-                        children: [
-                            {
-                                id: 'speed_flux_array',
-                                name: 'Flux Arrays',
-                                description: '+1 Speed, +11% dash recovery, +6% movement, +4% fire rate, and +2% drop chance.',
-                                cost: 2,
-                                prerequisites: ['speed_vector'],
-                                bonuses: {
-                                    stats: { speed: 1 },
-                                    perks: { dashCooldownMultiplier: -0.11, movementSpeed: 0.06, fireRateBonus: 0.04, dropChanceBonus: 0.02 }
-                                },
-                                children: [
-                                    {
-                                        id: 'speed_precision',
-                                        name: 'Precision Circuits',
-                                        description: '+1 Speed, +13% dash recovery, +7% movement, +6% fire rate, and +2% crit chance.',
-                                        cost: 3,
-                                        prerequisites: ['speed_flux_array'],
-                                        bonuses: {
-                                            stats: { speed: 1 },
-                                            perks: { dashCooldownMultiplier: -0.13, movementSpeed: 0.07, fireRateBonus: 0.06, critChanceBonus: 0.02 }
-                                        },
-                                        children: []
-                                    }
-                                ]
-                            },
-                            {
-                                id: 'speed_afterburn',
-                                name: 'Afterburn Channels',
-                                description: '+1 Speed, +12% dash recovery, +7% movement, and +5% fire rate.',
-                                cost: 2,
-                                prerequisites: ['speed_vector'],
-                                bonuses: {
-                                    stats: { speed: 1 },
-                                    perks: { fireRateBonus: 0.05, dashCooldownMultiplier: -0.12, movementSpeed: 0.07, evasionBonus: 0.03 }
-                                },
-                                children: [
-                                    {
-                                        id: 'speed_hyperflux',
-                                        name: 'Hyperflux Drives',
-                                        description: '+1 Speed, +15% dash recovery, +8% movement, +6% fire rate, and +4% evasion.',
-                                        cost: 3,
-                                        prerequisites: ['speed_afterburn'],
-                                        bonuses: {
-                                            stats: { speed: 1 },
-                                            perks: { fireRateBonus: 0.06, dashCooldownMultiplier: -0.15, movementSpeed: 0.08, evasionBonus: 0.04 }
-                                        },
-                                        children: [
-                                            {
-                                                id: 'speed_slipstream',
-                                                name: 'Quantum Slipstream',
-                                                description: '+1 Speed, +18% dash recovery, +10% movement, +8% fire rate, and +5% evasion.',
-                                                cost: 3,
-                                                prerequisites: ['speed_hyperflux'],
-                                                bonuses: {
-                                                    stats: { speed: 1 },
-                                                    perks: { fireRateBonus: 0.08, dashCooldownMultiplier: -0.18, movementSpeed: 0.1, evasionBonus: 0.05 }
-                                                },
-                                                children: []
-                                            }
-                                        ]
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            }
-        ]
-    },
-    focus: {
-        label: 'Focus Specialization',
-        description: 'Maximize crits, loot drops, and cosmic prosperity.',
-        mastery: {
-            id: 'focus_mastery',
-            name: 'Fate Weaver',
-            description: 'Master Focus to bend probability to your will.',
-            bonuses: {
-                stats: { focus: 1 },
-                perks: { critChanceBonus: 0.06, xpBonus: 0.08, creditBonus: 0.08, dropChanceBonus: 0.08 }
-            }
-        },
-        nodes: [
-            {
-                id: 'focus_core',
-                name: 'Lucky Glyphs',
-                description: '+1 Focus, +2% crit chance, and +2% drop rate.',
-                cost: 1,
-                prerequisites: [],
-                bonuses: {
-                    stats: { focus: 1 },
-                    perks: { critChanceBonus: 0.02, dropChanceBonus: 0.02 }
-                },
-                children: [
-                    {
-                        id: 'focus_resonance',
-                        name: 'Resonance Arrays',
-                        description: '+1 Focus, +2.5% crit chance, and +2% XP/Credit gain.',
-                        cost: 2,
-                        prerequisites: ['focus_core'],
-                        bonuses: {
-                            stats: { focus: 1 },
-                            perks: { critChanceBonus: 0.025, xpBonus: 0.02, creditBonus: 0.02 }
-                        },
-                        children: [
-                            {
-                                id: 'focus_clairvoyance',
-                                name: 'Clairvoyance Lattice',
-                                description: '+1 Focus, +3% crit, +3% drop rate, and +3% XP gain.',
-                                cost: 2,
-                                prerequisites: ['focus_resonance'],
-                                bonuses: {
-                                    stats: { focus: 1 },
-                                    perks: { critChanceBonus: 0.03, dropChanceBonus: 0.03, xpBonus: 0.03 }
-                                },
-                                children: [
-                                    {
-                                        id: 'focus_hawkeye',
-                                        name: 'Hawkeye Sensors',
-                                        description: '+1 Focus, +3.5% crit, +3% XP/Credit gain, and +2% drop rate.',
-                                        cost: 2,
-                                        prerequisites: ['focus_clairvoyance'],
-                                        bonuses: {
-                                            stats: { focus: 1 },
-                                            perks: { critChanceBonus: 0.035, xpBonus: 0.03, creditBonus: 0.03, dropChanceBonus: 0.02 }
-                                        },
-                                        children: [
-                                            {
-                                                id: 'focus_diviner',
-                                                name: 'Diviner Array',
-                                                description: '+1 Focus, +4% crit, +4% XP/Credit, and +3% drop rate.',
-                                                cost: 3,
-                                                prerequisites: ['focus_hawkeye'],
-                                                bonuses: {
-                                                    stats: { focus: 1 },
-                                                    perks: { critChanceBonus: 0.04, xpBonus: 0.04, creditBonus: 0.04, dropChanceBonus: 0.03 }
-                                                },
-                                                children: [
-                                                    {
-                                                        id: 'focus_destiny',
-                                                        name: 'Destiny Engine',
-                                                        description: '+1 Focus, +4.5% crit, +5% XP/Credit, +4% drop rate, and +2% credit windfall.',
-                                                        cost: 3,
-                                                        prerequisites: ['focus_diviner'],
-                                                        bonuses: {
-                                                            stats: { focus: 1 },
-                                                            perks: { critChanceBonus: 0.045, dropChanceBonus: 0.04, xpBonus: 0.05, creditBonus: 0.05 }
-                                                        },
-                                                        children: []
-                                                    }
-                                                ]
-                                            }
-                                        ]
-                                    }
-                                ]
-                            },
-                            {
-                                id: 'focus_windfall',
-                                name: 'Windfall Calculators',
-                                description: '+1 Focus, +2% XP gain, +4% credits, and +2% drop rate.',
-                                cost: 2,
-                                prerequisites: ['focus_resonance'],
-                                bonuses: {
-                                    stats: { focus: 1 },
-                                    perks: { xpBonus: 0.02, creditBonus: 0.04, dropChanceBonus: 0.02 }
-                                },
-                                children: []
-                            }
-                        ]
-                    }
-                ]
-            }
-        ]
-    }
+const CORE_STAT_DESCRIPTIONS = {
+    strength: 'Amplifies weapon damage and projectile potency.',
+    speed: 'Improves movement, dash handling, and evasion.',
+    vitality: 'Bolsters shields, mitigation, and survivability.',
+    focus: 'Enhances criticals, rewards, and drop consistency.'
 };
 
 const LEGACY_STAT_KEY_MAP = {
@@ -1952,56 +1540,8 @@ const LEGACY_STAT_KEY_MAP = {
     luck: 'focus'
 };
 
-const LEGACY_NODE_ID_MAP = {
-    attack_mastery: 'strength_mastery',
-    attack_core: 'strength_core',
-    attack_overdrive: 'strength_overdrive',
-    attack_plasma_forge: 'strength_plasma_forge',
-    defense_mastery: 'vitality_mastery',
-    defense_core: 'vitality_core',
-    defense_barrier: 'vitality_bastion',
-    defense_guardian: 'vitality_guardian',
-    agility_mastery: 'speed_mastery',
-    agility_core: 'speed_core',
-    agility_afterburn: 'speed_afterburn',
-    agility_quantum: 'speed_slipstream',
-    luck_mastery: 'focus_mastery',
-    luck_core: 'focus_core',
-    luck_hawkeye: 'focus_hawkeye',
-    luck_destiny: 'focus_destiny'
-};
-
-const skillNodeIndex = {};
-const branchNodeIds = {};
-
-function registerSkillNode(node, branchKey, parentId = null) {
-    const normalizedNode = node;
-    if (!Array.isArray(normalizedNode.prerequisites)) {
-        normalizedNode.prerequisites = [];
-    }
-    if (parentId && !normalizedNode.prerequisites.includes(parentId)) {
-        normalizedNode.prerequisites = [...normalizedNode.prerequisites, parentId];
-    }
-    normalizedNode.branch = branchKey;
-    normalizedNode.children = Array.isArray(normalizedNode.children) ? normalizedNode.children : [];
-    normalizedNode.cost = typeof normalizedNode.cost === 'number' ? normalizedNode.cost : 1;
-    skillNodeIndex[normalizedNode.id] = normalizedNode;
-    if (!branchNodeIds[branchKey]) {
-        branchNodeIds[branchKey] = [];
-    }
-    if (!branchNodeIds[branchKey].includes(normalizedNode.id)) {
-        branchNodeIds[branchKey].push(normalizedNode.id);
-    }
-    normalizedNode.children.forEach(child => registerSkillNode(child, branchKey, normalizedNode.id));
-}
-
-Object.entries(skillTree).forEach(([branchKey, branch]) => {
-    (branch.nodes || []).forEach(node => registerSkillNode(node, branchKey));
-});
-
 let cachedTotalStats = CORE_STATS.reduce((acc, key) => ({ ...acc, [key]: 0 }), {});
 let cachedPerks = {};
-let cachedMasteries = {};
 let cachedLevelBaseStats = CORE_STATS.reduce((acc, key) => ({ ...acc, [key]: LEVEL_BASELINE_STATS[key] || 0 }), {});
 
 const STAT_DISPLAY_NAMES = {
@@ -2154,80 +1694,24 @@ function getBaseStatsForLevel(level) {
 }
 
 function recomputeSpecializationTotals() {
+    const levelBaseSnapshot = getBaseStatsForLevel(playerData?.level || 1);
     const totals = CORE_STATS.reduce((acc, key) => {
-        const baseInvested = playerData?.stats?.[key] || 0;
-        const levelBase = getBaseStatsForLevel(playerData?.level || 1)[key] || 0;
-        acc[key] = baseInvested + levelBase;
+        const invested = playerData?.stats?.[key] || 0;
+        const combined = invested + (levelBaseSnapshot[key] || 0);
+        const cap = STAT_SOFT_CAPS[key];
+        if (cap && combined > cap) {
+            const overflow = combined - cap;
+            acc[key] = cap + Math.sqrt(Math.max(0, overflow));
+        } else {
+            acc[key] = combined;
+        }
         return acc;
     }, {});
 
-    const perks = {};
-    const unlocked = Array.isArray(playerData?.unlockedNodes) ? playerData.unlockedNodes : [];
-
-    const levelBaseSnapshot = getBaseStatsForLevel(playerData?.level || 1);
-
-    unlocked.forEach(nodeId => {
-        const node = skillNodeIndex[nodeId];
-        if (!node || !node.bonuses) return;
-        if (node.bonuses.stats) {
-            Object.entries(node.bonuses.stats).forEach(([key, value]) => {
-                if (!CORE_STATS.includes(key)) return;
-                totals[key] = (totals[key] || 0) + value;
-            });
-        }
-        if (node.bonuses.perks) {
-            Object.entries(node.bonuses.perks).forEach(([key, value]) => {
-                if (typeof value === 'number') {
-                    perks[key] = (perks[key] || 0) + value;
-                }
-            });
-        }
-    });
-
-    const masteries = {};
-    Object.entries(skillTree).forEach(([branchKey, branch]) => {
-        if (!branch) return;
-        const nodeIds = branchNodeIds[branchKey] || [];
-        if (!nodeIds.length) {
-            masteries[branchKey] = false;
-            return;
-        }
-
-        const unlockedCount = nodeIds.filter(id => unlocked.includes(id)).length;
-        const required = branch.mastery?.requiredUnlocked || nodeIds.length;
-        const hasMastery = unlockedCount >= required;
-        masteries[branchKey] = hasMastery;
-
-        if (hasMastery && branch.mastery?.bonuses) {
-            if (branch.mastery.bonuses.stats) {
-                Object.entries(branch.mastery.bonuses.stats).forEach(([stat, value]) => {
-                    if (!CORE_STATS.includes(stat)) return;
-                    totals[stat] = (totals[stat] || 0) + value;
-                });
-            }
-            if (branch.mastery.bonuses.perks) {
-                Object.entries(branch.mastery.bonuses.perks).forEach(([key, value]) => {
-                    if (typeof value === 'number') {
-                        perks[key] = (perks[key] || 0) + value;
-                    }
-                });
-            }
-        }
-    });
-
-    Object.entries(STAT_SOFT_CAPS).forEach(([stat, cap]) => {
-        const current = totals[stat] || 0;
-        if (current > cap) {
-            const overflow = current - cap;
-            totals[stat] = cap + Math.sqrt(Math.max(0, overflow));
-        }
-    });
-
     cachedTotalStats = totals;
-    cachedPerks = perks;
-    cachedMasteries = masteries;
+    cachedPerks = {};
     cachedLevelBaseStats = levelBaseSnapshot;
-    return { totals, perks, masteries, levelBase: levelBaseSnapshot };
+    return { totals, perks: cachedPerks, masteries: {}, levelBase: levelBaseSnapshot };
 }
 
 function getTotalStats() {
@@ -2239,43 +1723,35 @@ function getSpecializationPerks() {
 }
 
 function getActiveMasteries() {
-    return { ...cachedMasteries };
+    return {};
 }
 
 function getCachedLevelBaseStats() {
     return { ...cachedLevelBaseStats };
 }
 
-function isNodeUnlocked(nodeId) {
-    return Array.isArray(playerData?.unlockedNodes) && playerData.unlockedNodes.includes(nodeId);
+function getAvailableStatPoints() {
+    const numericPoints = Number(playerData?.specializationPoints);
+    return Number.isFinite(numericPoints) ? Math.max(0, Math.floor(numericPoints)) : 0;
 }
 
-function prerequisitesMet(node) {
-    if (!node) return false;
-    const prereqs = Array.isArray(node.prerequisites) ? node.prerequisites : [];
-    return prereqs.every(prereqId => isNodeUnlocked(prereqId));
-}
+function allocateStatPoint(statKey) {
+    if (!CORE_STATS.includes(statKey)) return;
+    const available = getAvailableStatPoints();
+    if (available <= 0) return;
 
-function canUnlockNode(node) {
-    if (!node || isNodeUnlocked(node.id)) return false;
-    const cost = node.cost ?? 1;
-    const hasPoints = typeof playerData?.specializationPoints === 'number' && playerData.specializationPoints >= cost;
-    return hasPoints && prerequisitesMet(node);
-}
-
-function unlockSpecializationNode(nodeId) {
-    const node = skillNodeIndex[nodeId];
-    if (!node || !canUnlockNode(node)) return;
-
-    playerData.specializationPoints -= node.cost;
-    if (!Array.isArray(playerData.unlockedNodes)) {
-        playerData.unlockedNodes = [];
-    }
-    if (!playerData.unlockedNodes.includes(nodeId)) {
-        playerData.unlockedNodes.push(nodeId);
+    if (!playerData.stats) {
+        playerData.stats = {};
     }
 
-    notifyItemUnlock(node.name || node.id, node.description || 'New specialization unlocked.');
+    playerData.stats[statKey] = (playerData.stats[statKey] || 0) + 1;
+    playerData.specializationPoints = available - 1;
+
+    notificationManager.push({
+        type: 'stat',
+        title: 'Stat Allocated',
+        message: `+1 ${getStatLabel(statKey)} applied.`
+    });
 
     applyStatEffects();
     refreshStatAllocationOverlay({ forceRender: true });
@@ -2283,214 +1759,26 @@ function unlockSpecializationNode(nodeId) {
     savePlayerData();
 }
 
-function formatNodeBonuses(node) {
-    if (!node?.bonuses) return '';
-    return summarizeBonuses(node.bonuses).join(' • ');
-}
-
-function aggregateBranchBonuses(branchKey) {
-    const stats = {};
-    const perks = {};
-    const nodeIds = branchNodeIds[branchKey] || [];
-
-    nodeIds.forEach(nodeId => {
-        const node = skillNodeIndex[nodeId];
-        if (!node) return;
-        if (node.bonuses?.stats) {
-            Object.entries(node.bonuses.stats).forEach(([stat, value]) => {
-                if (!CORE_STATS.includes(stat) || !Number.isFinite(value)) return;
-                stats[stat] = (stats[stat] || 0) + value;
-            });
-        }
-        if (node.bonuses?.perks) {
-            Object.entries(node.bonuses.perks).forEach(([key, value]) => {
-                if (typeof value !== 'number') return;
-                perks[key] = (perks[key] || 0) + value;
-            });
-        }
-    });
-
-    return { stats, perks };
-}
-
-function ensureUnlockedPrerequisites() {
-    if (!Array.isArray(playerData?.unlockedNodes)) return;
-    const unlockedSet = new Set(playerData.unlockedNodes.filter(id => skillNodeIndex[id]));
-    let changed = true;
-
-    while (changed) {
-        changed = false;
-        Array.from(unlockedSet).forEach(nodeId => {
-            const node = skillNodeIndex[nodeId];
-            if (!node || !Array.isArray(node.prerequisites)) return;
-            node.prerequisites.forEach(prereqId => {
-                if (!prereqId || !skillNodeIndex[prereqId]) return;
-                if (!unlockedSet.has(prereqId)) {
-                    unlockedSet.add(prereqId);
-                    changed = true;
-                }
-            });
-        });
-    }
-
-    if (unlockedSet.size !== playerData.unlockedNodes.length) {
-        playerData.unlockedNodes = Array.from(unlockedSet);
-    }
-}
-
-function createSkillNodeElement(node, depth = 0) {
-    const container = document.createElement('div');
-    container.className = `skill-node depth-${depth}`;
-
-    const unlocked = isNodeUnlocked(node.id);
-    const prerequisitesSatisfied = prerequisitesMet(node);
-
-    if (unlocked) container.classList.add('unlocked');
-    if (!prerequisitesSatisfied && !unlocked) container.classList.add('locked');
-
-    const header = document.createElement('div');
-    header.className = 'skill-node-header';
-
-    const titleGroup = document.createElement('div');
-    titleGroup.className = 'skill-node-title-group';
-
-    const title = document.createElement('strong');
-    title.textContent = node.name;
-    titleGroup.appendChild(title);
-
-    const nodeMeta = document.createElement('div');
-    nodeMeta.className = 'skill-node-meta';
-
-    const cost = document.createElement('span');
-    cost.className = 'skill-node-cost';
-    cost.textContent = `Cost: ${node.cost} pt${node.cost > 1 ? 's' : ''}`;
-    nodeMeta.appendChild(cost);
-
-    const statusPill = document.createElement('span');
-    statusPill.className = `skill-node-status ${unlocked ? 'unlocked' : 'locked'}`;
-    statusPill.textContent = unlocked ? 'Unlocked' : 'Locked';
-    nodeMeta.appendChild(statusPill);
-
-    titleGroup.appendChild(nodeMeta);
-    header.appendChild(titleGroup);
-
-    const button = document.createElement('button');
-    button.textContent = unlocked ? 'Equipped' : `Unlock (-${node.cost})`;
-    button.disabled = unlocked || !canUnlockNode(node);
-    if (!unlocked) {
-        button.addEventListener('click', () => unlockSpecializationNode(node.id));
-        if (!prerequisitesSatisfied) {
-            button.title = 'Unlock prerequisite nodes first';
-        } else if ((playerData.specializationPoints || 0) < node.cost) {
-            button.title = 'Not enough specialization points';
-        }
-    } else {
-        button.title = 'Specialization unlocked';
-    }
-
-    const description = document.createElement('p');
-    description.className = 'skill-node-description';
-    description.textContent = node.description;
-
-    const bonusesText = formatNodeBonuses(node);
-    const bonusesEl = document.createElement('p');
-    bonusesEl.className = 'skill-node-bonuses';
-    bonusesEl.textContent = bonusesText;
-
-    const requirementEl = document.createElement('p');
-    requirementEl.className = 'skill-node-requirements';
-    if (node.prerequisites && node.prerequisites.length) {
-        const names = node.prerequisites
-            .map(id => skillNodeIndex[id]?.name)
-            .filter(Boolean)
-            .join(', ');
-        requirementEl.textContent = `Requires: ${names}`;
-    } else {
-        requirementEl.textContent = 'Requires: None (starting node)';
-    }
-
-    const actions = document.createElement('div');
-    actions.className = 'skill-node-actions';
-    actions.appendChild(button);
-
-    header.appendChild(actions);
-    container.appendChild(header);
-
-    const details = document.createElement('div');
-    details.className = 'skill-node-details';
-    details.appendChild(description);
-    if (bonusesText) details.appendChild(bonusesEl);
-    details.appendChild(requirementEl);
-    container.appendChild(details);
-
-    if (Array.isArray(node.children) && node.children.length) {
-        const childrenWrapper = document.createElement('div');
-        childrenWrapper.className = 'skill-node-children';
-        node.children.forEach(child => {
-            childrenWrapper.appendChild(createSkillNodeElement(child, depth + 1));
-        });
-        container.appendChild(childrenWrapper);
-    }
-
-    return container;
-}
-
-function renderSkillTree() {
-    if (!statOptionsEl && !statSummaryEl && !statMasteryListEl) return;
-
-    if (!Array.isArray(playerData.unlockedNodes)) {
-        playerData.unlockedNodes = [];
-    }
-
+function renderStatAllocation() {
     if (statOptionsEl) statOptionsEl.innerHTML = '';
     if (statSummaryEl) statSummaryEl.innerHTML = '';
     if (statMasteryListEl) statMasteryListEl.innerHTML = '';
 
-    const { totals, masteries, levelBase } = recomputeSpecializationTotals();
+    const { totals, levelBase } = recomputeSpecializationTotals();
+    const availablePoints = getAvailableStatPoints();
+
     const summaryWrapper = document.createElement('div');
     summaryWrapper.className = 'skill-summary';
 
-    const legend = document.createElement('div');
-    legend.className = 'skill-legend';
-    legend.innerHTML = `
-        <div class="skill-legend-row">
-            <span class="skill-node-status unlocked">Unlocked</span>
-            <span class="skill-node-status locked">Locked</span>
-            <span class="skill-node-cost">Cost: n pts</span>
-        </div>
-        <p class="skill-legend-copy">Spend specialization points to unlock nodes. Unlock every node within a branch to activate its Mastery bonus.</p>
-    `;
-
     CORE_STATS.forEach(key => {
         const total = totals[key] || 0;
-        const baseInvested = playerData.stats?.[key] || 0;
+        const invested = playerData.stats?.[key] || 0;
         const levelContribution = levelBase?.[key] || 0;
-        const specializationBonus = total - baseInvested - levelContribution;
         const statLine = document.createElement('div');
         statLine.className = 'skill-summary-line';
-        const breakdown = [`Invested ${formatStatValue(baseInvested)}`, `Level ${formatStatValue(levelContribution)}`];
-        if (Math.abs(specializationBonus) > 0.01) {
-            breakdown.push(`Tree ${formatStatValue(specializationBonus)}`);
-        }
-        statLine.textContent = `${STAT_DISPLAY_NAMES[key]}: ${formatStatValue(total)} (${breakdown.join(' + ')})`;
+        statLine.textContent = `${STAT_DISPLAY_NAMES[key]}: ${formatStatValue(total)} (Invested ${formatStatValue(invested)} + Level ${formatStatValue(levelContribution)})`;
         summaryWrapper.appendChild(statLine);
     });
-
-    const masterySummary = document.createElement('div');
-    masterySummary.className = 'skill-masteries';
-    const masteryBranches = Object.entries(skillTree).filter(([, branch]) => Boolean(branch.mastery));
-    const activeMasteries = masteryBranches
-        .filter(([branchKey]) => masteries?.[branchKey])
-        .map(([, branch]) => branch.mastery?.name || branch.label);
-    const masteredCount = activeMasteries.length;
-    const totalMasteries = masteryBranches.length;
-
-    if (masteredCount) {
-        masterySummary.textContent = `Masteries Active (${masteredCount}/${totalMasteries}): ${activeMasteries.join(', ')}`;
-    } else {
-        masterySummary.textContent = `Masteries are unlocked by completing a branch. 0/${totalMasteries} active so far.`;
-    }
-    summaryWrapper.appendChild(masterySummary);
 
     if (statSummaryEl) {
         statSummaryEl.appendChild(summaryWrapper);
@@ -2499,235 +1787,72 @@ function renderSkillTree() {
     }
 
     if (statOptionsEl) {
-        statOptionsEl.appendChild(legend);
+        const allocationList = document.createElement('div');
+        allocationList.className = 'skill-branch';
+
+        CORE_STATS.forEach(key => {
+            const option = document.createElement('div');
+            option.className = 'skill-node depth-0';
+
+            const header = document.createElement('div');
+            header.className = 'skill-node-header';
+
+            const titleGroup = document.createElement('div');
+            titleGroup.className = 'skill-node-title-group';
+
+            const title = document.createElement('strong');
+            title.textContent = getStatLabel(key);
+            titleGroup.appendChild(title);
+
+            const nodeMeta = document.createElement('div');
+            nodeMeta.className = 'skill-node-meta';
+
+            const investedTag = document.createElement('span');
+            investedTag.className = 'skill-node-cost';
+            investedTag.textContent = `Invested: ${formatStatValue(playerData.stats?.[key] || 0)}`;
+            nodeMeta.appendChild(investedTag);
+
+            titleGroup.appendChild(nodeMeta);
+            header.appendChild(titleGroup);
+
+            const button = document.createElement('button');
+            button.textContent = availablePoints > 0 ? 'Allocate (+1)' : 'No points available';
+            button.disabled = availablePoints <= 0;
+            button.addEventListener('click', () => allocateStatPoint(key));
+
+            const actions = document.createElement('div');
+            actions.className = 'skill-node-actions';
+            actions.appendChild(button);
+            header.appendChild(actions);
+
+            const details = document.createElement('div');
+            details.className = 'skill-node-details';
+
+            const description = document.createElement('p');
+            description.className = 'skill-node-description';
+            description.textContent = CORE_STAT_DESCRIPTIONS[key] || '';
+            details.appendChild(description);
+
+            option.appendChild(header);
+            option.appendChild(details);
+            allocationList.appendChild(option);
+        });
+
+        statOptionsEl.appendChild(allocationList);
+
+        if (availablePoints <= 0) {
+            const hint = document.createElement('p');
+            hint.className = 'skill-hint';
+            hint.textContent = 'Earn more stat points by leveling up or completing quests.';
+            statOptionsEl.appendChild(hint);
+        }
     }
-
-    const unlockedNodes = Array.isArray(playerData.unlockedNodes) ? playerData.unlockedNodes : [];
-    const masteryListFragment = document.createDocumentFragment();
-    const masteryCardFragment = document.createDocumentFragment();
-
-    Object.entries(skillTree).forEach(([branchKey, branch], branchIndex) => {
-        const branchEl = document.createElement('div');
-        branchEl.className = 'skill-branch';
-
-        const branchHeader = document.createElement('div');
-        branchHeader.className = 'skill-branch-header';
-
-        const titleGroup = document.createElement('div');
-        titleGroup.className = 'skill-branch-title-group';
-
-        const title = document.createElement('h4');
-        title.textContent = branch.label;
-        titleGroup.appendChild(title);
-
-        if (branch.description) {
-            const desc = document.createElement('p');
-            desc.className = 'skill-branch-description';
-            desc.textContent = branch.description;
-            titleGroup.appendChild(desc);
-        }
-
-        branchHeader.appendChild(titleGroup);
-        branchEl.appendChild(branchHeader);
-
-        const branchTotals = aggregateBranchBonuses(branchKey);
-        const statSummaries = summarizeStats(branchTotals.stats);
-        const perkSummaries = summarizePerks(branchTotals.perks);
-
-        let masteryActive = false;
-        let masteryBadge;
-        let masteryProgressText = '';
-        let unlockedCount = 0;
-        let required = 0;
-
-        if (branch.mastery) {
-            const nodeIds = branchNodeIds[branchKey] || [];
-            unlockedCount = nodeIds.filter(id => unlockedNodes.includes(id)).length;
-            required = branch.mastery.requiredUnlocked || nodeIds.length;
-            masteryActive = Boolean(masteries?.[branchKey]);
-            masteryProgressText = masteryActive
-                ? `${branch.mastery.name} active`
-                : `${unlockedCount}/${required} unlocked`;
-            masteryBadge = document.createElement('span');
-            masteryBadge.className = `skill-mastery-pill ${masteryActive ? 'active' : 'inactive'}`;
-            masteryBadge.textContent = masteryActive
-                ? `Mastery Active · ${branch.mastery.name}`
-                : `Mastery Progress ${unlockedCount}/${required}`;
-            masteryBadge.title = branch.mastery.description || 'Complete this branch to activate its mastery bonus.';
-            branchHeader.appendChild(masteryBadge);
-        }
-
-        const branchOverview = document.createElement('div');
-        branchOverview.className = 'skill-branch-overview compact';
-
-        const quickMeta = document.createElement('div');
-        quickMeta.className = 'branch-quick-meta';
-
-        const progressTag = document.createElement('span');
-        progressTag.className = 'branch-pill';
-        progressTag.textContent = branch.mastery ? `Progress ${masteryProgressText}` : 'Explore to view bonuses';
-        quickMeta.appendChild(progressTag);
-
-        if (statSummaries.length) {
-            const statTag = document.createElement('span');
-            statTag.className = 'branch-pill secondary';
-            statTag.textContent = `Focus: ${statSummaries.join(', ')}`;
-            quickMeta.appendChild(statTag);
-        }
-
-        if (perkSummaries.length) {
-            const perkTag = document.createElement('span');
-            perkTag.className = 'branch-pill secondary';
-            perkTag.textContent = `Perks: ${perkSummaries.join(', ')}`;
-            quickMeta.appendChild(perkTag);
-        }
-
-        branchOverview.appendChild(quickMeta);
-
-        const focusList = document.createElement('ul');
-        focusList.className = 'branch-focus-list';
-
-        const focusLine = document.createElement('li');
-        focusLine.textContent = statSummaries.length
-            ? `Stat path: ${statSummaries.join(', ')}`
-            : 'Stat path: Balanced gains across the tree.';
-        focusList.appendChild(focusLine);
-
-        const perkLine = document.createElement('li');
-        perkLine.textContent = perkSummaries.length
-            ? `Perks unlocked as you invest: ${perkSummaries.join(', ')}`
-            : 'Perks unlock as you progress through this branch.';
-        focusList.appendChild(perkLine);
-
-        if (branch.mastery) {
-            const masteryLine = document.createElement('li');
-            masteryLine.textContent = `Mastery: ${branch.mastery.name} — ${branch.mastery.description || 'Complete the branch to unlock the bonus.'}`;
-            focusList.appendChild(masteryLine);
-        }
-
-        branchOverview.appendChild(focusList);
-        branchEl.appendChild(branchOverview);
-
-        const nodesContainer = document.createElement('div');
-        nodesContainer.className = 'skill-node-container';
-        (branch.nodes || []).forEach(node => {
-            nodesContainer.appendChild(createSkillNodeElement(node));
-        });
-
-        const toggleButton = document.createElement('button');
-        toggleButton.type = 'button';
-        toggleButton.className = 'branch-toggle';
-        toggleButton.setAttribute('aria-expanded', 'false');
-        toggleButton.textContent = 'View nodes';
-
-        const setExpanded = (expanded) => {
-            branchEl.classList.toggle('expanded', expanded);
-            nodesContainer.hidden = !expanded;
-            toggleButton.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-            toggleButton.textContent = expanded ? 'Hide nodes' : 'View nodes';
-        };
-
-        toggleButton.addEventListener('click', () => {
-            const isExpanded = branchEl.classList.contains('expanded');
-            setExpanded(!isExpanded);
-        });
-
-        const controlsBar = document.createElement('div');
-        controlsBar.className = 'branch-controls';
-        controlsBar.appendChild(toggleButton);
-        branchEl.appendChild(controlsBar);
-
-        const defaultExpanded = branchIndex === 0;
-        setExpanded(defaultExpanded);
-
-        branchEl.appendChild(nodesContainer);
-        if (branch.mastery) {
-            const masteryInfo = document.createElement('p');
-            masteryInfo.className = `skill-branch-mastery ${masteryActive ? 'active' : 'inactive'}`;
-            masteryInfo.textContent = masteryActive
-                ? `Mastery Active: ${branch.mastery.name} — ${branch.mastery.description}`
-                : `Mastery: ${masteryProgressText} until ${branch.mastery.name} (${branch.mastery.description})`;
-            branchEl.appendChild(masteryInfo);
-
-            const masteryListItem = document.createElement('li');
-            masteryListItem.className = masteryInfo.className;
-            masteryListItem.textContent = masteryInfo.textContent;
-            masteryListFragment.appendChild(masteryListItem);
-
-            const masteryCard = document.createElement('article');
-            masteryCard.className = `mastery-card ${masteryActive ? 'active' : 'inactive'}`;
-
-            const cardHeader = document.createElement('div');
-            cardHeader.className = 'mastery-card-header';
-
-            const cardTitleGroup = document.createElement('div');
-            cardTitleGroup.className = 'mastery-card-title-group';
-
-            const cardTitle = document.createElement('h5');
-            cardTitle.textContent = branch.mastery.name || `${branch.label} Mastery`;
-            cardTitleGroup.appendChild(cardTitle);
-
-            const cardSubtitle = document.createElement('p');
-            cardSubtitle.className = 'mastery-card-branch';
-            cardSubtitle.textContent = `${branch.label} branch`;
-            cardTitleGroup.appendChild(cardSubtitle);
-
-            const statusBadge = document.createElement('span');
-            statusBadge.className = `mastery-card-status ${masteryActive ? 'active' : 'inactive'}`;
-            statusBadge.textContent = masteryActive ? 'Active' : 'Locked';
-
-            cardHeader.append(cardTitleGroup, statusBadge);
-
-            const progress = document.createElement('p');
-            progress.className = 'mastery-card-progress';
-            progress.textContent = masteryActive
-                ? 'All nodes unlocked—bonus active.'
-                : `Progress ${unlockedCount}/${required}: unlock all nodes in ${branch.label} to activate this mastery.`;
-
-            const bonus = document.createElement('p');
-            bonus.className = 'mastery-card-bonus';
-            bonus.textContent = branch.mastery.description || 'Complete the branch to earn its unique bonus.';
-
-            masteryCard.append(cardHeader, progress, bonus);
-            masteryCardFragment.appendChild(masteryCard);
-        }
-        if (statOptionsEl) {
-            statOptionsEl.appendChild(branchEl);
-        }
-    });
 
     if (statMasteryListEl) {
-        const masteryHeader = document.createElement('div');
-        masteryHeader.className = 'mastery-panel-header';
-        masteryHeader.innerHTML = `
-            <h3>Mastery Bonuses</h3>
-            <p class="mastery-panel-copy">Clear each branch to activate its mastery. Each mastery grants a permanent bonus for your runs.</p>
-        `;
-        statMasteryListEl.appendChild(masteryHeader);
-
-        if (masteryCardFragment.childNodes.length) {
-            const masteryGrid = document.createElement('div');
-            masteryGrid.className = 'mastery-card-grid';
-            masteryGrid.appendChild(masteryCardFragment);
-            statMasteryListEl.appendChild(masteryGrid);
-
-            const quickList = document.createElement('ul');
-            quickList.className = 'skill-branch-summary';
-            quickList.appendChild(masteryListFragment);
-            statMasteryListEl.appendChild(quickList);
-        } else {
-            const emptyState = document.createElement('p');
-            emptyState.className = 'skill-hint';
-            emptyState.textContent = 'Unlock nodes within a branch to activate its mastery bonus.';
-            statMasteryListEl.appendChild(emptyState);
-        }
-    }
-
-    if (playerData.specializationPoints <= 0 && statOptionsEl) {
-        const hint = document.createElement('p');
-        hint.className = 'skill-hint';
-        hint.textContent = 'Earn more specialization points by leveling up or completing quests to unlock additional nodes.';
-        statOptionsEl.appendChild(hint);
+        const info = document.createElement('p');
+        info.className = 'skill-hint';
+        info.textContent = 'Specialization nodes have been retired. Allocate points directly into core stats.';
+        statMasteryListEl.appendChild(info);
     }
 }
 
@@ -2736,8 +1861,7 @@ function refreshStatAllocationOverlay({ forceRender = false } = {}) {
         statLevelOverlayEl.textContent = playerData.level;
     }
 
-    const numericPoints = Number(playerData.specializationPoints);
-    const pointsAvailable = Number.isFinite(numericPoints) ? Math.max(0, Math.floor(numericPoints)) : 0;
+    const pointsAvailable = getAvailableStatPoints();
     if (statPointsEl) {
         statPointsEl.textContent = pointsAvailable;
     }
@@ -2746,7 +1870,7 @@ function refreshStatAllocationOverlay({ forceRender = false } = {}) {
 
     const overlayVisible = Boolean(statAllocationEl && statAllocationEl.style.display !== 'none');
     if (forceRender || overlayVisible) {
-        renderSkillTree();
+        renderStatAllocation();
     }
 }
 
@@ -3509,7 +2633,7 @@ function updateQuestsUI() {
         } else if (quest.reward.type === 'xpBonus') {
             rewardText = `+${quest.reward.amount} XP`;
         } else if (quest.reward.type === 'specializationPoint' || quest.reward.type === 'levelPoint') {
-            const suffix = quest.reward.amount === 1 ? 'Spec Point' : 'Spec Points';
+            const suffix = quest.reward.amount === 1 ? 'Stat Point' : 'Stat Points';
             rewardText = `+${quest.reward.amount} ${suffix}`;
         } else {
             rewardText = 'Special Reward';
@@ -3557,12 +2681,12 @@ function updateGuestStatTooltip(pointsAvailableOverride) {
 
     if (guestStorageAvailable) {
         openStatAllocationBtn.title = resolvedPoints > 0
-            ? "Allocate specialization points (progress stored locally)."
-            : "View your specialization tree (progress stored locally).";
+            ? "Allocate stat points (progress stored locally)."
+            : "View your stat allocation (progress stored locally).";
     } else {
         openStatAllocationBtn.title = resolvedPoints > 0
-            ? "Allocate specialization points (local storage unavailable; progress resets after refresh)."
-            : "View your specialization tree (local storage unavailable; progress resets after refresh).";
+            ? "Allocate stat points (local storage unavailable; progress resets after refresh)."
+            : "View your stat allocation (local storage unavailable; progress resets after refresh).";
     }
 }
 
@@ -5447,7 +4571,6 @@ function sanitizePlayerDataForChain(data) {
         currentXP: typeof data.currentXP === 'number' ? data.currentXP : base.currentXP,
         specializationPoints: typeof data.specializationPoints === 'number' ? data.specializationPoints : base.specializationPoints,
         stats: { ...base.stats, ...(data.stats || {}) },
-        unlockedNodes: Array.isArray(data.unlockedNodes) ? data.unlockedNodes.slice(0, 128) : base.unlockedNodes,
         daily: data.daily ? { ...data.daily } : base.daily,
         profile: data.profile ? { ...data.profile } : base.profile
     };
@@ -5500,7 +4623,6 @@ function toCompactSnapshot(snapshot, { allowTruncation = false } = {}) {
         xp: snapshot.currentXP,
         sp: snapshot.specializationPoints,
         st: snapshot.stats,
-        un: Array.isArray(snapshot.unlockedNodes) ? snapshot.unlockedNodes : undefined,
         d: snapshot.daily,
         p: snapshot.profile
     };
@@ -5508,7 +4630,6 @@ function toCompactSnapshot(snapshot, { allowTruncation = false } = {}) {
     if (allowTruncation) {
         compact.it = compact.it ? compact.it.slice(0, 12) : undefined;
         compact.os = compact.os ? compact.os.slice(0, 12) : undefined;
-        compact.un = compact.un ? compact.un.slice(0, 48) : undefined;
 
         if (compact.p) {
             compact.p = {
@@ -5525,7 +4646,7 @@ function toCompactSnapshot(snapshot, { allowTruncation = false } = {}) {
 function fromCompactSnapshot(payload) {
     if (!payload || typeof payload !== 'object') return payload;
 
-    if (payload.version || payload.gamesPlayed || payload.profile || payload.unlockedNodes) {
+    if (payload.version || payload.gamesPlayed || payload.profile) {
         return payload;
     }
 
@@ -5544,7 +4665,6 @@ function fromCompactSnapshot(payload) {
         currentXP: payload.xp,
         specializationPoints: payload.sp,
         stats: payload.st,
-        unlockedNodes: payload.un,
         daily: payload.d,
         profile: payload.p
     };
@@ -5850,15 +4970,6 @@ function applyPlayerDataSnapshot(loadedData) {
             delete playerData.version;
         }
 
-        const rawUnlocked = Array.isArray(loadedData.unlockedNodes)
-            ? loadedData.unlockedNodes
-            : [];
-        const normalizedUnlocked = rawUnlocked
-            .map(id => LEGACY_NODE_ID_MAP[id] || id)
-            .filter(id => skillNodeIndex[id]);
-        playerData.unlockedNodes = Array.from(new Set(normalizedUnlocked));
-        ensureUnlockedPrerequisites();
-
         const dailyFallback = base.daily;
         playerData.daily = { ...dailyFallback, ...(loadedData.daily || {}) };
         if (!Array.isArray(playerData.daily.quests) || playerData.daily.quests.length !== 3) {
@@ -5974,62 +5085,55 @@ function getXPForNextLevel(currentLevel) {
 }
 
 function applyStatEffects() {
-    const { totals, perks, masteries } = recomputeSpecializationTotals();
+    const { totals, perks } = recomputeSpecializationTotals();
 
     const speedStat = totals.speed || 0;
     const strengthStat = totals.strength || 0;
     const vitalityStat = totals.vitality || 0;
     const focusStat = totals.focus || 0;
 
-    const movementModifier = (perks.movementSpeed || 0) + (masteries.speed ? 0.12 : 0);
+    const movementModifier = perks.movementSpeed || 0;
     const baseSpeed = 6.5 + (speedStat * 0.65);
     player.baseSpeed = baseSpeed * (1 + movementModifier);
     getCurrentPlayerSpeed();
 
     const damageMultiplierBonus = 1 + (perks.damageMultiplier || 0);
-    const masteryDamageBonus = masteries.strength ? 1.12 : 1;
-    player.damageMultiplier = (1 + (strengthStat * 0.2)) * damageMultiplierBonus * masteryDamageBonus;
+    player.damageMultiplier = (1 + (strengthStat * 0.2)) * damageMultiplierBonus;
 
     player.vitalityRating = vitalityStat;
     player.focusRating = focusStat;
 
     const baseCritChance = Math.min(0.55, focusStat * 0.012);
-    const masteryCritChance = masteries.focus ? 0.06 : 0;
-    player.critChance = Math.min(0.75, baseCritChance + (perks.critChanceBonus || 0) + masteryCritChance);
+    player.critChance = Math.min(0.75, baseCritChance + (perks.critChanceBonus || 0));
 
     const baseCritMultiplier = 2.0 + (strengthStat * 0.035);
-    const masteryCritMultiplier = masteries.strength ? 0.25 : 0;
-    player.critMultiplier = baseCritMultiplier + (perks.critMultiplierBonus || 0) + masteryCritMultiplier;
+    player.critMultiplier = baseCritMultiplier + (perks.critMultiplierBonus || 0);
 
     const baseDamageReduction = Math.min(0.7, vitalityStat * 0.017);
-    const masteryDamageReduction = masteries.vitality ? 0.08 : 0;
-    const totalDamageReduction = Math.min(0.85, baseDamageReduction + (perks.damageReduction || 0) + masteryDamageReduction);
+    const totalDamageReduction = Math.min(0.85, baseDamageReduction + (perks.damageReduction || 0));
 
     const baseGuardChance = Math.min(0.35, vitalityStat * 0.012);
-    const masteryGuardBonus = masteries.vitality ? 0.15 : 0;
-    const guardChance = Math.min(0.95, baseGuardChance + (perks.guardChance || 0) + masteryGuardBonus);
+    const guardChance = Math.min(0.95, baseGuardChance + (perks.guardChance || 0));
 
-    const dashCooldownModifier = (perks.dashCooldownMultiplier || 0) + (masteries.speed ? -0.2 : 0);
-    const fireRateBonus = Math.max(0, (perks.fireRateBonus || 0) + (masteries.speed ? 0.08 : 0));
-    const projectileSize = (perks.projectileSize || 0) + (masteries.strength ? 0.08 : 0);
-    const extraPierce = Math.max(0, Math.round((perks.extraPierce || 0) + (masteries.strength ? 1 : 0)));
+    const dashCooldownModifier = perks.dashCooldownMultiplier || 0;
+    const fireRateBonus = Math.max(0, perks.fireRateBonus || 0);
+    const projectileSize = perks.projectileSize || 0;
+    const extraPierce = Math.max(0, Math.round(perks.extraPierce || 0));
 
     const baseShieldDuration = vitalityStat * 70;
-    const masteryShieldBonus = masteries.vitality ? 500 : 0;
-    const shieldDurationBonus = Math.max(0, (perks.shieldDurationBonus || 0) + baseShieldDuration + masteryShieldBonus);
+    const shieldDurationBonus = Math.max(0, (perks.shieldDurationBonus || 0) + baseShieldDuration);
 
-    const dropChanceBonus = Math.max(0, (perks.dropChanceBonus || 0) + (masteries.focus ? 0.08 : 0));
+    const dropChanceBonus = Math.max(0, perks.dropChanceBonus || 0);
     const evasionBase = Math.min(0.35, speedStat * 0.005);
-    const evasionMastery = masteries.speed ? 0.1 : 0;
-    const evasionChance = Math.min(0.5, evasionBase + (perks.evasionBonus || 0) + evasionMastery);
+    const evasionChance = Math.min(0.5, evasionBase + (perks.evasionBonus || 0));
 
     const baseXpMultiplier = Math.min(0.7, focusStat * 0.005);
-    const xpBonusPerks = Math.max(0, (perks.xpBonus || 0) + (masteries.focus ? 0.08 : 0));
+    const xpBonusPerks = Math.max(0, perks.xpBonus || 0);
     const baseCreditMultiplier = Math.min(0.5, focusStat * 0.004);
-    const creditBonusPerks = Math.max(0, (perks.creditBonus || 0) + (masteries.focus ? 0.08 : 0));
+    const creditBonusPerks = Math.max(0, perks.creditBonus || 0);
 
     const baseMaxHP = 140 + (playerData.level * 16);
-    player.maxHP = Math.floor(baseMaxHP + vitalityStat * 15 + (masteries.vitality ? 50 : 0));
+    player.maxHP = Math.floor(baseMaxHP + vitalityStat * 15);
     if (typeof player.currentHP !== 'number' || Number.isNaN(player.currentHP)) {
         player.currentHP = player.maxHP;
     } else {
@@ -6114,11 +5218,11 @@ function gainXP(amount, options = {}) {
     }
 
     if (levelsGained > 0) {
-        showAnnounce(waveAnnounceEl, `LEVEL UP! Lv.${playerData.level}! (+${levelsGained * 3} Spec Points)`);
+        showAnnounce(waveAnnounceEl, `LEVEL UP! Lv.${playerData.level}! (+${levelsGained * 3} Stat Points)`);
         notificationManager.push({
             type: 'level',
             title: 'Level Up',
-            message: `Reached Level ${playerData.level}! +${levelsGained * 3} specialization points.`
+            message: `Reached Level ${playerData.level}! +${levelsGained * 3} stat points.`
         });
         applyStatEffects();
     }
@@ -6497,7 +5601,7 @@ function claimQuestReward(questId) {
             rewardMsg = `+${gainedXP} XP`;
         } else if (quest.reward.type === 'specializationPoint' || quest.reward.type === 'levelPoint') {
             playerData.specializationPoints += quest.reward.amount;
-            const suffix = quest.reward.amount === 1 ? 'Spec Point' : 'Spec Points';
+            const suffix = quest.reward.amount === 1 ? 'Stat Point' : 'Stat Points';
             rewardMsg = `+${quest.reward.amount} ${suffix}`;
         }
 
