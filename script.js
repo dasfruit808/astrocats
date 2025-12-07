@@ -5641,8 +5641,20 @@ function formatWalletDisplay(key) {
     return { snippet, full: trimmed };
 }
 
+function getWalletPublicKeySafe() {
+    try {
+        return walletPublicKey;
+    } catch (error) {
+        if (error instanceof ReferenceError) {
+            return null;
+        }
+
+        throw error;
+    }
+}
+
 function updateStartMenuActions() {
-    const hasWallet = Boolean(walletPublicKey);
+    const hasWallet = Boolean(getWalletPublicKeySafe());
     const canNavigate = navigationUnlocked;
 
     if (returnHubBtn) {
