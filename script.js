@@ -2374,6 +2374,7 @@ function spawnProjectile(config = {}) {
         dy: config.dy || 0,
         damage: config.damage ?? 1,
         hits: config.hits ?? 1,
+        hasHit: false,
         isBeam: Boolean(config.isBeam),
         targetX: config.targetX ?? null,
         targetY: config.targetY ?? null,
@@ -6241,6 +6242,7 @@ function updateEnemies() {
         for (let e = enemies.length - 1; e >= 0 && hitsThisFrame < proj.hits; e--) {
             const enemy = enemies[e];
             if (rectOverlap(proj, enemy)) {
+                proj.hasHit = true;
                 let damage = proj.baseDamage ?? proj.damage ?? 1;
                 let isCrit = false;
 
@@ -6452,7 +6454,17 @@ function updateProjectiles() {
         if (proj.dy) {
             proj.y += proj.dy * deltaMultiplier;
         }
-        if (proj.x > gameCanvas.width || proj.hits <= 0) { projectiles.splice(i, 1); }
+        const outOfBounds = proj.x > gameCanvas.width || proj.x < -proj.width || proj.y < -proj.height || proj.y > gameCanvas.height + proj.height;
+        if (outOfBounds) {
+            if (!proj.hasHit && killStreak !== 0) {
+                killStreak = 0;
+                uiCache.combo = null;
+                lastKillTime = 0;
+            }
+            projectiles.splice(i, 1);
+            continue;
+        }
+        if (proj.hits <= 0) { projectiles.splice(i, 1); }
     }
 }
 
