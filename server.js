@@ -72,7 +72,7 @@ function sanitizeString(value, maxLength, shouldTrim = false) {
 
 function sanitizeNumber(value) {
     const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : 0;
+    return Number.isFinite(numeric) ? numeric : null;
 }
 
 function sanitizeHistory(historyEntries) {
@@ -94,7 +94,7 @@ function sanitizeHistory(historyEntries) {
         if (bio !== null) sanitized.bio = bio;
 
         const updatedAt = sanitizeNumber(entry.updatedAt);
-        if (updatedAt) sanitized.updatedAt = updatedAt;
+        if (updatedAt !== null) sanitized.updatedAt = updatedAt;
 
         return sanitized;
     });
@@ -141,7 +141,8 @@ export function validateProfileInput(body) {
                     const str = sanitizeString(value, rules.maxLength, rules.trim);
                     if (str !== null) sanitizedMetadata[field] = str;
                 } else if (rules.type === 'number') {
-                    sanitizedMetadata[field] = sanitizeNumber(value);
+                    const numericValue = sanitizeNumber(value);
+                    if (numericValue !== null) sanitizedMetadata[field] = numericValue;
                 } else if (rules.type === 'array' && Array.isArray(value)) {
                     sanitizedMetadata[field] = sanitizeHistory(value);
                 }
