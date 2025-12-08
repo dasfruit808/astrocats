@@ -516,6 +516,46 @@ body.ui-locked .xp-window-controls {
     color: #f4f6ff;
 }
 
+.combo-meter {
+    gap: 8px;
+}
+
+.combo-meter-track {
+    position: relative;
+    width: 120px;
+    height: 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 233, 171, 0.4);
+    background: rgba(7, 12, 28, 0.55);
+    overflow: hidden;
+}
+
+.combo-meter-fill {
+    position: absolute;
+    inset: 0;
+    width: 0;
+    background: linear-gradient(90deg, #7df59c 0%, #7ad6ff 50%, #ff9bd0 100%);
+    box-shadow: 0 0 8px rgba(125, 245, 156, 0.7);
+    transition: width 0.2s ease, filter 0.2s ease;
+}
+
+.combo-meter-value {
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    color: #e8f1ff;
+}
+
+.combo-meter.flash .combo-meter-fill {
+    filter: drop-shadow(0 0 8px rgba(255, 233, 171, 0.7));
+    animation: combo-flash 0.6s ease;
+}
+
+@keyframes combo-flash {
+    0% { opacity: 1; }
+    50% { opacity: 0.55; }
+    100% { opacity: 1; }
+}
+
 #dash-cooldown {
     width: 100%;
     display: flex;
@@ -1310,6 +1350,49 @@ button:disabled {
     flex-direction: column;
     gap: 10px;
     width: 100%;
+}
+
+.leaderboard-panel {
+    width: 100%;
+}
+
+.leaderboard-tabs {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.leaderboard-tabs button {
+    border: 1px solid rgba(0, 246, 255, 0.35);
+    background: rgba(7, 18, 42, 0.8);
+    color: #9defff;
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.leaderboard-tabs button[aria-selected="true"] {
+    background: linear-gradient(135deg, rgba(0, 246, 255, 0.22), rgba(125, 245, 156, 0.28));
+    color: #0b182d;
+}
+
+.leaderboard-tabs button:hover {
+    background: rgba(0, 246, 255, 0.18);
+}
+
+.event-countdown {
+    margin: 0 0 8px;
+    font-weight: 700;
+    color: #f4f6ff;
+}
+
+.hud-panels {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 12px;
+    margin: 12px 0;
 }
 
 .leaderboard-header,

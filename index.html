@@ -61,6 +61,13 @@
                         <span class="status-label">Combo</span>
                         <span class="status-value">0</span>
                     </span>
+                    <span class="status-chip combo-meter" id="combo-streak" aria-label="Streak Meter">
+                        <span class="status-label">Streak</span>
+                        <span class="combo-meter-track" aria-hidden="true">
+                            <span class="combo-meter-fill" id="combo-streak-fill"></span>
+                        </span>
+                        <span class="combo-meter-value" id="combo-streak-value">0</span>
+                    </span>
                 </div>
                 <div id="dash-cooldown" aria-live="polite">
                     <span class="status-label dash-label">Dash</span>
@@ -74,6 +81,26 @@
             <div id="controls">
                 <div>Use ← → ↑ ↓ (or WASD) to Move | Double-Tap to Dash (2s CD)</div>
                 <div>SPACE to Shoot (Hold for Charge)</div>
+            </div>
+            <div id="mission-board" class="hud-panels">
+                <div id="daily-quests" class="mission-card"></div>
+                <div id="leaderboard-panel" class="xp-window leaderboard-panel">
+                    <div class="xp-titlebar">
+                        <div class="xp-title-group">
+                            <span class="xp-title-icon">🏆</span>
+                            <span class="xp-app-name">Leaderboards</span>
+                        </div>
+                        <div class="leaderboard-tabs" role="tablist" aria-label="Leaderboard Channels">
+                            <button type="button" data-leaderboard-tab="global" aria-selected="true">Global</button>
+                            <button type="button" data-leaderboard-tab="event" aria-selected="false">Event</button>
+                        </div>
+                    </div>
+                    <div class="xp-window-content">
+                        <p id="event-countdown" class="event-countdown" aria-live="polite"></p>
+                        <div data-leaderboard="global" class="leaderboard" role="tabpanel" aria-label="Global Leaderboard"></div>
+                        <div data-leaderboard="event" class="leaderboard" role="tabpanel" aria-label="Event Leaderboard" hidden></div>
+                    </div>
+                </div>
             </div>
             <div id="touch-controls" aria-hidden="true">
                 <div class="joystick touch-haptic" id="joystick">
