@@ -1,0 +1,48 @@
+/* iOS-only touch overrides to expand hit areas on smaller screens. */
+@media (max-width: 900px) {
+  #touch-controls {
+    gap: 28px;
+    bottom: 18px;
+  }
+
+  .touch-supported #joystick {
+    width: 152px;
+    height: 152px;
+  }
+
+  .touch-supported #joystick .joystick-knob {
+    width: 72px;
+    height: 72px;
+  }
+
+  .touch-supported #fire-button {
+    width: 124px;
+    height: 124px;
+    font-size: 17px;
+    letter-spacing: 0.08em;
+  }
+}
+
+@media (max-width: 640px) {
+  #touch-controls {
+    gap: 32px;
+    bottom: 16px;
+  }
+
+  .touch-supported #joystick {
+    width: 164px;
+    height: 164px;
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.26), inset 0 2px 8px rgba(255, 255, 255, 0.7);
+  }
+
+  .touch-supported #joystick .joystick-knob {
+    width: 78px;
+    height: 78px;
+  }
+
+  .touch-supported #fire-button {
+    width: 134px;
+    height: 134px;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24), inset 0 3px 10px rgba(255, 255, 255, 0.82);
+  }
+}

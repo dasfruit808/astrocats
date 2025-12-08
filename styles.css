@@ -697,6 +697,32 @@ button:disabled {
     display: inline-flex;
 }
 
+.orientation-overlay {
+    z-index: 40;
+}
+
+.orientation-panel {
+    max-width: min(92vw, 440px);
+    text-align: center;
+    gap: 8px;
+}
+
+.onboarding-overlay {
+    z-index: 38;
+}
+
+.onboarding-tips {
+    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.onboarding-tips li {
+    font-weight: 600;
+    color: var(--xp-text);
+}
+
 .overlay,
 .shop-overlay {
     position: absolute;
