@@ -1508,6 +1508,7 @@ class WaveManager {
     advanceWave({ announce = false } = {}) {
         this.waveIndex += 1;
         this.waveConfig = this.getWaveConfig(this.waveIndex);
+        waveIndex = this.waveIndex;
         this.enemiesSpawned = 0;
         this.waveHoldSeconds = 0.9;
         this.bossSpawned = false;
@@ -3723,7 +3724,7 @@ function resumeFromIntermission() {
     if (!intermissionActive) return;
     closeIntermissionOverlay();
     waveIndex += 1;
-    startWave();
+    waveManager.start();
 }
 
 function evaluateWaveCompletion({ bossDefeated = false } = {}) {
@@ -3817,7 +3818,7 @@ function startGame(isNewSession = true) {
         playerData.gamesPlayed = (playerData.gamesPlayed || 0) + 1;
     }
 
-    startWave();
+    waveManager.start();
 
     updateUI();
     savePlayerData();
