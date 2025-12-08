@@ -61,6 +61,9 @@ const creditsValueEl = creditsEl?.querySelector('.status-value') || creditsEl;
 const livesValueEl = livesEl?.querySelector('.status-value') || livesEl;
 const levelValueEl = levelEl?.querySelector('.status-value') || levelEl;
 const comboValueEl = comboEl?.querySelector('.status-value') || comboEl;
+const comboStreakEl = document.getElementById('combo-streak');
+const comboStreakFillEl = document.getElementById('combo-streak-fill');
+const comboStreakValueEl = document.getElementById('combo-streak-value');
 const dashCooldownEl = document.getElementById('dash-cooldown');
 const dashBarEl = document.getElementById('dash-bar');
 const dashStateEl = document.getElementById('dash-state');
@@ -97,6 +100,8 @@ const ownedSpriteListEl = document.getElementById('owned-sprite-list');
 const hubStatPointsValueEl = document.getElementById('hub-stat-points');
 const dailyQuestsEl = document.getElementById('daily-quests');
 const leaderboardEls = Array.from(document.querySelectorAll('[data-leaderboard]'));
+const leaderboardTabButtons = Array.from(document.querySelectorAll('[data-leaderboard-tab]'));
+const eventCountdownEl = document.getElementById('event-countdown');
 const waveAnnounceEl = document.getElementById('wave-announce');
 const bossAnnounceEl = document.getElementById('boss-announce');
 // STAT UI ELEMENTS
@@ -323,12 +328,13 @@ function handleRealtimeNotificationPayload(payload = {}) {
 
 function handleRealtimeEventPayload(payload) {
     if (!payload?.type) return false;
-    if (payload.type === 'leaderboard_update') {
+    if (payload.type === 'leaderboard_update' || payload.type === 'event_leaderboard_update') {
+        const channel = payload.channel || (payload.type === 'event_leaderboard_update' ? 'event' : 'global');
         if (Array.isArray(payload.entries) && payload.entries.length) {
-            applyLeaderboardRealtimeUpdate(payload.entries);
+            applyLeaderboardRealtimeUpdate(payload.entries, channel);
         } else {
-            markLeaderboardDirty();
-            loadAndDisplayLeaderboard({ force: true });
+            markLeaderboardDirty(channel);
+            loadAndDisplayLeaderboard({ force: true, channel });
         }
         return true;
     }
@@ -1287,6 +1293,10 @@ function createBasePlayerData() {
         daily: {
             lastLogin: 0,
             claimedLogin: false,
+            loginStreak: 0,
+            streakRewardTier: 0,
+            activeModifierId: '',
+            lastModifierDate: 0,
             quests: createDefaultQuests()
         },
         profile: baseProfile
@@ -1342,11 +1352,45 @@ let tail = []; let particles = [];
 let chargeStartTime = 0; let isCharging = false;
 const COMBO_WINDOW = 5000; const COMBO_THRESHOLD = 3;
 let killStreak = 0; let lastKillTime = 0;
+const COMBO_STREAK_TIMEOUT = 4500;
+const COMBO_STREAK_THRESHOLDS = [10, 25, 50];
+let comboStreakCount = 0;
+let comboStreakTimer = 0;
+let comboThresholdsHit = new Set();
+let comboScoreBuff = { value: 1, expiresAt: 0 };
 let powerupTimeouts = [];
 const activeSpeedBuffs = new Map();
 let speedModifierSequence = 0;
 let screenShakeDuration = 0; let hitStopDuration = 0;
 const DAILY_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const DAILY_MODIFIERS = [
+    {
+        id: 'fast_enemies',
+        label: 'Faster Enemies',
+        description: 'Enemies move 15% faster today.',
+        effects: { enemySpeedMultiplier: 1.15 }
+    },
+    {
+        id: 'limited_ammo',
+        label: 'Limited Ammo',
+        description: 'Only a handful of player shots can exist at once.',
+        effects: { projectileCap: 12 }
+    },
+    {
+        id: 'bonus_credits',
+        label: 'Bonus Credits',
+        description: 'Earn extra credits and score from every takedown.',
+        effects: { scoreMultiplier: 1.2, creditMultiplier: 1.2 }
+    },
+    {
+        id: 'double_projectiles',
+        label: 'Double Projectiles',
+        description: 'Every shot spawns a partner bolt.',
+        effects: { duplicateProjectiles: true }
+    }
+];
+const DAILY_MODIFIER_DAY_KEY = 'astro_invaders_modifier_day';
+let activeDailyModifier = null;
 
 const WAVES = [
     { enemyCount: 6, pattern: 'scout', modifiers: { spawnInterval: 1.6, speedMultiplier: 0.9 } },
@@ -1363,6 +1407,7 @@ const uiCache = {
     lives: null,
     levelText: null,
     combo: null,
+    comboStreak: null,
     shopCredits: null
 };
 
@@ -1410,6 +1455,17 @@ if (profileForm) profileForm.addEventListener('submit', handleProfileFormSubmit)
 if (profileNameInput) {
     profileNameInput.addEventListener('input', updateProfilePreview);
 }
+if (leaderboardTabButtons.length) {
+    leaderboardTabButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            const targetChannel = button.dataset.leaderboardTab || 'global';
+            setActiveLeaderboardChannel(targetChannel);
+        });
+    });
+}
+updateEventCountdown();
+setActiveLeaderboardChannel('global');
+setInterval(() => updateEventCountdown(), 60000);
 
 function updateDifficultyProgress(elapsedSeconds) {
     if (!gameRunning || gamePaused) return;
@@ -2365,6 +2421,11 @@ function findNearestEnemy() {
 }
 
 function spawnProjectile(config = {}) {
+    const projectileCap = activeDailyModifier?.effects?.projectileCap;
+    if (projectileCap && projectiles.length >= projectileCap) {
+        return;
+    }
+
     const projectile = {
         x: player.x + player.width - 4,
         y: player.y + player.height / 2 - (config.height || 4) / 2,
@@ -2382,6 +2443,11 @@ function spawnProjectile(config = {}) {
         spriteKey: config.spriteKey || (config.isBeam ? 'beam' : 'bolt')
     };
     projectiles.push(projectile);
+
+    if (activeDailyModifier?.effects?.duplicateProjectiles && !config.__duplicateApplied) {
+        const duplicateConfig = { ...config, __duplicateApplied: true, dy: (config.dy || 0) + 0.5 };
+        spawnProjectile(duplicateConfig);
+    }
 }
 
 function triggerDash(directionKey) {
@@ -2662,6 +2728,86 @@ function updateStarfield() {
     });
 }
 
+function getComboScoreMultiplier(now = Date.now()) {
+    if (comboScoreBuff.expiresAt && comboScoreBuff.expiresAt > now && comboScoreBuff.value > 1) {
+        return comboScoreBuff.value;
+    }
+
+    if (comboScoreBuff.expiresAt && comboScoreBuff.expiresAt <= now) {
+        comboScoreBuff = { value: 1, expiresAt: 0 };
+    }
+    return 1;
+}
+
+function resetComboStreakMeter() {
+    comboStreakCount = 0;
+    comboStreakTimer = 0;
+    comboThresholdsHit = new Set();
+    comboScoreBuff = { value: 1, expiresAt: 0 };
+    uiCache.comboStreak = null;
+}
+
+function flashComboMeter() {
+    if (!comboStreakEl) return;
+    comboStreakEl.classList.remove('flash');
+    // force reflow to restart animation
+    void comboStreakEl.offsetWidth;
+    comboStreakEl.classList.add('flash');
+}
+
+function applyComboThresholdEffects() {
+    const now = Date.now();
+    if (comboStreakCount >= 50 && !comboThresholdsHit.has(50)) {
+        comboThresholdsHit.add(50);
+        comboScoreBuff = { value: 1.5, expiresAt: now + 8000 };
+        registerSpeedModifier(1.25, 6000, 'combo_streak_50');
+        flashComboMeter();
+        showAnnounce(waveAnnounceEl, 'Combo Surge! Massive boost engaged.');
+    } else if (comboStreakCount >= 25 && !comboThresholdsHit.has(25)) {
+        comboThresholdsHit.add(25);
+        comboScoreBuff = { value: 1.35, expiresAt: now + 7000 };
+        registerSpeedModifier(1.15, 5000, 'combo_streak_25');
+        flashComboMeter();
+        showAnnounce(waveAnnounceEl, 'Streak ignited! Speed boosted.');
+    } else if (comboStreakCount >= 10 && !comboThresholdsHit.has(10)) {
+        comboThresholdsHit.add(10);
+        comboScoreBuff = { value: 1.15, expiresAt: now + 6000 };
+        flashComboMeter();
+        showAnnounce(waveAnnounceEl, 'Combo warmed up! Bonus score active.');
+    }
+}
+
+function registerComboHit() {
+    comboStreakCount += 1;
+    comboStreakTimer = COMBO_STREAK_TIMEOUT;
+    applyComboThresholdEffects();
+}
+
+function updateComboMeterUI() {
+    if (!comboStreakEl || !comboStreakFillEl || !comboStreakValueEl) return;
+
+    if (uiCache.comboStreak !== comboStreakCount) {
+        uiCache.comboStreak = comboStreakCount;
+        comboStreakValueEl.textContent = `${comboStreakCount}`;
+
+        const maxThreshold = COMBO_STREAK_THRESHOLDS[COMBO_STREAK_THRESHOLDS.length - 1];
+        const targetThreshold = COMBO_STREAK_THRESHOLDS.find(threshold => comboStreakCount <= threshold) || maxThreshold;
+        const previousThreshold = COMBO_STREAK_THRESHOLDS.slice().reverse().find(threshold => comboStreakCount >= threshold) || 0;
+        const range = Math.max(1, targetThreshold - previousThreshold);
+        const clamped = Math.max(0, Math.min(targetThreshold, comboStreakCount));
+        const portion = (clamped - previousThreshold) / range;
+        comboStreakFillEl.style.width = `${Math.min(100, Math.max(0, portion * 100))}%`;
+    }
+}
+
+function updateComboStreakTimer(elapsedMs) {
+    if (comboStreakCount <= 0) return;
+    comboStreakTimer -= elapsedMs;
+    if (comboStreakTimer <= 0) {
+        resetComboStreakMeter();
+    }
+}
+
 function updateUI() {
     if (scoreValueEl && uiCache.score !== score) {
         uiCache.score = score;
@@ -2688,6 +2834,7 @@ function updateUI() {
         uiCache.combo = killStreak;
         comboValueEl.textContent = `x${killStreak}`;
     }
+    updateComboMeterUI();
     if (shopCreditsEl && uiCache.shopCredits !== credits) {
         uiCache.shopCredits = credits;
         shopCreditsEl.textContent = credits;
@@ -2702,6 +2849,19 @@ function updateQuestsUI() {
 
     const fragment = document.createDocumentFragment();
     fragment.appendChild(staticTitle);
+
+    const streakInfo = document.createElement('p');
+    streakInfo.className = 'status-text';
+    streakInfo.textContent = `Login Streak: ${playerData.daily.loginStreak || 0} day${(playerData.daily.loginStreak || 0) === 1 ? '' : 's'}`;
+    fragment.appendChild(streakInfo);
+
+    const activeMod = getActiveDailyModifier();
+    if (activeMod) {
+        const modEl = document.createElement('div');
+        modEl.className = 'status-text';
+        modEl.textContent = `Daily Rule: ${activeMod.label} — ${activeMod.description}`;
+        fragment.appendChild(modEl);
+    }
 
     if (!Array.isArray(playerData?.daily?.quests) || playerData.daily.quests.length === 0) {
         const emptyMessage = document.createElement('p');
@@ -3744,6 +3904,8 @@ function startGame(isNewSession = true) {
     hideOnboardingOverlay(true);
     setUiMode(UI_MODES.PLAY);
 
+    applyDailyModifierEffects();
+
     gameRunning = true;
     gamePaused = false;
     bossActive = false;
@@ -3769,6 +3931,7 @@ function startGame(isNewSession = true) {
 
     killStreak = 0;
     lastKillTime = 0;
+    resetComboStreakMeter();
     uiCache.score = null;
     uiCache.lives = null;
     uiCache.combo = null;
@@ -3845,7 +4008,8 @@ function handleGameOver() {
 
     const rewardCredits = Math.max(0, Math.floor(score / 5) + level * 10);
     const creditBonus = Math.max(0, player.specialPerks?.creditBonus || 0);
-    const creditMultiplier = Math.max(0.5, (player.creditGainMultiplier || 1) * (1 + creditBonus));
+    const dailyModifierBonus = activeDailyModifier?.effects?.creditMultiplier || 1;
+    const creditMultiplier = Math.max(0.5, (player.creditGainMultiplier || 1) * (1 + creditBonus) * dailyModifierBonus);
     const adjustedCredits = Math.max(0, Math.floor(rewardCredits * creditMultiplier));
     if (adjustedCredits > 0) {
         credits += adjustedCredits;
@@ -4178,13 +4342,26 @@ function sanitizeLeaderboardEntry(entry) {
     const level = normalizeNumber(entry.level);
     const bestScore = normalizeNumber(entry.bestScore);
     const stats = entry.stats && typeof entry.stats === 'object' ? { ...entry.stats } : {};
+    const eventId = typeof entry.eventId === 'string' ? entry.eventId : undefined;
 
-    return { publicKey, level, bestScore, stats };
+    return { publicKey, level, bestScore, stats, ...(eventId ? { eventId } : {}) };
 }
 
 const GUEST_PROFILE_STORAGE_KEY = 'astro_invaders_guest';
 const LEADERBOARD_STORAGE_KEY = 'astro_invaders_leaderboard';
+const EVENT_LEADERBOARD_STORAGE_KEY = 'astro_invaders_leaderboard_event';
 const STORAGE_WARNING_MESSAGE = 'Progress may not be saved: storage unavailable.';
+const EVENT_CONFIG = {
+    id: 'weekly_boss',
+    label: 'Weekly Boss Rush',
+    durationMs: 1000 * 60 * 60 * 24 * 7
+};
+const EVENT_EPOCH = Date.UTC(2024, 0, 1);
+let activeLeaderboardChannel = 'global';
+const leaderboardState = {
+    global: { changeToken: 0, lastFetchToken: -1, lastFetchTime: 0 },
+    event: { changeToken: 0, lastFetchToken: -1, lastFetchTime: 0 }
+};
 
 function showStorageWarning(message = STORAGE_WARNING_MESSAGE) {
     if (!storageWarningEl) return;
@@ -4197,7 +4374,33 @@ function hideStorageWarning() {
     storageWarningEl.hidden = true;
 }
 
-function readLeaderboardSafely() {
+function getCurrentEventWindow(now = Date.now()) {
+    const elapsed = Math.max(0, now - EVENT_EPOCH);
+    const cycle = Math.floor(elapsed / EVENT_CONFIG.durationMs);
+    const start = EVENT_EPOCH + cycle * EVENT_CONFIG.durationMs;
+    const end = start + EVENT_CONFIG.durationMs;
+    return { start, end, eventId: `${EVENT_CONFIG.id}_${start}` };
+}
+
+function isEventLeaderboardActive(now = Date.now()) {
+    const window = getCurrentEventWindow(now);
+    return now < window.end;
+}
+
+function updateEventCountdown(now = Date.now()) {
+    if (!eventCountdownEl) return;
+    const window = getCurrentEventWindow(now);
+    const remaining = Math.max(0, window.end - now);
+    const hours = Math.floor(remaining / (1000 * 60 * 60));
+    const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+    eventCountdownEl.textContent = `${EVENT_CONFIG.label}: ${hours}h ${minutes}m remaining`;
+}
+
+function getLeaderboardStorageKey(channel = 'global') {
+    return channel === 'event' ? EVENT_LEADERBOARD_STORAGE_KEY : LEADERBOARD_STORAGE_KEY;
+}
+
+function readLeaderboardSafely(channel = 'global') {
     if (typeof localStorage === 'undefined') {
         console.warn('Local storage is not available; leaderboard cannot be loaded.');
         showStorageWarning();
@@ -4205,7 +4408,7 @@ function readLeaderboardSafely() {
     }
 
     try {
-        const raw = localStorage.getItem(LEADERBOARD_STORAGE_KEY);
+        const raw = localStorage.getItem(getLeaderboardStorageKey(channel));
         if (!raw) return [];
         const parsed = JSON.parse(raw);
         if (!Array.isArray(parsed)) {
@@ -4223,7 +4426,7 @@ function readLeaderboardSafely() {
     }
 }
 
-function writeLeaderboardSafely(entries) {
+function writeLeaderboardSafely(entries, channel = 'global') {
     if (typeof localStorage === 'undefined') {
         console.warn('Local storage is not available; leaderboard cannot be saved.');
         showStorageWarning();
@@ -4234,7 +4437,7 @@ function writeLeaderboardSafely(entries) {
         const sanitized = Array.isArray(entries)
             ? entries.map(sanitizeLeaderboardEntry).filter(Boolean)
             : [];
-        localStorage.setItem(LEADERBOARD_STORAGE_KEY, JSON.stringify(sanitized));
+        localStorage.setItem(getLeaderboardStorageKey(channel), JSON.stringify(sanitized));
         hideStorageWarning();
         return true;
     } catch (error) {
@@ -4245,10 +4448,7 @@ function writeLeaderboardSafely(entries) {
 }
 
 const LEADERBOARD_FETCH_COOLDOWN_MS = 5000;
-let leaderboardLoadPromise = null;
-let leaderboardChangeToken = 0;
-let lastLeaderboardFetchToken = -1;
-let lastLeaderboardFetchTime = 0;
+const leaderboardLoadPromises = { global: null, event: null };
 
 function enqueueProfileSync(snapshot) {
     if (!REMOTE_PROFILE_ENDPOINT || !snapshot) return;
@@ -4309,14 +4509,35 @@ function connectRealtimeChannel() {
     }
 }
 
-function markLeaderboardDirty() {
-    leaderboardChangeToken += 1;
+function getLeaderboardContainers(channel = 'global') {
+    const targetChannel = channel || 'global';
+    return leaderboardEls.filter(el => (el.dataset?.leaderboard || 'global') === targetChannel);
 }
 
-function applyLeaderboardRealtimeUpdate(entries) {
+function markLeaderboardDirty(channel = 'global') {
+    const state = leaderboardState[channel];
+    if (!state) return;
+    state.changeToken += 1;
+}
+
+function applyLeaderboardRealtimeUpdate(entries, channel = 'global') {
     const sanitizedEntries = Array.isArray(entries)
         ? entries.map(sanitizeLeaderboardEntry).filter(Boolean)
         : [];
+
+    if (channel === 'event') {
+        const window = getCurrentEventWindow();
+        for (let i = sanitizedEntries.length - 1; i >= 0; i--) {
+            if (sanitizedEntries[i].eventId && sanitizedEntries[i].eventId !== window.eventId) {
+                sanitizedEntries.splice(i, 1);
+            } else {
+                sanitizedEntries[i].eventId = window.eventId;
+            }
+        }
+    }
+
+    const containers = getLeaderboardContainers(channel);
+    if (!containers.length) return;
 
     sanitizedEntries.sort((a, b) => {
         if (b.level !== a.level) { return b.level - a.level; }
@@ -4324,28 +4545,45 @@ function applyLeaderboardRealtimeUpdate(entries) {
     });
 
     if (sanitizedEntries.length) {
-        leaderboardEls.forEach((container) => {
+        containers.forEach((container) => {
             buildLeaderboardDisplay(container, sanitizedEntries);
         });
-        writeLeaderboardSafely(sanitizedEntries.slice(0, 10));
+        writeLeaderboardSafely(sanitizedEntries.slice(0, 10), channel);
     } else {
-        renderLeaderboardMessage('No leaderboard data yet.');
+        renderLeaderboardMessage('No leaderboard data yet.', channel);
     }
 
-    markLeaderboardDirty();
-    lastLeaderboardFetchToken = leaderboardChangeToken;
-    lastLeaderboardFetchTime = Date.now();
+    markLeaderboardDirty(channel);
+    leaderboardState[channel].lastFetchToken = leaderboardState[channel].changeToken;
+    leaderboardState[channel].lastFetchTime = Date.now();
 }
 
-function renderLeaderboardMessage(text) {
-    if (!leaderboardEls.length) return;
+function renderLeaderboardMessage(text, channel = 'global') {
+    const containers = getLeaderboardContainers(channel);
+    if (!containers.length) return;
 
-    leaderboardEls.forEach((container) => {
+    containers.forEach((container) => {
         container.innerHTML = '';
         const messageEl = document.createElement('p');
         messageEl.textContent = text;
         container.appendChild(messageEl);
     });
+}
+
+function setActiveLeaderboardChannel(channel = 'global') {
+    activeLeaderboardChannel = channel;
+    leaderboardTabButtons.forEach((btn) => {
+        const isActive = btn.dataset.leaderboardTab === channel;
+        btn.setAttribute('aria-selected', String(isActive));
+    });
+
+    leaderboardEls.forEach((container) => {
+        const isChannel = (container.dataset?.leaderboard || 'global') === channel;
+        container.hidden = !isChannel;
+    });
+
+    updateEventCountdown();
+    loadAndDisplayLeaderboard({ force: true, channel });
 }
 
 function buildLeaderboardDisplay(container, leaderboard) {
@@ -4418,23 +4656,30 @@ function buildLeaderboardDisplay(container, leaderboard) {
     container.appendChild(listEl);
 }
 
-function saveLocalLeaderboard(currentData) {
+function saveLocalLeaderboard(currentData, channel = 'global') {
     if (freePlaySessionActive) {
         return;
     }
 
-    const sanitizedEntry = sanitizeLeaderboardEntry({
+    const payload = {
         publicKey: walletPublicKey,
         level: currentData.level,
         bestScore: currentData.bestScore,
         stats: currentData.stats
-    });
+    };
+
+    if (channel === 'event') {
+        const window = getCurrentEventWindow();
+        payload.eventId = window.eventId;
+    }
+
+    const sanitizedEntry = sanitizeLeaderboardEntry(payload);
 
     if (!sanitizedEntry) {
         return;
     }
 
-    const currentLeaderboard = readLeaderboardSafely();
+    const currentLeaderboard = readLeaderboardSafely(channel);
     const previousTopEntries = JSON.stringify(currentLeaderboard.slice(0, 10));
 
     const leaderboard = currentLeaderboard.filter(entry => entry.publicKey !== sanitizedEntry.publicKey);
@@ -4451,43 +4696,48 @@ function saveLocalLeaderboard(currentData) {
     const leaderboardChanged = previousTopEntries !== nextTopEntries;
 
     if (leaderboardChanged) {
-        const saved = writeLeaderboardSafely(trimmedLeaderboard);
+        const saved = writeLeaderboardSafely(trimmedLeaderboard, channel);
         if (saved) {
-            markLeaderboardDirty();
+            markLeaderboardDirty(channel);
         }
     }
 
     if (typeof window !== 'undefined' && window.LeaderboardAPI?.postEntry) {
-        window.LeaderboardAPI.postEntry(sanitizedEntry).catch((error) => {
+        window.LeaderboardAPI.postEntry(sanitizedEntry, channel).catch((error) => {
             console.warn('Failed to submit leaderboard entry to API:', error);
         });
     }
 }
 
-async function loadAndDisplayLeaderboard({ force = false } = {}) {
-    if (!leaderboardEls.length) return;
+async function loadAndDisplayLeaderboard({ force = false, channel = activeLeaderboardChannel } = {}) {
+    const containers = getLeaderboardContainers(channel);
+    if (!containers.length) return;
 
     const now = Date.now();
-    const hasScoreChanges = leaderboardChangeToken !== lastLeaderboardFetchToken;
-    const cooldownElapsed = now - lastLeaderboardFetchTime >= LEADERBOARD_FETCH_COOLDOWN_MS;
+    const state = leaderboardState[channel];
+    if (!state) return;
+    const hasScoreChanges = state.changeToken !== state.lastFetchToken;
+    const cooldownElapsed = now - state.lastFetchTime >= LEADERBOARD_FETCH_COOLDOWN_MS;
+    const existingPromise = leaderboardLoadPromises[channel];
 
     if (!hasScoreChanges && !force) {
-        return leaderboardLoadPromise || Promise.resolve();
+        return existingPromise || Promise.resolve();
     }
 
     if (!hasScoreChanges && force && !cooldownElapsed) {
-        return leaderboardLoadPromise || Promise.resolve();
+        return existingPromise || Promise.resolve();
     }
 
-    if (leaderboardLoadPromise) {
-        return leaderboardLoadPromise;
+    if (existingPromise) {
+        return existingPromise;
     }
 
-    renderLeaderboardMessage('Loading leaderboard...');
+    renderLeaderboardMessage('Loading leaderboard...', channel);
 
-    const tokenAtStart = leaderboardChangeToken;
+    const tokenAtStart = state.changeToken;
+    const currentEventWindow = getCurrentEventWindow();
 
-    leaderboardLoadPromise = (async () => {
+    leaderboardLoadPromises[channel] = (async () => {
         try {
             const entryMap = new Map();
 
@@ -4495,6 +4745,12 @@ async function loadAndDisplayLeaderboard({ force = false } = {}) {
                 const sanitized = sanitizeLeaderboardEntry(entry);
                 if (!sanitized) {
                     return;
+                }
+                if (channel === 'event') {
+                    if (sanitized.eventId && sanitized.eventId !== currentEventWindow.eventId) {
+                        return;
+                    }
+                    sanitized.eventId = currentEventWindow.eventId;
                 }
 
                 const hasStableKey = sanitized.publicKey && sanitized.publicKey !== 'Unknown Player';
@@ -4510,11 +4766,19 @@ async function loadAndDisplayLeaderboard({ force = false } = {}) {
                 }
             };
 
-            readLeaderboardSafely().forEach(registerEntry);
+            const localEntries = readLeaderboardSafely(channel);
+            localEntries.forEach(registerEntry);
+
+            if (channel === 'event' && isEventLeaderboardActive()) {
+                const pruned = localEntries.filter(entry => entry.eventId === currentEventWindow.eventId);
+                if (pruned.length !== localEntries.length) {
+                    writeLeaderboardSafely(pruned, 'event');
+                }
+            }
 
             if (typeof window !== 'undefined' && window.LeaderboardAPI?.flushQueue) {
                 try {
-                    await window.LeaderboardAPI.flushQueue();
+                    await window.LeaderboardAPI.flushQueue(channel);
                 } catch (error) {
                     console.warn('Failed to flush queued leaderboard entries:', error);
                 }
@@ -4522,7 +4786,7 @@ async function loadAndDisplayLeaderboard({ force = false } = {}) {
 
             if (typeof window !== 'undefined' && window.LeaderboardAPI?.fetchTopEntries) {
                 try {
-                    const remoteEntries = await window.LeaderboardAPI.fetchTopEntries();
+                    const remoteEntries = await window.LeaderboardAPI.fetchTopEntries(channel);
                     remoteEntries.forEach(registerEntry);
                 } catch (error) {
                     console.warn('Failed to load remote leaderboard entries:', error);
@@ -4535,21 +4799,21 @@ async function loadAndDisplayLeaderboard({ force = false } = {}) {
                 return b.bestScore - a.bestScore;
             });
 
-            leaderboardEls.forEach((container) => {
+            containers.forEach((container) => {
                 buildLeaderboardDisplay(container, leaderboard);
             });
 
-            lastLeaderboardFetchToken = tokenAtStart;
-            lastLeaderboardFetchTime = Date.now();
+            state.lastFetchToken = tokenAtStart;
+            state.lastFetchTime = Date.now();
         } catch (error) {
             console.error('Failed to render leaderboard:', error);
-            renderLeaderboardMessage('Unable to load leaderboard right now.');
+            renderLeaderboardMessage('Unable to load leaderboard right now.', channel);
         } finally {
-            leaderboardLoadPromise = null;
+            leaderboardLoadPromises[channel] = null;
         }
     })();
 
-    return leaderboardLoadPromise;
+    return leaderboardLoadPromises[channel];
 }
 
 function loadExternalScript(src) {
@@ -5206,6 +5470,7 @@ function savePlayerData() {
             }
             hideStorageWarning();
             saveLocalLeaderboard(playerData);
+            if (isEventLeaderboardActive()) { saveLocalLeaderboard(playerData, 'event'); }
             loadAndDisplayLeaderboard();
 
             enqueueProfileSync({
@@ -5231,6 +5496,7 @@ function savePlayerData() {
     }
 
     saveLocalLeaderboard(playerData);
+    if (isEventLeaderboardActive()) { saveLocalLeaderboard(playerData, 'event'); }
     loadAndDisplayLeaderboard();
 
     const snapshot = sanitizePlayerDataForChain(playerData);
@@ -5582,6 +5848,10 @@ function resolveIncomingDamage(baseDamage, options = {}) {
     const mitigatedDamage = Math.max(0, baseDamage * (1 - mitigation));
     const livesLost = applyLifeDamage(mitigatedDamage);
 
+    if (livesLost > 0) {
+        resetComboStreakMeter();
+    }
+
     return { prevented: livesLost === 0 && mitigatedDamage < baseDamage, reason: livesLost ? 'damage' : 'mitigated', livesLost, mitigatedDamage };
 }
 
@@ -5850,8 +6120,43 @@ function showStatAllocation() {
 
 // --- DAILY LOGIN AND QUEST SYSTEM ---
 
+function getStartOfDay(timestamp = Date.now()) {
+    const date = new Date(timestamp);
+    date.setHours(0, 0, 0, 0);
+    return date.getTime();
+}
+
+function selectDailyModifier() {
+    const today = getStartOfDay();
+    const lastApplied = playerData.daily.lastModifierDate || 0;
+
+    if (playerData.daily.activeModifierId && lastApplied === today) {
+        return playerData.daily.activeModifierId;
+    }
+
+    const previousId = playerData.daily.activeModifierId;
+    const available = DAILY_MODIFIERS.filter(mod => mod.id !== previousId);
+    const selectionPool = available.length ? available : DAILY_MODIFIERS;
+    const chosen = selectionPool[Math.floor(Math.random() * selectionPool.length)];
+
+    playerData.daily.activeModifierId = chosen?.id || '';
+    playerData.daily.lastModifierDate = today;
+    try { localStorage.setItem(DAILY_MODIFIER_DAY_KEY, String(today)); } catch (err) { /* ignore */ }
+    return playerData.daily.activeModifierId;
+}
+
+function getActiveDailyModifier() {
+    const id = playerData.daily.activeModifierId;
+    return DAILY_MODIFIERS.find(entry => entry.id === id) || null;
+}
+
+function applyDailyModifierEffects() {
+    activeDailyModifier = getActiveDailyModifier();
+}
+
 function checkDailyLogin() {
     const now = Date.now();
+    const startOfToday = getStartOfDay(now);
 
     if (!Array.isArray(playerData.daily.quests) || playerData.daily.quests.length === 0) {
         playerData.daily.quests = createDefaultQuests();
@@ -5859,6 +6164,7 @@ function checkDailyLogin() {
 
     if (!playerData.daily.lastLogin) {
         playerData.daily.lastLogin = now;
+        playerData.daily.loginStreak = 0;
     }
 
     const elapsed = now - playerData.daily.lastLogin;
@@ -5877,19 +6183,34 @@ function checkDailyLogin() {
             showAnnounce(document.getElementById('hub-announcement') || document.getElementById('wave-announce'), `Rest Bonus stored: +${restedEarned} XP`);
         }
 
+        const lastLoginDay = getStartOfDay(playerData.daily.lastLogin);
+        const consecutive = startOfToday - lastLoginDay <= DAILY_INTERVAL_MS;
+        playerData.daily.loginStreak = consecutive ? (playerData.daily.loginStreak || 0) + 1 : 1;
+        playerData.daily.streakRewardTier = Math.min(3, Math.floor(playerData.daily.loginStreak / 5));
+
         playerData.daily.lastLogin = now;
         savePlayerData();
         updateUI();
     }
 
+    selectDailyModifier();
+    applyDailyModifierEffects();
+
     // Grant Daily Login Reward
     if (!playerData.daily.claimedLogin) {
-        credits += 25;
+        if (!playerData.daily.loginStreak || playerData.daily.loginStreak < 1) {
+            playerData.daily.loginStreak = 1;
+            playerData.daily.streakRewardTier = Math.min(3, Math.floor(playerData.daily.loginStreak / 5));
+        }
+        const streakBonus = 5 * (playerData.daily.streakRewardTier || 0);
+        const baseReward = 25 + Math.max(0, playerData.daily.loginStreak || 0);
+        const totalReward = baseReward + streakBonus;
+        credits += totalReward;
         playerData.credits = credits;
         playerData.daily.claimedLogin = true;
-        notifyCreditsGain(25, 'Daily login bonus');
+        notifyCreditsGain(totalReward, 'Daily login bonus');
 
-        showAnnounce(document.getElementById('hub-announcement') || document.getElementById('wave-announce'), 'Daily Login Bonus: +25 Credits!');
+        showAnnounce(document.getElementById('hub-announcement') || document.getElementById('wave-announce'), `Daily Login Bonus: +${totalReward} Credits!`);
         savePlayerData();
         updateUI();
     }
@@ -6193,7 +6514,8 @@ function updateEnemies() {
         const enemy = enemies[i];
         if (bossActive && enemy !== boss && enemy.variant !== 'mecha') continue;
 
-        const horizontalSpeed = enemy.speed || 0;
+        const dailySpeedBoost = activeDailyModifier?.effects?.enemySpeedMultiplier || 1;
+        const horizontalSpeed = (enemy.speed || 0) * dailySpeedBoost;
         const verticalSpeed = enemy.dy || 0;
         enemy.x -= horizontalSpeed * deltaMultiplier;
         enemy.y += verticalSpeed * deltaMultiplier;
@@ -6265,11 +6587,14 @@ function updateEnemies() {
 
                 emitParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, isCrit ? 6 : 3);
                 enemy.hp = (enemy.hp || 1) - finalDamage;
+                registerComboHit();
 
                 if (enemy.hp <= 0) {
                     const streakBonus = killStreak >= COMBO_THRESHOLD ? 20 : 10;
                     const baseScore = streakBonus + (enemy.variant === 'mecha' ? 10 : 0) + (enemy.variant === 'boss' ? 100 : 0);
-                    const scaledScore = Math.round(baseScore * Math.max(1, waveScoreMultiplier));
+                    const activeComboMultiplier = getComboScoreMultiplier();
+                    const dailyScoreMultiplier = activeDailyModifier?.effects?.scoreMultiplier || 1;
+                    const scaledScore = Math.round(baseScore * Math.max(1, waveScoreMultiplier) * activeComboMultiplier * dailyScoreMultiplier);
                     score += scaledScore;
                     uiCache.score = null;
 
@@ -6756,6 +7081,8 @@ function gameLoop(timestamp = (typeof performance !== 'undefined' ? performance.
     if (screenShakeDuration > 0) {
         screenShakeDuration = Math.max(0, screenShakeDuration - elapsedMs);
     }
+
+    updateComboStreakTimer(elapsedMs);
 
     updateDifficultyProgress(deltaTime);
     updateStarfield();
