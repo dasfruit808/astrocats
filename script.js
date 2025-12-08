@@ -1336,7 +1336,7 @@ const MIN_SPAWN_INTERVAL = 0.25; // seconds
 const DIFFICULTY_TIME_SCALE = 32; // seconds to add roughly +1 difficulty
 const SCORE_DIFFICULTY_SCALE = 600; // score points required for +1 difficulty
 const MAX_DIFFICULTY_FACTOR = 12;
-const DASH_COOLDOWN_DURATION = 2000; 
+const DASH_COOLDOWN_DURATION = 2000;
 let dashCooldown = 0;
 let tail = []; let particles = [];
 let chargeStartTime = 0; let isCharging = false;
@@ -1347,6 +1347,15 @@ const activeSpeedBuffs = new Map();
 let speedModifierSequence = 0;
 let screenShakeDuration = 0; let hitStopDuration = 0;
 const DAILY_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+const WAVES = [
+    { enemyCount: 6, pattern: 'scout', modifiers: { spawnInterval: 1.6, speedMultiplier: 0.9 } },
+    { enemyCount: 8, pattern: 'mixed', modifiers: { spawnInterval: 1.45 } },
+    { enemyCount: 10, pattern: 'sine', modifiers: { spawnInterval: 1.3, verticalVariance: 6 } },
+    { enemyCount: 12, pattern: 'mecha', modifiers: { spawnInterval: 1.1, hpBonus: 1 } },
+    { enemyCount: 14, pattern: 'mixed', modifiers: { spawnInterval: 1, speedMultiplier: 1.15 } },
+];
+const BOSS_WAVE_INTERVAL = 5;
 
 const uiCache = {
     score: null,
@@ -1437,24 +1446,149 @@ function getSpawnIntervalSeconds() {
     return Math.max(MIN_SPAWN_INTERVAL, scaled);
 }
 
-function buildEnemyTemplate() {
-    const baseSpeed = 2.1 + difficultyFactor * 0.45;
-    const baseHp = 1 + Math.floor(Math.max(0, difficultyFactor - 1) * 0.75);
+function buildEnemyTemplate(pattern = 'adaptive', modifiers = {}) {
+    const baseSpeed = (2.1 + difficultyFactor * 0.45) * (modifiers.speedMultiplier || 1);
+    const baseHp = 1 + Math.floor(Math.max(0, difficultyFactor - 1) * 0.75) + (modifiers.hpBonus || 0);
     const aggressiveChance = Math.min(0.85, Math.max(0, (difficultyFactor - 1) * 0.12));
-    const useMecha = Math.random() < aggressiveChance;
+    const preferMecha = pattern === 'mecha' || pattern === 'sine';
+    const preferScout = pattern === 'scout';
+
+    let useMecha = Math.random() < aggressiveChance;
+    if (preferMecha) useMecha = true;
+    if (preferScout) useMecha = false;
 
     const diveStrength = useMecha
         ? 18 + difficultyFactor * 4
-        : (difficultyFactor > 4 ? 10 + difficultyFactor * 2 : 0);
+        : (pattern === 'sine' ? 8 + difficultyFactor * 2 : (difficultyFactor > 4 ? 10 + difficultyFactor * 2 : 0));
+
+    const variance = typeof modifiers.verticalVariance === 'number'
+        ? modifiers.verticalVariance
+        : (useMecha ? 4 + Math.random() * 3 : 2 + Math.random() * 2);
 
     return {
         variant: useMecha ? 'mecha' : 'scout',
         speed: baseSpeed * (0.88 + Math.random() * 0.3),
         hp: Math.max(1, baseHp + (useMecha ? 1 : 0)),
         diveStrength,
-        verticalVariance: useMecha ? 4 + Math.random() * 3 : 2 + Math.random() * 2
+        verticalVariance: variance
     };
 }
+
+class WaveManager {
+    constructor() {
+        this.reset();
+    }
+
+    reset() {
+        this.waveIndex = 0;
+        this.waveConfig = null;
+        this.enemiesSpawned = 0;
+        this.waveHoldSeconds = 0;
+        this.bossSpawned = false;
+        this.isBossWave = false;
+        enemySpawnTimer = 0;
+    }
+
+    getWaveConfig(waveNumber) {
+        if (WAVES[waveNumber - 1]) return WAVES[waveNumber - 1];
+
+        const overflow = waveNumber - WAVES.length;
+        const enemyCount = 14 + overflow * 2;
+        const spawnInterval = Math.max(0.6, 1 - overflow * 0.04);
+        const hpBonus = Math.floor(waveNumber / 3);
+        const pattern = waveNumber % 2 === 0 ? 'mixed' : 'mecha';
+
+        return { enemyCount, pattern, modifiers: { spawnInterval, hpBonus } };
+    }
+
+    start() {
+        this.advanceWave({ announce: true });
+    }
+
+    advanceWave({ announce = false } = {}) {
+        this.waveIndex += 1;
+        this.waveConfig = this.getWaveConfig(this.waveIndex);
+        this.enemiesSpawned = 0;
+        this.waveHoldSeconds = 0.9;
+        this.bossSpawned = false;
+        this.isBossWave = this.waveIndex % BOSS_WAVE_INTERVAL === 0;
+        enemySpawnTimer = 0;
+
+        if (announce) {
+            const text = this.isBossWave ? `Phase ${this.waveIndex}: Boss Approaching` : `Wave ${this.waveIndex}`;
+            showAnnounce(this.isBossWave ? bossAnnounceEl : waveAnnounceEl, text);
+        }
+    }
+
+    spawnBossEncounter() {
+        if (bossActive || !gameRunning || gamePaused) return;
+
+        const sizeMultiplier = 1.65;
+        const width = Math.round(enemySpriteDimensions.width * sizeMultiplier);
+        const height = Math.round(enemySpriteDimensions.height * sizeMultiplier);
+        const bossHp = Math.max(12, 10 + this.waveIndex * 4);
+        const bossSpeed = 2.2 + Math.min(2, this.waveIndex * 0.15);
+
+        boss = {
+            x: gameCanvas.width - width - PLAYFIELD_PADDING_X,
+            y: clampWithinPadding(gameCanvas.height / 2 - height / 2, height, gameCanvas.height, PLAYFIELD_PADDING_Y),
+            width,
+            height,
+            speed: bossSpeed,
+            dy: 0,
+            variant: 'boss',
+            hp: bossHp,
+            maxHp: bossHp,
+            diveStrength: 10,
+            divePhase: Math.random() * Math.PI * 2,
+            mirrorDash: true
+        };
+
+        enemies.push(boss);
+        bossActive = true;
+        this.bossSpawned = true;
+        showAnnounce(bossAnnounceEl, this.waveIndex % (BOSS_WAVE_INTERVAL * 2) === 0 ? 'Boss Encounter!' : 'Mini-Boss Approaching');
+    }
+
+    update(deltaSeconds) {
+        if (!gameRunning || gamePaused) return;
+        if (!this.waveConfig) return;
+
+        if (this.waveHoldSeconds > 0) {
+            this.waveHoldSeconds = Math.max(0, this.waveHoldSeconds - deltaSeconds);
+            return;
+        }
+
+        if (this.isBossWave) {
+            if (!this.bossSpawned && !bossActive) {
+                this.spawnBossEncounter();
+            } else if (this.bossSpawned && !bossActive && enemies.length === 0) {
+                this.finishWave();
+            }
+            return;
+        }
+
+        const targetCount = this.waveConfig.enemyCount || 0;
+        if (this.enemiesSpawned < targetCount) {
+            const spawned = spawnEnemy(this.waveConfig.pattern, this.waveConfig.modifiers);
+            if (spawned) {
+                this.enemiesSpawned += 1;
+            }
+        } else if (enemies.length === 0 && !bossActive) {
+            this.finishWave();
+        }
+    }
+
+    finishWave() {
+        this.waveConfig = null;
+        setTimeout(() => {
+            if (!gameRunning) return;
+            this.advanceWave({ announce: true });
+        }, 500);
+    }
+}
+
+const waveManager = new WaveManager();
 
 const SHOP_RARITY_COSTS = { common: 75, rare: 125, epic: 200, legendary: 350 };
 const SHOP_RARITY_COLORS = {
@@ -3666,6 +3800,8 @@ function startGame(isNewSession = true) {
     waveScoreMultiplier = 1;
     nextWaveScoreMultiplier = 1;
     intermissionOptions = [];
+
+    waveManager.reset();
 
     player.x = Math.round(BASE_CANVAS_WIDTH * 0.08);
     player.y = gameCanvas.height / 2 - player.height / 2;
@@ -6332,14 +6468,14 @@ function spawnEnemy() {
     if (!gameRunning || bossActive || gamePaused || hitStopDuration > 0 || intermissionActive) return;
 
     enemySpawnTimer += deltaTime;
-    const spawnInterval = getSpawnIntervalSeconds();
+    const spawnInterval = modifiers?.spawnInterval ?? getSpawnIntervalSeconds();
 
     if (enemySpawnTimer >= spawnInterval) {
         if (waveEnemyTarget > 0 && waveEnemiesSpawned >= waveEnemyTarget) {
             return;
         }
         enemySpawnTimer = 0;
-        const template = buildEnemyTemplate();
+        const template = buildEnemyTemplate(pattern, modifiers);
 
         let minY = PLAYFIELD_PADDING_Y;
         let maxY = gameCanvas.height - enemySpriteDimensions.height - PLAYFIELD_PADDING_Y;
@@ -6364,6 +6500,8 @@ function spawnEnemy() {
         });
         waveEnemiesSpawned++;
     }
+
+    return false;
 }
 
 function updateBossAI(now, deltaStep) {
@@ -6612,7 +6750,7 @@ function gameLoop(timestamp = (typeof performance !== 'undefined' ? performance.
         if (gameRunning && !gamePaused) {
             updatePlayer();
             updateProjectiles();
-            if (!bossActive) spawnEnemy();
+            waveManager.update(deltaTime);
             updateEnemies();
             updatePowerups();
         }
