@@ -140,9 +140,7 @@ const DEFAULT_STATUS_TIP_TEXT = statusTipEl ? statusTipEl.textContent : '';
 
 const UI_MODES = {
     START: 'start',
-    HUB: 'hub',
-    SHOP: 'shop',
-    STAT: 'stat'
+    PLAY: 'play'
 };
 let uiMode = UI_MODES.START;
 
@@ -365,18 +363,6 @@ function setNavigationUnlocked(unlocked) {
     navigationUnlocked = !!unlocked;
     document.body.classList.toggle('controls-locked', !navigationUnlocked);
 
-    const lockableButtons = [
-        windowBackToStartBtn,
-        returnHubBtn,
-        ...uiRibbonButtons
-    ];
-
-    lockableButtons.forEach((btn) => {
-        if (!btn) return;
-        btn.disabled = !navigationUnlocked;
-        btn.setAttribute('aria-disabled', navigationUnlocked ? 'false' : 'true');
-    });
-
     updateStartMenuActions();
 }
 
@@ -386,7 +372,7 @@ function startFreePlaySession() {
     freePlaySessionActive = true;
     applyPlayerDataSnapshot(null);
     setNavigationUnlocked(true);
-    showHub();
+    startGame(true);
 }
 
 function handleConnectButtonClick() {
@@ -399,54 +385,8 @@ function handleConnectButtonClick() {
 
 function initializeUIEvents() {
     bindButtonClick(playBtn, startFreePlaySession);
-    bindButtonClick(connectBtn, handleConnectButtonClick);
-    bindButtonClick(returnHubBtn, showHub);
-
     bindButtonClick(windowBackToStartBtn, showStartMenu);
 
-    bindButtonClick(hubCloseBtn, showStartMenu);
-    bindButtonClick(hubPlayNextBtn, () => startGame(true));
-
-    bindButtonClick(shopCloseBtn, showHub);
-    bindButtonClick(shopSkipBtn, skipShop);
-
-    uiRibbonButtons.forEach((button) => {
-        bindButtonClick(button, () => setUiMode(button.dataset.uiTarget));
-    });
-
-    hubTabButtons.forEach((button) => {
-        const tab = button.dataset.tab;
-        bindButtonClick(button, () => setActiveHubTab(tab), { preventDefault: false });
-    });
-
-    statTabButtons.forEach((button) => {
-        const tab = button.dataset.tab;
-        bindButtonClick(button, () => setActiveStatTab(tab), { preventDefault: false });
-    });
-
-    setActiveHubTab('play');
-    setActiveStatTab('overview');
-    updateNavigationRibbon();
-
-    if (dailyQuestsEl && !dailyQuestsEl.dataset.listenerAttached) {
-        dailyQuestsEl.addEventListener('click', (event) => {
-            const button = event.target instanceof Element
-                ? event.target.closest('button[data-quest-id]')
-                : null;
-            if (!button || button.disabled) return;
-
-            event.preventDefault();
-            const { questId } = button.dataset;
-            if (questId) {
-                claimQuestReward(questId);
-            }
-        });
-        dailyQuestsEl.dataset.listenerAttached = 'true';
-    }
-
-    bindButtonClick(openStatAllocationBtn, showStatAllocation);
-    bindButtonClick(statCloseBtn, showHub);
-    bindButtonClick(statReturnHubBtn, showHub);
     bindButtonClick(focusPauseResumeBtn, () => resumeGameFromFocusLoss({ triggeredByUser: true }));
 }
 
@@ -2407,7 +2347,7 @@ function isElementVisible(element) {
 function updatePageScrollLock() {
     if (!bodyEl) return;
 
-    const overlayElements = [startMenuEl, hubEl, shopEl, statAllocationEl, profileModalEl];
+    const overlayElements = [startMenuEl, focusPauseOverlayEl];
     const shouldLockScroll = overlayElements.some(isElementVisible);
 
     bodyEl.classList.toggle('scroll-locked', shouldLockScroll);
@@ -2418,9 +2358,7 @@ function handleKeyDown(event) {
 
     if (code === 'Escape') {
         const overlayHandlers = [
-            { element: profileModalEl, handler: hideProfileModal },
-            { element: shopEl, handler: skipShop },
-            { element: hubEl, handler: showStartMenu },
+            { element: focusPauseOverlayEl, handler: () => resumeGameFromFocusLoss({ triggeredByUser: true }) },
             { element: startMenuEl, handler: hideAllOverlays }
         ];
 
@@ -2432,16 +2370,6 @@ function handleKeyDown(event) {
             }
         }
 
-        return;
-    }
-
-    if (code === 'KeyK') {
-        event.preventDefault();
-        if (isElementVisible(statAllocationEl)) {
-            showHub();
-        } else if (walletPublicKey && (isElementVisible(hubEl) || !gameRunning)) {
-            showStatAllocation();
-        }
         return;
     }
 
@@ -2785,7 +2713,7 @@ function updateHubUI() {
 
 function hideAllOverlays() {
     const focusOverlayWasVisible = !!(focusPauseOverlayEl && focusPauseOverlayEl.style.display !== 'none');
-    [startMenuEl, hubEl, shopEl, statAllocationEl, profileModalEl, focusPauseOverlayEl].forEach(el => {
+    [startMenuEl, focusPauseOverlayEl].forEach(el => {
         if (!el) return;
         el.style.display = 'none';
         if (el === focusPauseOverlayEl) {
@@ -2867,46 +2795,14 @@ function setUiMode(nextMode) {
                 activateFocusTrap(startMenuEl, { initialFocus });
             }
             updateUI();
-            updateHubUI();
             if (playBtn && playBtn.dataset.walletLocked === 'true') {
                 playBtn.disabled = false;
             }
             updatePageScrollLock();
             break;
-        case UI_MODES.HUB:
-            gameRunning = false;
-            gamePaused = true;
-            if (hubEl) {
-                hubEl.style.display = 'flex';
-                const initialFocus = findFirstContentControl(hubEl);
-                activateFocusTrap(hubEl, { initialFocus });
-            }
-            updateUI();
-            updateHubUI();
-            loadAndDisplayLeaderboard({ force: true });
-            updatePageScrollLock();
-            break;
-        case UI_MODES.SHOP:
-            gameRunning = false;
-            gamePaused = true;
-            if (shopEl) {
-                shopEl.style.display = 'flex';
-                const initialFocus = findFirstContentControl(shopEl);
-                activateFocusTrap(shopEl, { initialFocus });
-            }
-            renderShopOptions();
-            updateUI();
-            updateHubUI();
-            updatePageScrollLock();
-            break;
-        case UI_MODES.STAT:
-            gamePaused = true;
-            if (statAllocationEl) {
-                statAllocationEl.style.display = 'flex';
-                const initialFocus = findFirstContentControl(statAllocationEl);
-                activateFocusTrap(statAllocationEl, { initialFocus });
-            }
-            refreshStatAllocationOverlay({ forceRender: true });
+        case UI_MODES.PLAY:
+            gamePaused = false;
+            gameRunning = true;
             updatePageScrollLock();
             break;
         default:
@@ -3432,12 +3328,13 @@ function showStartMenu() {
 }
 
 function showHub() {
-    setUiMode(UI_MODES.HUB);
+    showStartMenu();
 }
 
 function startGame(isNewSession = true) {
     unlockInterfaceControls();
     hideAllOverlays();
+    setUiMode(UI_MODES.PLAY);
 
     gameRunning = true;
     gamePaused = false;
@@ -3504,31 +3401,21 @@ function startGame(isNewSession = true) {
         playerData.gamesPlayed = (playerData.gamesPlayed || 0) + 1;
     }
 
-    renderShopOptions();
-
-    const playQuest = playerData.daily?.quests?.find(q => q.id === 'playRounds');
-    if (playQuest && !playQuest.completed) {
-        playQuest.progress = Math.min(playQuest.target, playQuest.progress + 1);
-    }
-
     const spawnInterval = getSpawnIntervalSeconds();
     enemySpawnTimer = spawnInterval;
     spawnEnemy();
     enemySpawnTimer = 0;
 
-    updateQuestsUI();
     updateUI();
-    updateHubUI();
     savePlayerData();
-    loadAndDisplayLeaderboard();
 }
 
 function openShop() {
-    setUiMode(UI_MODES.SHOP);
+    showStartMenu();
 }
 
 function skipShop() {
-    showHub();
+    showStartMenu();
 }
 
 function handleGameOver() {
@@ -3560,8 +3447,6 @@ function handleGameOver() {
 
     savePlayerData();
     updateUI();
-    updateHubUI();
-    updateQuestsUI();
 
     const hubAnnouncementEl = document.getElementById('hub-announcement') || waveAnnounceEl;
     if (adjustedCredits > 0) {
@@ -3571,7 +3456,7 @@ function handleGameOver() {
         showAnnounce(hubAnnouncementEl, 'Flight complete! Ready for the next sortie.');
     }
 
-    showHub();
+    showStartMenu();
 }
 
 function purchaseUpgrade(optionId) {
@@ -5543,7 +5428,7 @@ function renderShopOptions() {
 }
 
 function showStatAllocation() {
-    setUiMode(UI_MODES.STAT);
+    showStartMenu();
 }
 
 // --- DAILY LOGIN AND QUEST SYSTEM ---
@@ -5624,7 +5509,7 @@ function claimQuestReward(questId) {
         updateUI();
         updateQuestsUI();
         refreshStatAllocationOverlay();
-        showHub();
+        showStartMenu();
     }
 }
 
@@ -5658,22 +5543,9 @@ function getWalletPublicKeySafe() {
 }
 
 function updateStartMenuActions() {
-    const hasWallet = Boolean(getWalletPublicKeySafe());
-    const canNavigate = navigationUnlocked;
-
-    if (returnHubBtn) {
-        const shouldShow = hasWallet;
-        returnHubBtn.hidden = !shouldShow;
-        returnHubBtn.setAttribute('aria-hidden', (!shouldShow).toString());
-        returnHubBtn.disabled = !shouldShow || !canNavigate;
-        returnHubBtn.setAttribute('aria-disabled', returnHubBtn.disabled ? 'true' : 'false');
-    }
-
-    if (connectBtn) {
-        const label = hasWallet ? 'Disconnect' : 'Connect Wallet';
-        if (connectBtn.textContent !== label) {
-            connectBtn.textContent = label;
-        }
+    if (playBtn) {
+        playBtn.disabled = false;
+        playBtn.removeAttribute('aria-disabled');
     }
 }
 
@@ -5738,7 +5610,7 @@ function openPhantomInstallGuide() {
     }
 
     setNavigationUnlocked(true);
-    showHub();
+    showStartMenu();
 }
 
 function clearPhantomInstallGuide({ resetStatus = false } = {}) {
@@ -5764,7 +5636,7 @@ async function connectWallet() {
     // even if the wallet flow takes time or fails.
     setNavigationUnlocked(true);
     unlockInterfaceControls();
-    showHub();
+    showStartMenu();
 
     if (!provider) { openPhantomInstallGuide(); return; }
 
@@ -5796,12 +5668,12 @@ async function connectWallet() {
 
         await loadPlayerData();
         unlockInterfaceControls();
-        showHub();
+        showStartMenu();
     } catch (err) {
         console.error('Wallet connect error:', err);
         if (walletStatusEl) walletStatusEl.textContent = 'Connection Rejected/Failed';
         setNavigationUnlocked(true);
-        showHub();
+        showStartMenu();
     }
 }
 
@@ -6529,8 +6401,6 @@ async function initializeApp() {
     monitorPointerCapabilityChanges();
 
     showStartMenu();
-    loadAndDisplayLeaderboard();
-    connectRealtimeChannel();
 
     gameLoop();
 }
