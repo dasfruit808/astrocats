@@ -853,6 +853,7 @@ let enemySpriteDimensions = {
 
 let projectiles = [];
 let enemies = [];
+let enemyProjectiles = [];
 
 function computeSpriteDimensions(img, baseSize, minSize, maxSize) {
     if (!img) {
@@ -1465,12 +1466,19 @@ function buildEnemyTemplate(pattern = 'adaptive', modifiers = {}) {
         ? modifiers.verticalVariance
         : (useMecha ? 4 + Math.random() * 3 : 2 + Math.random() * 2);
 
+    const shootCapable = useMecha || difficultyFactor >= 4;
+    const baseFireDelay = Math.max(950, 1700 - difficultyFactor * 120);
+    const projectileSpeed = 6 + difficultyFactor * 0.25;
+
     return {
         variant: useMecha ? 'mecha' : 'scout',
         speed: baseSpeed * (0.88 + Math.random() * 0.3),
         hp: Math.max(1, baseHp + (useMecha ? 1 : 0)),
         diveStrength,
-        verticalVariance: variance
+        verticalVariance: variance,
+        canShoot: shootCapable,
+        shootCooldownMs: baseFireDelay,
+        projectileSpeed
     };
 }
 
@@ -1542,7 +1550,11 @@ class WaveManager {
             maxHp: bossHp,
             diveStrength: 10,
             divePhase: Math.random() * Math.PI * 2,
-            mirrorDash: true
+            mirrorDash: true,
+            canShoot: true,
+            shootCooldownMs: Math.max(750, 1400 - this.waveIndex * 45),
+            projectileSpeed: 7 + this.waveIndex * 0.15,
+            nextShotAt: 0
         };
 
         enemies.push(boss);
@@ -2382,6 +2394,32 @@ function spawnProjectile(config = {}) {
         spriteKey: config.spriteKey || (config.isBeam ? 'beam' : 'bolt')
     };
     projectiles.push(projectile);
+}
+
+function spawnEnemyProjectile(enemy) {
+    if (!enemy) return;
+    const centerX = enemy.x + enemy.width / 2;
+    const centerY = enemy.y + enemy.height / 2;
+    const targetX = player.x + player.width / 2;
+    const targetY = player.y + player.height / 2;
+    const dx = targetX - centerX;
+    const dy = targetY - centerY;
+    const dist = Math.hypot(dx, dy) || 1;
+    const speed = Math.max(4.5, enemy.projectileSpeed || 6);
+    const width = Math.max(8, Math.round(enemy.width * 0.2));
+    const height = Math.max(4, Math.round(enemy.height * 0.12));
+
+    enemyProjectiles.push({
+        x: centerX - width / 2,
+        y: centerY - height / 2,
+        width,
+        height,
+        dx: (dx / dist) * speed,
+        dy: (dy / dist) * speed,
+        speed,
+        spriteKey: 'bolt',
+        isEnemy: true
+    });
 }
 
 function triggerDash(directionKey) {
@@ -3756,6 +3794,7 @@ function startGame(isNewSession = true) {
     pendingLifeDamage = 0;
     enemies = [];
     projectiles = [];
+    enemyProjectiles = [];
     powerups = [];
     tail = [];
     particles = [];
@@ -6204,6 +6243,18 @@ function updateEnemies() {
         enemy.y = clampWithinPadding(enemy.y, enemy.height, gameCanvas.height, PLAYFIELD_PADDING_Y);
         if (enemy.x < -enemy.width) { enemies.splice(i, 1); continue; }
 
+        if (enemy.canShoot) {
+            const cooldown = enemy.shootCooldownMs || 1400;
+            if (!enemy.nextShotAt) {
+                enemy.nextShotAt = now + Math.random() * cooldown * 0.5;
+            }
+            if (now >= enemy.nextShotAt) {
+                spawnEnemyProjectile(enemy);
+                const variance = 0.75 + Math.random() * 0.35;
+                enemy.nextShotAt = now + cooldown * variance;
+            }
+        }
+
         let tailHit = false;
         for (let t = 1; t < tail.length; t++) {
             const seg = { x: tail[t].x, y: tail[t].y, width: player.width * 0.8, height: player.height * 0.8 };
@@ -6468,6 +6519,54 @@ function updateProjectiles() {
     }
 }
 
+function updateEnemyProjectiles() {
+    if (hitStopDuration > 0) return;
+
+    for (let i = enemyProjectiles.length - 1; i >= 0; i--) {
+        const proj = enemyProjectiles[i];
+        proj.x += proj.dx * deltaMultiplier;
+        proj.y += proj.dy * deltaMultiplier;
+
+        const outOfBounds = proj.x < -proj.width || proj.x > gameCanvas.width + proj.width
+            || proj.y < -proj.height || proj.y > gameCanvas.height + proj.height;
+        if (outOfBounds) { enemyProjectiles.splice(i, 1); continue; }
+
+        let hitPlayer = false;
+
+        if (rectOverlap(player, proj)) {
+            if (shieldActive) {
+                shieldActive = false;
+            } else {
+                const result = resolveIncomingDamage(1, { announce: true });
+                if (result.prevented && result.reason === 'mitigated' && result.mitigatedDamage > 0 && lives > 0) {
+                    showAnnounce(waveAnnounceEl, 'Plating absorbed most of the blast!');
+                }
+            }
+            hitPlayer = true;
+        } else {
+            for (let t = 1; t < tail.length; t++) {
+                const seg = { x: tail[t].x, y: tail[t].y, width: player.width * 0.8, height: player.height * 0.8 };
+                if (rectOverlap(proj, seg)) {
+                    if (shieldActive) {
+                        shieldActive = false;
+                    } else {
+                        const result = resolveIncomingDamage(1, { announce: true });
+                        if (result.prevented && result.reason === 'mitigated' && result.mitigatedDamage > 0 && lives > 0) {
+                            showAnnounce(waveAnnounceEl, 'Plating absorbed most of the blast!');
+                        }
+                    }
+                    hitPlayer = true;
+                    break;
+                }
+            }
+        }
+
+        if (hitPlayer) {
+            enemyProjectiles.splice(i, 1);
+        }
+    }
+}
+
 function updatePowerups() {
     if (hitStopDuration > 0) return;
     for (let i = powerups.length - 1; i >= 0; i--) {
@@ -6509,7 +6608,11 @@ function spawnEnemy(pattern, modifiers = {}) {
             variant: template.variant,
             hp: template.hp,
             diveStrength: template.diveStrength,
-            divePhase: Math.random() * Math.PI * 2
+            divePhase: Math.random() * Math.PI * 2,
+            canShoot: template.canShoot,
+            shootCooldownMs: template.shootCooldownMs,
+            projectileSpeed: template.projectileSpeed,
+            nextShotAt: 0
         });
         waveEnemiesSpawned++;
 
@@ -6542,6 +6645,42 @@ function updateBossAI(now, deltaStep) {
 
 // --- RENDERING & WEBGL FUNCTIONS ---
 
+function renderProjectileList(list, { enemy = false } = {}) {
+    list.forEach(proj => {
+        const spriteKey = proj.spriteKey || (proj.isBeam ? 'beam' : 'bolt');
+        const projectileSprite = projectileImageCache[spriteKey];
+
+        if (isImageReady(projectileSprite)) {
+            gameCtx.save();
+            const width = proj.width;
+            const height = proj.height;
+            const centerX = proj.x + width / 2;
+            const centerY = proj.y + height / 2;
+            gameCtx.translate(centerX, centerY);
+
+            if (!proj.isBeam) {
+                const vx = enemy ? proj.dx || 0.001 : Math.max(0.001, proj.speed || 0.001);
+                const vy = proj.dy || 0;
+                const angle = Math.atan2(vy, vx);
+                gameCtx.rotate(angle);
+                gameCtx.shadowColor = enemy ? '#ff6b6b' : '#ffe066';
+                gameCtx.shadowBlur = Math.max(width, height);
+            } else {
+                gameCtx.shadowColor = '#ff82ff';
+                gameCtx.shadowBlur = Math.max(width, height) * 0.6;
+                gameCtx.globalAlpha = 0.95;
+            }
+
+            gameCtx.drawImage(projectileSprite, -width / 2, -height / 2, width, height);
+            gameCtx.restore();
+        } else {
+            const fallbackColor = enemy ? '#ff6666' : (proj.isBeam ? '#ff00ff' : '#ffff00');
+            gameCtx.fillStyle = fallbackColor;
+            gameCtx.fillRect(proj.x, proj.y, proj.width, proj.height);
+        }
+    });
+}
+
 function renderGameScene() {
     if (!gameCtx) {
         return;
@@ -6564,36 +6703,8 @@ function renderGameScene() {
         drawPowerup(pu.x, pu.y, pu.width, pu.height, visuals);
     });
 
-    projectiles.forEach(proj => {
-        const spriteKey = proj.spriteKey || (proj.isBeam ? 'beam' : 'bolt');
-        const projectileSprite = projectileImageCache[spriteKey];
-
-        if (isImageReady(projectileSprite)) {
-            gameCtx.save();
-            const width = proj.width;
-            const height = proj.height;
-            const centerX = proj.x + width / 2;
-            const centerY = proj.y + height / 2;
-            gameCtx.translate(centerX, centerY);
-
-            if (!proj.isBeam) {
-                const angle = Math.atan2(proj.dy || 0, Math.max(0.001, proj.speed || 0.001));
-                gameCtx.rotate(angle);
-                gameCtx.shadowColor = '#ffe066';
-                gameCtx.shadowBlur = Math.max(width, height);
-            } else {
-                gameCtx.shadowColor = '#ff82ff';
-                gameCtx.shadowBlur = Math.max(width, height) * 0.6;
-                gameCtx.globalAlpha = 0.95;
-            }
-
-            gameCtx.drawImage(projectileSprite, -width / 2, -height / 2, width, height);
-            gameCtx.restore();
-        } else {
-            gameCtx.fillStyle = proj.isBeam ? '#ff00ff' : '#ffff00';
-            gameCtx.fillRect(proj.x, proj.y, proj.width, proj.height);
-        }
-    });
+    renderProjectileList(projectiles);
+    renderProjectileList(enemyProjectiles, { enemy: true });
 
     enemies.forEach(enemy => {
         const extra = bossActive && enemy === boss ? { variant: 'boss', hp: boss.hp / boss.maxHp * 5 + 1 } : { variant: enemy.variant };
@@ -6765,6 +6876,7 @@ function gameLoop(timestamp = (typeof performance !== 'undefined' ? performance.
         if (gameRunning && !gamePaused) {
             updatePlayer();
             updateProjectiles();
+            updateEnemyProjectiles();
             waveManager.update(deltaTime);
             updateEnemies();
             updatePowerups();
