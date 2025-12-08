@@ -7,16 +7,16 @@ const dataRoot = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : __d
 const leaderboardFile = path.join(dataRoot, 'leaderboard.json');
 const profilesFile = path.join(dataRoot, 'profiles.json');
 
-const MIN_LEADERBOARD_CAP = 100;
+const MIN_LEADERBOARD_CAP = 1;
 const MAX_LEADERBOARD_CAP = 500;
-const leaderboardMaxEntries = Math.max(
-    MIN_LEADERBOARD_CAP,
-    Math.min(
-        MAX_LEADERBOARD_CAP,
-        Number.isFinite(Number(process.env.LEADERBOARD_MAX_ENTRIES))
-            ? Number(process.env.LEADERBOARD_MAX_ENTRIES)
-            : MAX_LEADERBOARD_CAP,
-    ),
+const DEFAULT_LEADERBOARD_CAP = MAX_LEADERBOARD_CAP;
+const envLeaderboardCap = Number(process.env.LEADERBOARD_MAX_ENTRIES);
+
+export const leaderboardMaxEntries = Math.min(
+    MAX_LEADERBOARD_CAP,
+    Number.isFinite(envLeaderboardCap)
+        ? Math.max(MIN_LEADERBOARD_CAP, envLeaderboardCap)
+        : DEFAULT_LEADERBOARD_CAP,
 );
 
 let leaderboardEntries = new Map();
