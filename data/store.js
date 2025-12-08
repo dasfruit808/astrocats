@@ -20,6 +20,7 @@ export const leaderboardMaxEntries = Math.min(
 );
 
 let leaderboardEntries = new Map();
+let cachedLeaderboard = [];
 let profiles = new Map();
 
 function compareLeaderboardEntries(a, b) {
@@ -36,7 +37,14 @@ function trimLeaderboardEntries(sortedEntries) {
 }
 
 function refreshLeaderboardCache(sortedEntries) {
+    cachedLeaderboard = sortedEntries;
     leaderboardEntries = new Map(sortedEntries.map((entry) => [entry.publicKey, entry]));
+}
+
+function rebuildLeaderboardCache() {
+    const sorted = trimLeaderboardEntries(sortLeaderboardEntries());
+    refreshLeaderboardCache(sorted);
+    return sorted;
 }
 
 async function ensureDataDir() {
@@ -56,7 +64,11 @@ async function loadJsonArray(filePath, description) {
         const message = error.code === 'ENOENT'
             ? `[data] No existing ${description} file found. Starting with empty data.`
             : `[data] Failed to load ${description}; starting with empty data.`;
-        console.warn(message, error);
+        if (error.code === 'ENOENT') {
+            console.warn(message);
+        } else {
+            console.warn(message, error);
+        }
         return [];
     }
 }
@@ -106,19 +118,18 @@ async function persistProfiles() {
 async function loadStore() {
     await ensureDataDir();
     leaderboardEntries = await loadLeaderboard();
-    const trimmed = trimLeaderboardEntries(sortLeaderboardEntries());
-    refreshLeaderboardCache(trimmed);
+    rebuildLeaderboardCache();
     profiles = await loadProfiles();
 }
 
 export const storeReady = loadStore();
 
 export function getSortedLeaderboardSnapshot(limit) {
-    const sorted = trimLeaderboardEntries(sortLeaderboardEntries());
-    if (leaderboardEntries.size > sorted.length) {
-        refreshLeaderboardCache(sorted);
+    if (!cachedLeaderboard.length && leaderboardEntries.size > 0) {
+        rebuildLeaderboardCache();
     }
-    return Number.isFinite(limit) ? sorted.slice(0, limit) : sorted;
+    const snapshot = cachedLeaderboard;
+    return Number.isFinite(limit) ? snapshot.slice(0, limit) : snapshot.slice();
 }
 
 export async function getTopLeaderboard(limit = 50) {
@@ -129,8 +140,7 @@ export async function getTopLeaderboard(limit = 50) {
 export async function upsertLeaderboardEntry(entry) {
     await storeReady;
     leaderboardEntries.set(entry.publicKey, entry);
-    const sorted = trimLeaderboardEntries(sortLeaderboardEntries());
-    refreshLeaderboardCache(sorted);
+    rebuildLeaderboardCache();
     await persistLeaderboard();
 }
 
@@ -153,6 +163,7 @@ export async function resetStoreForTest() {
         throw new Error('resetStoreForTest should only be used during tests');
     }
     leaderboardEntries = new Map();
+    cachedLeaderboard = [];
     profiles = new Map();
     await ensureDataDir();
     await saveJsonArray(leaderboardFile, [], 'leaderboard');
