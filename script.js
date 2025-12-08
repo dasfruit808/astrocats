@@ -6464,7 +6464,7 @@ function updatePowerups() {
     }
 }
 
-function spawnEnemy() {
+function spawnEnemy(pattern, modifiers = {}) {
     if (!gameRunning || bossActive || gamePaused || hitStopDuration > 0 || intermissionActive) return;
 
     enemySpawnTimer += deltaTime;
@@ -6499,6 +6499,8 @@ function spawnEnemy() {
             divePhase: Math.random() * Math.PI * 2
         });
         waveEnemiesSpawned++;
+
+        return true;
     }
 
     return false;
