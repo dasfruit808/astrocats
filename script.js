@@ -73,6 +73,10 @@ const touchControlsContainer = document.getElementById('touch-controls');
 const fireButton = document.getElementById('fire-button');
 const bodyEl = document.body;
 const startMenuEl = document.getElementById('start-menu');
+const intermissionOverlayEl = document.getElementById('intermission-overlay');
+const intermissionSummaryEl = document.getElementById('intermission-summary');
+const intermissionOptionsEl = document.getElementById('intermission-options');
+const intermissionContinueBtn = document.getElementById('intermission-continue');
 const hubEl = document.getElementById('hub');
 const storageWarningEl = document.getElementById('storage-warning');
 const shopEl = document.getElementById('shop');
@@ -393,6 +397,7 @@ function initializeUIEvents() {
 
     bindButtonClick(focusPauseResumeBtn, () => resumeGameFromFocusLoss({ triggeredByUser: true }));
     bindButtonClick(onboardingDismissBtn, () => hideOnboardingOverlay(true));
+    bindButtonClick(intermissionContinueBtn, resumeFromIntermission);
 }
 
 function detectTouchSupport() {
@@ -1317,6 +1322,14 @@ let dashEndTime = 0; let dashDurationMs = 0; let dashVector = { x: 1, y: 0 };
 let lastMovementInput = { x: 1, y: 0 };
 let flightTimeSeconds = 0;
 let difficultyFactor = 1;
+let waveIndex = 1;
+let waveEnemyTarget = 0;
+let waveEnemiesSpawned = 0;
+let intermissionActive = false;
+let damageTakenThisWave = false;
+let waveScoreMultiplier = 1;
+let nextWaveScoreMultiplier = 1;
+let intermissionOptions = [];
 
 const BASE_SPAWN_INTERVAL = 1.35; // seconds
 const MIN_SPAWN_INTERVAL = 0.25; // seconds
@@ -2364,7 +2377,7 @@ function isElementVisible(element) {
 function updatePageScrollLock() {
     if (!bodyEl) return;
 
-    const overlayElements = [startMenuEl, focusPauseOverlayEl];
+    const overlayElements = [startMenuEl, focusPauseOverlayEl, intermissionOverlayEl];
     const shouldLockScroll = overlayElements.some(isElementVisible);
 
     bodyEl.classList.toggle('scroll-locked', shouldLockScroll);
@@ -2376,6 +2389,7 @@ function handleKeyDown(event) {
     if (code === 'Escape') {
         const overlayHandlers = [
             { element: focusPauseOverlayEl, handler: () => resumeGameFromFocusLoss({ triggeredByUser: true }) },
+            { element: intermissionOverlayEl, handler: resumeFromIntermission },
             { element: startMenuEl, handler: hideAllOverlays }
         ];
 
@@ -2730,10 +2744,13 @@ function updateHubUI() {
 
 function hideAllOverlays() {
     const focusOverlayWasVisible = !!(focusPauseOverlayEl && focusPauseOverlayEl.style.display !== 'none');
-    [startMenuEl, focusPauseOverlayEl].forEach(el => {
+    [startMenuEl, focusPauseOverlayEl, intermissionOverlayEl].forEach(el => {
         if (!el) return;
         el.style.display = 'none';
         if (el === focusPauseOverlayEl) {
+            deactivateFocusTrap(el, { restoreFocus: false });
+        } else if (el === intermissionOverlayEl) {
+            intermissionActive = false;
             deactivateFocusTrap(el, { restoreFocus: false });
         } else {
             deactivateFocusTrap(el);
@@ -3398,6 +3415,193 @@ function showHub() {
     showStartMenu();
 }
 
+function getWaveTargetSize(index = waveIndex) {
+    return Math.max(8, Math.min(40, Math.floor(10 + index * 1.8)));
+}
+
+function isBossWave(index = waveIndex) {
+    return index > 0 && index % 5 === 0;
+}
+
+function spawnBossForWave(index = waveIndex) {
+    const baseSize = {
+        width: Math.max(ENEMY_MIN_SIZE * 1.6, enemySpriteDimensions.width * 1.4),
+        height: Math.max(ENEMY_MIN_SIZE * 1.3, enemySpriteDimensions.height * 1.1)
+    };
+    const baseHp = 85 + index * 12;
+    boss = {
+        x: Math.max(gameCanvas.width - baseSize.width - PLAYFIELD_PADDING_X, gameCanvas.width * 0.6),
+        y: clampWithinPadding(gameCanvas.height / 2 - baseSize.height / 2, baseSize.height, gameCanvas.height, PLAYFIELD_PADDING_Y),
+        width: baseSize.width,
+        height: baseSize.height,
+        speed: 1.4 + index * 0.08,
+        variant: 'boss',
+        hp: baseHp,
+        maxHp: baseHp,
+        mirrorDash: index >= 3
+    };
+    bossActive = true;
+    enemies.push(boss);
+    waveEnemyTarget = 1;
+    waveEnemiesSpawned = 1;
+    showAnnounce(bossAnnounceEl, `Boss Incoming! (Wave ${index})`);
+}
+
+function startWave() {
+    intermissionActive = false;
+    gamePaused = false;
+    damageTakenThisWave = false;
+    waveEnemyTarget = getWaveTargetSize(waveIndex);
+    waveEnemiesSpawned = 0;
+    waveScoreMultiplier = nextWaveScoreMultiplier || 1;
+    nextWaveScoreMultiplier = 1;
+
+    if (isBossWave(waveIndex)) {
+        spawnBossForWave(waveIndex);
+    } else {
+        bossActive = false;
+        boss = null;
+    }
+
+    enemySpawnTimer = getSpawnIntervalSeconds();
+    showAnnounce(waveAnnounceEl, `Wave ${waveIndex}`);
+}
+
+function buildIntermissionOptions({ perfectClear = false } = {}) {
+    const shuffled = [...UPGRADE_CATALOG].sort(() => Math.random() - 0.5);
+    const options = shuffled.slice(0, 3).map(option => ({
+        ...option,
+        type: 'upgrade',
+        free: false
+    }));
+
+    if (perfectClear) {
+        options.push({
+            id: 'perfect-score',
+            type: 'scoreMultiplier',
+            multiplier: 1.25,
+            label: 'Score Uplink',
+            description: 'Next wave score gains +25%.',
+            free: true
+        });
+        options.push({
+            id: 'perfect-life',
+            type: 'life',
+            amount: 1,
+            label: 'Reinforced Hull',
+            description: 'Gain +1 life for a flawless run.',
+            free: true
+        });
+    }
+
+    return options;
+}
+
+function renderIntermissionOptions(options = intermissionOptions) {
+    if (!intermissionOptionsEl) return;
+    intermissionOptionsEl.innerHTML = '';
+    options.forEach(option => {
+        const card = document.createElement('article');
+        card.className = 'intermission-card';
+        card.setAttribute('role', 'listitem');
+
+        const title = document.createElement('h4');
+        title.textContent = option.label;
+
+        const rarity = option.rarity ? option.rarity.toUpperCase() : (option.type === 'scoreMultiplier' ? 'BONUS' : 'REWARD');
+        const rarityBadge = document.createElement('span');
+        rarityBadge.className = 'status-chip';
+        rarityBadge.textContent = rarity;
+        title.appendChild(rarityBadge);
+        card.appendChild(title);
+
+        const body = document.createElement('p');
+        body.textContent = option.description || '';
+        card.appendChild(body);
+
+        const meta = document.createElement('div');
+        meta.className = 'intermission-meta';
+        const cost = option.free ? 'Free' : `${option.cost || 0} Cr.`;
+        meta.textContent = option.type === 'upgrade' ? `Cost: ${cost}` : 'Bonus';
+        card.appendChild(meta);
+
+        const actionBtn = document.createElement('button');
+        actionBtn.type = 'button';
+        actionBtn.textContent = option.free ? 'Claim' : 'Purchase';
+        actionBtn.addEventListener('click', () => handleIntermissionChoice(option));
+        card.appendChild(actionBtn);
+
+        intermissionOptionsEl.appendChild(card);
+    });
+}
+
+function openIntermission({ bossDefeated = false } = {}) {
+    intermissionActive = true;
+    gamePaused = true;
+    if (intermissionOverlayEl) {
+        intermissionOverlayEl.style.display = 'flex';
+        activateFocusTrap(intermissionOverlayEl, { initialFocus: intermissionContinueBtn });
+    }
+
+    const perfectClear = !damageTakenThisWave;
+    intermissionOptions = buildIntermissionOptions({ perfectClear });
+    const summaryParts = [`Wave ${waveIndex} cleared${bossDefeated ? ' (Boss)' : ''}.`];
+    if (perfectClear) {
+        summaryParts.push('No damage sustained! Perfect clear bonuses unlocked.');
+    }
+    if (intermissionSummaryEl) intermissionSummaryEl.textContent = summaryParts.join(' ');
+    renderIntermissionOptions();
+    updatePageScrollLock();
+}
+
+function handleIntermissionChoice(option) {
+    if (!option) return;
+    if (option.type === 'upgrade') {
+        if (option.free) {
+            playerData.items.push(option.id);
+            applyPowerup(option.id);
+        } else {
+            purchaseUpgrade(option.id);
+        }
+    } else if (option.type === 'scoreMultiplier') {
+        nextWaveScoreMultiplier = Math.max(nextWaveScoreMultiplier, option.multiplier || 1);
+        notificationManager.push({ type: 'buff', title: 'Score Bonus Ready', message: 'Next wave earnings increased.' });
+    } else if (option.type === 'life') {
+        const newLives = Math.min(MAX_LIVES, lives + (option.amount || 0));
+        if (newLives !== lives) {
+            lives = newLives;
+            uiCache.lives = null;
+        }
+    }
+    updateUI();
+}
+
+function closeIntermissionOverlay() {
+    if (intermissionOverlayEl) {
+        intermissionOverlayEl.style.display = 'none';
+        deactivateFocusTrap(intermissionOverlayEl);
+    }
+    intermissionActive = false;
+    updatePageScrollLock();
+}
+
+function resumeFromIntermission() {
+    if (!intermissionActive) return;
+    closeIntermissionOverlay();
+    waveIndex += 1;
+    startWave();
+}
+
+function evaluateWaveCompletion({ bossDefeated = false } = {}) {
+    if (intermissionActive || !gameRunning) return;
+    const clearedBoss = bossDefeated || (!bossActive && isBossWave(waveIndex) && waveEnemyTarget === 1 && enemies.length === 0);
+    const clearedWave = waveEnemyTarget > 0 && waveEnemiesSpawned >= waveEnemyTarget && enemies.length === 0;
+
+    if (clearedBoss || clearedWave) {
+        openIntermission({ bossDefeated: clearedBoss });
+    }
+}
+
 function startGame(isNewSession = true) {
     unlockInterfaceControls();
     hideAllOverlays();
@@ -3454,6 +3658,14 @@ function startGame(isNewSession = true) {
     chargeStartTime = 0;
     isCharging = false;
     dashCooldown = 0;
+    waveIndex = 1;
+    waveEnemyTarget = 0;
+    waveEnemiesSpawned = 0;
+    intermissionActive = false;
+    damageTakenThisWave = false;
+    waveScoreMultiplier = 1;
+    nextWaveScoreMultiplier = 1;
+    intermissionOptions = [];
 
     player.x = Math.round(BASE_CANVAS_WIDTH * 0.08);
     player.y = gameCanvas.height / 2 - player.height / 2;
@@ -3469,10 +3681,7 @@ function startGame(isNewSession = true) {
         playerData.gamesPlayed = (playerData.gamesPlayed || 0) + 1;
     }
 
-    const spawnInterval = getSpawnIntervalSeconds();
-    enemySpawnTimer = spawnInterval;
-    spawnEnemy();
-    enemySpawnTimer = 0;
+    startWave();
 
     updateUI();
     savePlayerData();
@@ -3489,6 +3698,7 @@ function skipShop() {
 function handleGameOver() {
     if (!gameRunning) return;
 
+    closeIntermissionOverlay();
     gameRunning = false;
     gamePaused = true;
     bossActive = false;
@@ -5194,6 +5404,7 @@ function gainXP(amount, options = {}) {
 function applyLifeDamage(amount) {
     if (!Number.isFinite(amount) || amount <= 0 || lives <= 0) return 0;
     pendingLifeDamage += amount;
+    damageTakenThisWave = true;
     let livesLost = 0;
     while (pendingLifeDamage >= 1 && lives > 0) {
         pendingLifeDamage -= 1;
@@ -5918,7 +6129,9 @@ function updateEnemies() {
 
                 if (enemy.hp <= 0) {
                     const streakBonus = killStreak >= COMBO_THRESHOLD ? 20 : 10;
-                    score += streakBonus + (enemy.variant === 'mecha' ? 10 : 0) + (enemy.variant === 'boss' ? 100 : 0);
+                    const baseScore = streakBonus + (enemy.variant === 'mecha' ? 10 : 0) + (enemy.variant === 'boss' ? 100 : 0);
+                    const scaledScore = Math.round(baseScore * Math.max(1, waveScoreMultiplier));
+                    score += scaledScore;
                     uiCache.score = null;
 
                     // XP GAIN
@@ -5943,7 +6156,8 @@ function updateEnemies() {
                     
                     if (killStreak >= COMBO_THRESHOLD) { registerSpeedModifier(1.2, 3000, 'combo_streak'); }
     
-                    if (enemy === boss) {
+                    const defeatedBoss = enemy === boss;
+                    if (defeatedBoss) {
                         enemies.splice(e, 1);
                         bossActive = false;
                         if (boss.split) {
@@ -5967,7 +6181,8 @@ function updateEnemies() {
                             }
                         }
                         showAnnounce(waveAnnounceEl, 'Boss Defeated!');
-                        
+                        evaluateWaveCompletion({ bossDefeated: true });
+
                     } else {
                         const dropChance = Math.min(0.95, 0.2 + (player.focusRating * 0.01) + (player.specialPerks?.dropChanceBonus || 0));
                         if (Math.random() < dropChance) {
@@ -5975,6 +6190,7 @@ function updateEnemies() {
                             const puType = puTypes[Math.floor(Math.random() * puTypes.length)];
                             powerups.push({ x: enemy.x + enemy.width / 2 - 10, y: enemy.y + enemy.height / 2 - 10, type: puType, width: 20, height: 20 });
                         } enemies.splice(e, 1);
+                        evaluateWaveCompletion();
                     }
                 }
                 hitsThisFrame++;
@@ -5989,6 +6205,8 @@ function updateEnemies() {
             uiCache.combo = null;
         }
     }
+
+    evaluateWaveCompletion();
 }
 
 function updatePlayer() {
@@ -6111,12 +6329,15 @@ function updatePowerups() {
 }
 
 function spawnEnemy() {
-    if (!gameRunning || bossActive || gamePaused || hitStopDuration > 0) return;
+    if (!gameRunning || bossActive || gamePaused || hitStopDuration > 0 || intermissionActive) return;
 
     enemySpawnTimer += deltaTime;
     const spawnInterval = getSpawnIntervalSeconds();
 
     if (enemySpawnTimer >= spawnInterval) {
+        if (waveEnemyTarget > 0 && waveEnemiesSpawned >= waveEnemyTarget) {
+            return;
+        }
         enemySpawnTimer = 0;
         const template = buildEnemyTemplate();
 
@@ -6141,6 +6362,7 @@ function spawnEnemy() {
             diveStrength: template.diveStrength,
             divePhase: Math.random() * Math.PI * 2
         });
+        waveEnemiesSpawned++;
     }
 }
 
