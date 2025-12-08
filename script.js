@@ -133,10 +133,14 @@ const focusPauseOverlayEl = document.getElementById('focus-pause-overlay');
 const focusPauseTitleEl = document.getElementById('focus-pause-title');
 const focusPauseMessageEl = document.getElementById('focus-pause-message');
 const focusPauseResumeBtn = document.getElementById('focus-pause-resume');
+const orientationOverlayEl = document.getElementById('orientation-overlay');
+const onboardingOverlayEl = document.getElementById('onboarding-overlay');
+const onboardingDismissBtn = document.getElementById('onboarding-dismiss');
 const statusValueEl = document.querySelector('.xp-status-value');
 const statusTipEl = document.querySelector('.xp-status-tip');
 const DEFAULT_STATUS_VALUE_TEXT = statusValueEl ? statusValueEl.textContent : '';
 const DEFAULT_STATUS_TIP_TEXT = statusTipEl ? statusTipEl.textContent : '';
+const ONBOARDING_SEEN_KEY = 'astro_onboarding_seen';
 
 const UI_MODES = {
     START: 'start',
@@ -388,6 +392,7 @@ function initializeUIEvents() {
     bindButtonClick(windowBackToStartBtn, showStartMenu);
 
     bindButtonClick(focusPauseResumeBtn, () => resumeGameFromFocusLoss({ triggeredByUser: true }));
+    bindButtonClick(onboardingDismissBtn, () => hideOnboardingOverlay(true));
 }
 
 function detectTouchSupport() {
@@ -407,6 +412,16 @@ function detectTouchSupport() {
         // Ignore matchMedia errors; fallback to other detection methods.
     }
     return false;
+}
+
+function emitNativeHaptic(eventName) {
+    try {
+        if (window.webkit?.messageHandlers?.haptics) {
+            window.webkit.messageHandlers.haptics.postMessage({ event: eventName });
+        }
+    } catch (error) {
+        // Ignore native bridge failures to keep controls responsive.
+    }
 }
 
 function configureTouchControls(forceTouch = null) {
@@ -488,6 +503,7 @@ function setupFireButtonControls() {
         event.preventDefault();
         fireButton.classList.add('active');
         fireButton.classList.add('haptic-active');
+        emitNativeHaptic('fireButton');
         if (typeof event.pointerId === 'number' && typeof fireButton.setPointerCapture === 'function') {
             try {
                 fireButton.setPointerCapture(event.pointerId);
@@ -545,6 +561,7 @@ function handleJoystickStart(event) {
     joystickActive = true;
     joystick.classList.add('active');
     joystick.classList.add('haptic-active');
+    emitNativeHaptic('joystick');
 
     if (isTouchEvent) {
         const touch = event.changedTouches?.[0];
@@ -2739,6 +2756,56 @@ function hideAllOverlays() {
     updatePageScrollLock();
 }
 
+async function requestLandscapeLock() {
+    if (screen.orientation?.lock) {
+        try {
+            await screen.orientation.lock('landscape');
+            document.body.classList.add('landscape-locked');
+        } catch (error) {
+            // Orientation lock may fail on some browsers; fall back to overlay hint.
+        }
+    }
+}
+
+function updateOrientationOverlay() {
+    if (!orientationOverlayEl) return;
+    const isPortrait = window.matchMedia && window.matchMedia('(orientation: portrait)').matches;
+    orientationOverlayEl.style.display = isPortrait ? 'flex' : 'none';
+}
+
+function showOnboardingOverlay() {
+    if (!onboardingOverlayEl) return;
+    onboardingOverlayEl.style.display = 'flex';
+    const dismissTarget = onboardingDismissBtn || onboardingOverlayEl.querySelector('button');
+    activateFocusTrap(onboardingOverlayEl, { initialFocus: dismissTarget });
+}
+
+function hideOnboardingOverlay(markSeen = false) {
+    if (!onboardingOverlayEl) return;
+    onboardingOverlayEl.style.display = 'none';
+    deactivateFocusTrap(onboardingOverlayEl);
+    if (markSeen) {
+        try {
+            localStorage.setItem(ONBOARDING_SEEN_KEY, '1');
+        } catch (error) {
+            // Ignore storage errors; onboarding will simply show again.
+        }
+    }
+}
+
+function maybeShowOnboardingOverlay() {
+    let hasSeenOnboarding = false;
+    try {
+        hasSeenOnboarding = localStorage.getItem(ONBOARDING_SEEN_KEY) === '1';
+    } catch (error) {
+        hasSeenOnboarding = false;
+    }
+
+    if (!hasSeenOnboarding) {
+        showOnboardingOverlay();
+    }
+}
+
 function updateNavigationRibbon() {
     uiRibbonButtons.forEach((button) => {
         const isActive = button.dataset.uiTarget === uiMode;
@@ -3334,6 +3401,7 @@ function showHub() {
 function startGame(isNewSession = true) {
     unlockInterfaceControls();
     hideAllOverlays();
+    hideOnboardingOverlay(true);
     setUiMode(UI_MODES.PLAY);
 
     gameRunning = true;
@@ -6399,6 +6467,11 @@ async function initializeApp() {
     initializeUIEvents();
     configureTouchControls();
     monitorPointerCapabilityChanges();
+    requestLandscapeLock();
+    updateOrientationOverlay();
+    window.addEventListener('orientationchange', updateOrientationOverlay);
+    window.addEventListener('resize', updateOrientationOverlay);
+    maybeShowOnboardingOverlay();
 
     showStartMenu();
 

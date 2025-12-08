@@ -9,6 +9,15 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <script>
+        const isIOS = /iP(ad|hone|od)/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        if (isIOS) {
+            const iosStylesheet = document.createElement('link');
+            iosStylesheet.rel = 'stylesheet';
+            iosStylesheet.href = 'styles.ios.css';
+            document.head.appendChild(iosStylesheet);
+        }
+    </script>
     <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/@metaplex-foundation/js@0.20.1/dist/js/index.iife.min.js" defer></script>
 </head>
@@ -103,6 +112,40 @@
                         <p id="focus-pause-message" class="modal-lede">Play paused while the window lost focus. Resume when you're ready.</p>
                         <div class="modal-actions">
                             <button id="focus-pause-resume" type="button">Resume Game</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="orientation-overlay" class="overlay orientation-overlay" role="alert" aria-live="polite">
+                <div class="menu-panel xp-window xp-modal orientation-panel">
+                    <div class="xp-titlebar">
+                        <div class="xp-title-group">
+                            <span class="xp-title-icon">📱</span>
+                            <span class="xp-app-name">Landscape Required</span>
+                        </div>
+                    </div>
+                    <div class="xp-window-content">
+                        <p class="modal-lede">Rotate your device to landscape for the best cockpit view.</p>
+                        <p>We lock the cabinet to landscape so you can see the whole sector and avoid accidental touches.</p>
+                    </div>
+                </div>
+            </div>
+            <div id="onboarding-overlay" class="overlay onboarding-overlay" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+                <div class="menu-panel xp-window xp-modal">
+                    <div class="xp-titlebar">
+                        <div class="xp-title-group">
+                            <span class="xp-title-icon">🎮</span>
+                            <span class="xp-app-name" id="onboarding-title">Dash & Charge Primer</span>
+                        </div>
+                    </div>
+                    <div class="xp-window-content">
+                        <p class="modal-lede">Double-tap movement to dash and hold Fire to charge a mega shot.</p>
+                        <ul class="onboarding-tips">
+                            <li><strong>Dash</strong>: double-tap a direction to blink through incoming fire (2s cooldown).</li>
+                            <li><strong>Charge</strong>: hold the fire button to charge, then release for heavy damage.</li>
+                        </ul>
+                        <div class="modal-actions">
+                            <button id="onboarding-dismiss" type="button">Got it</button>
                         </div>
                     </div>
                 </div>
