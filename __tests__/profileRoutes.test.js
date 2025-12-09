@@ -12,6 +12,7 @@ const tmpRoot = path.join(__dirname, '..', 'tmp-data');
 let app;
 let store;
 let activeServer;
+const apiKey = 'profile-key';
 
 async function startServer() {
   return new Promise((resolve, reject) => {
@@ -25,13 +26,20 @@ async function apiRequest(pathname, options = {}) {
   activeServer = server;
   const { port } = server.address();
   const url = `http://localhost:${port}${pathname}`;
-  return fetch(url, options);
+  try {
+    return await fetch(url, options);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    activeServer = null;
+  }
 }
 
 before(async () => {
   await fs.rm(tmpRoot, { recursive: true, force: true });
   process.env.DATA_DIR = tmpRoot;
   process.env.NODE_ENV = 'test';
+  process.env.LEADERBOARD_API_KEY = apiKey;
+  process.env.PROFILE_API_KEY = apiKey;
 
   const serverModule = await import('../server.js');
   const storeModule = await import('../data/store.js');
@@ -61,7 +69,7 @@ after(async () => {
 test('accepts and sanitizes valid profile payloads', async () => {
   const response = await apiRequest('/api/profile/test-owner', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
     body: JSON.stringify({
       name: '  Nova  ',
       title: 'Star Commander',
@@ -124,7 +132,7 @@ test('accepts and sanitizes valid profile payloads', async () => {
 test('rejects invalid profile payloads', async () => {
   const response = await apiRequest('/api/profile/test-owner', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
     body: JSON.stringify({
       name: 'Nova!',
       avatar: 'ftp://example.com/avatar.png',
@@ -155,7 +163,7 @@ test('rejects invalid owners for profile routes', async () => {
 
     const putResponse = await apiRequest(`/api/profile/${encodedOwner}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
       body: JSON.stringify({ name: 'Nova' }),
     });
 
@@ -163,7 +171,9 @@ test('rejects invalid owners for profile routes', async () => {
     const putPayload = await putResponse.json();
     assert.strictEqual(putPayload.error, 'invalid_owner');
 
-    const getResponse = await apiRequest(`/api/profile/${encodedOwner}`);
+    const getResponse = await apiRequest(`/api/profile/${encodedOwner}`, {
+      headers: { 'x-api-key': apiKey },
+    });
     assert.strictEqual(getResponse.status, 400);
     const getPayload = await getResponse.json();
     assert.strictEqual(getPayload.error, 'invalid_owner');
