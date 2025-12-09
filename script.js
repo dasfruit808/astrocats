@@ -1434,6 +1434,22 @@ const XP_CURVE_SEGMENTS = [
     { minLevel: 41, maxLevel: MAX_PLAYER_LEVEL, base: BASE_XP_TO_LEVEL * 30, growth: 1.45, bonus: 4500 * 3 }
 ];
 
+const GUEST_PROFILE_STORAGE_KEY = 'astro_invaders_guest';
+const LEADERBOARD_STORAGE_KEY = 'astro_invaders_leaderboard';
+const EVENT_LEADERBOARD_STORAGE_KEY = 'astro_invaders_leaderboard_event';
+const STORAGE_WARNING_MESSAGE = 'Progress may not be saved: storage unavailable.';
+const EVENT_CONFIG = {
+    id: 'weekly_boss',
+    label: 'Weekly Boss Rush',
+    durationMs: 1000 * 60 * 60 * 24 * 7
+};
+const EVENT_EPOCH = Date.UTC(2024, 0, 1);
+let activeLeaderboardChannel = 'global';
+const leaderboardState = {
+    global: { changeToken: 0, lastFetchToken: -1, lastFetchTime: 0 },
+    event: { changeToken: 0, lastFetchToken: -1, lastFetchTime: 0 }
+};
+
 const LEVEL_BASELINE_STATS = { strength: 3, speed: 2, vitality: 3, focus: 1 };
 const LEVEL_STAT_TIERS = [
     { maxLevel: 10, perLevel: { strength: 0.8, speed: 0.6, vitality: 0.9, focus: 0.45 } },
@@ -4385,22 +4401,6 @@ function sanitizeLeaderboardEntry(entry) {
 
     return { publicKey, level, bestScore, stats, ...(eventId ? { eventId } : {}) };
 }
-
-const GUEST_PROFILE_STORAGE_KEY = 'astro_invaders_guest';
-const LEADERBOARD_STORAGE_KEY = 'astro_invaders_leaderboard';
-const EVENT_LEADERBOARD_STORAGE_KEY = 'astro_invaders_leaderboard_event';
-const STORAGE_WARNING_MESSAGE = 'Progress may not be saved: storage unavailable.';
-const EVENT_CONFIG = {
-    id: 'weekly_boss',
-    label: 'Weekly Boss Rush',
-    durationMs: 1000 * 60 * 60 * 24 * 7
-};
-const EVENT_EPOCH = Date.UTC(2024, 0, 1);
-let activeLeaderboardChannel = 'global';
-const leaderboardState = {
-    global: { changeToken: 0, lastFetchToken: -1, lastFetchTime: 0 },
-    event: { changeToken: 0, lastFetchToken: -1, lastFetchTime: 0 }
-};
 
 function showStorageWarning(message = STORAGE_WARNING_MESSAGE) {
     if (!storageWarningEl) return;
