@@ -3,17 +3,81 @@ import cors from 'cors';
 import { WebSocketServer } from 'ws';
 import http from 'http';
 import {
+    getLeaderboardSize,
     getProfile,
     getSortedLeaderboardSnapshot,
     getTopLeaderboard,
+    getStoreStatus,
     saveProfile,
     storeReady,
     upsertLeaderboardEntry,
 } from './data/store.js';
 
 const app = express();
-app.use(cors());
+app.set('trust proxy', true);
+
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+function applySecurityHeaders(req, res, next) {
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    if (req.secure || process.env.FORCE_STRICT_TRANSPORT === 'true') {
+        res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
+    }
+    next();
+}
+
+const corsOptions = {
+    origin(origin, callback) {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes('*')) return callback(null, true);
+        const isAllowed = allowedOrigins.some((allowed) => {
+            try {
+                return new URL(allowed).origin === new URL(origin).origin;
+            } catch (error) {
+                return allowed === origin;
+            }
+        });
+        if (isAllowed) {
+            return callback(null, true);
+        }
+        return callback(new Error('Not allowed by CORS'));
+    },
+    optionsSuccessStatus: 200,
+};
+
+app.use(applySecurityHeaders);
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
+app.use((err, req, res, next) => {
+    if (err && err.message === 'Not allowed by CORS') {
+        res.status(403).json({ error: 'origin_not_allowed' });
+        return;
+    }
+    next(err);
+});
+
+const leaderboardApiKey = process.env.LEADERBOARD_API_KEY;
+if (!leaderboardApiKey) {
+    throw new Error('LEADERBOARD_API_KEY must be set');
+}
+const profileApiKey = process.env.PROFILE_API_KEY || leaderboardApiKey;
+
+function requireApiKey(expectedKey) {
+    return (req, res, next) => {
+        if (req.header('x-api-key') !== expectedKey) {
+            res.status(401).json({ error: 'unauthorized' });
+            return;
+        }
+        next();
+    };
+}
 
 const PROFILE_SCHEMA = {
     name: {
@@ -36,7 +100,9 @@ const PROFILE_SCHEMA = {
         trim: true,
         validator: (value) => {
             if (!value) return true;
-            if (value.startsWith('data:')) return value.length <= 4096;
+            if (value.startsWith('data:')) {
+                return value.length <= 2048 && value.toLowerCase().startsWith('data:image/');
+            }
             try {
                 const url = new URL(value);
                 return ['http:', 'https:'].includes(url.protocol);
@@ -171,15 +237,32 @@ const rateLimitState = new Map();
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 10;
 
+function cleanupRateLimitState(now) {
+    for (const [identifier, record] of rateLimitState.entries()) {
+        if (record.resetAt <= now) {
+            rateLimitState.delete(identifier);
+        }
+    }
+}
+
 const OWNER_RULES = {
     maxLength: 64,
     pattern: /^[A-Za-z0-9_-]+$/,
 };
 
+function getClientIdentifier(req) {
+    const apiKey = req.header('x-api-key');
+    if (apiKey) return `key:${apiKey}`;
+    const forwarded = req.header('x-forwarded-for');
+    if (forwarded) return `xff:${forwarded.split(',')[0].trim()}`;
+    return `ip:${req.ip || req.connection.remoteAddress || 'unknown'}`;
+}
+
 function enforceRateLimit(identifier) {
     if (!identifier) return { allowed: true };
 
     const now = Date.now();
+    cleanupRateLimitState(now);
     const current = rateLimitState.get(identifier) || { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS };
 
     if (now > current.resetAt) {
@@ -290,38 +373,47 @@ function broadcastLeaderboard(wss, snapshot) {
     broadcastPayload(wss, { type: 'leaderboard_update', entries: snapshot || [] });
 }
 
-function broadcastValidationError(wss, details) {
-    broadcastPayload(wss, { type: 'leaderboard_error', ...details });
+function broadcastValidationError(wss, error, metadata = {}) {
+    broadcastPayload(wss, { type: 'leaderboard_error', error, ...metadata });
 }
 
 export function resetAbuseControls() {
     rateLimitState.clear();
 }
 
-app.get('/api/leaderboard/top', async (req, res) => {
+app.get('/health', async (req, res) => {
     await storeReady;
-    const sorted = await getTopLeaderboard(50);
-    res.json(sorted);
+    const status = getStoreStatus();
+    const body = { status: status.ok ? 'ok' : 'degraded' };
+    if (!status.ok) body.error = status.error;
+    res.status(status.ok ? 200 : 503).json(body);
 });
 
-app.post('/api/leaderboard', async (req, res) => {
-    const apiKey = process.env.LEADERBOARD_API_KEY;
-    if (apiKey && req.header('x-api-key') !== apiKey) {
-        broadcastValidationError(server.wss, { error: 'unauthorized' });
-        res.status(401).json({ error: 'unauthorized' });
-        return;
-    }
+app.get('/api/leaderboard/top', async (req, res) => {
+    await storeReady;
+    const requestedLimit = clampNumber(req.query.limit, { min: 1, max: leaderboardMaxEntries }) || 50;
+    const offset = clampNumber(req.query.offset, { min: 0, max: leaderboardMaxEntries }) || 0;
+    const snapshot = await getTopLeaderboard(Math.min(leaderboardMaxEntries, requestedLimit + offset));
+    const total = await getLeaderboardSize();
+    res.json({
+        entries: snapshot.slice(offset, offset + requestedLimit),
+        limit: requestedLimit,
+        offset,
+        total,
+    });
+});
 
-    const rateResult = enforceRateLimit(req.ip);
+app.post('/api/leaderboard', requireApiKey(leaderboardApiKey), async (req, res) => {
+    const rateResult = enforceRateLimit(getClientIdentifier(req));
     if (!rateResult.allowed) {
-        broadcastValidationError(server.wss, { error: 'rate_limited', resetAt: rateResult.resetAt });
+        broadcastValidationError(server.wss, 'rate_limited', { resetAt: rateResult.resetAt });
         res.status(429).json({ error: 'rate_limited', resetAt: rateResult.resetAt });
         return;
     }
 
     const validation = validateLeaderboardEntry(req.body);
     if (!validation.ok) {
-        broadcastValidationError(server.wss, { error: 'invalid_entry', details: validation.errors });
+        broadcastValidationError(server.wss, 'invalid_entry');
         res.status(400).json({ error: 'invalid_entry', details: validation.errors });
         return;
     }
@@ -332,7 +424,7 @@ app.post('/api/leaderboard', async (req, res) => {
     res.json({ ok: true });
 });
 
-app.put('/api/profile/:owner', async (req, res) => {
+app.put('/api/profile/:owner', requireApiKey(profileApiKey), async (req, res) => {
     const ownerValidation = validateOwner(req.params.owner);
     if (!ownerValidation.ok) {
         res.status(400).json({ error: 'invalid_owner' });
@@ -350,7 +442,7 @@ app.put('/api/profile/:owner', async (req, res) => {
     res.json({ ok: true });
 });
 
-app.get('/api/profile/:owner', async (req, res) => {
+app.get('/api/profile/:owner', requireApiKey(profileApiKey), async (req, res) => {
     const ownerValidation = validateOwner(req.params.owner);
     if (!ownerValidation.ok) {
         res.status(400).json({ error: 'invalid_owner' });
@@ -371,7 +463,28 @@ await storeReady;
 const server = http.createServer(app);
 if (process.env.NODE_ENV !== 'test') {
     server.wss = new WebSocketServer({ server, path: '/api/realtime' });
+    const heartbeatInterval = setInterval(() => {
+        server.wss.clients.forEach((client) => {
+            if (client.isAlive === false) {
+                client.terminate();
+                return;
+            }
+            client.isAlive = false;
+            client.ping();
+        });
+    }, 30_000);
+
+    server.wss.on('close', () => clearInterval(heartbeatInterval));
+
     server.wss.on('connection', (socket) => {
+        socket.isAlive = true;
+        socket.on('pong', () => {
+            socket.isAlive = true;
+        });
+        socket.on('close', () => {
+            socket.isAlive = false;
+        });
+
         socket.send(JSON.stringify({ type: 'connected' }));
         const snapshot = getSortedLeaderboardSnapshot();
         if (snapshot.length && socket.readyState === 1) {

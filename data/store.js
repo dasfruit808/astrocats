@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'fs/promises';
+import { mkdir, readFile, rename, writeFile } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -22,6 +22,7 @@ export const leaderboardMaxEntries = Math.min(
 let leaderboardEntries = new Map();
 let cachedLeaderboard = [];
 let profiles = new Map();
+let storeLoadError = null;
 
 function compareLeaderboardEntries(a, b) {
     if (b.level !== a.level) return b.level - a.level;
@@ -99,7 +100,9 @@ async function saveJsonArray(filePath, data, description) {
     try {
         await ensureDataDir();
         const serialized = JSON.stringify(data, null, 2);
-        await writeFile(filePath, serialized, 'utf8');
+        const tempFilePath = `${filePath}.tmp`;
+        await writeFile(tempFilePath, serialized, 'utf8');
+        await rename(tempFilePath, filePath);
     } catch (error) {
         console.warn(`[data] Failed to persist ${description}.`, error);
     }
@@ -122,7 +125,17 @@ async function loadStore() {
     profiles = await loadProfiles();
 }
 
-export const storeReady = loadStore();
+export const storeReady = (async () => {
+    try {
+        await loadStore();
+    } catch (error) {
+        storeLoadError = error;
+        console.error('[data] Failed to initialize store. Starting with empty state.', error);
+        leaderboardEntries = new Map();
+        cachedLeaderboard = [];
+        profiles = new Map();
+    }
+})();
 
 export function getSortedLeaderboardSnapshot(limit) {
     if (!cachedLeaderboard.length && leaderboardEntries.size > 0) {
@@ -135,6 +148,11 @@ export function getSortedLeaderboardSnapshot(limit) {
 export async function getTopLeaderboard(limit = 50) {
     await storeReady;
     return getSortedLeaderboardSnapshot(limit);
+}
+
+export async function getLeaderboardSize() {
+    await storeReady;
+    return leaderboardEntries.size;
 }
 
 export async function upsertLeaderboardEntry(entry) {
@@ -156,6 +174,13 @@ export async function saveProfile(owner, profile) {
         : {};
     profiles.set(owner, sanitizedProfile);
     await persistProfiles();
+}
+
+export function getStoreStatus() {
+    return {
+        ok: !storeLoadError,
+        error: storeLoadError ? 'failed_to_load' : null,
+    };
 }
 
 export async function resetStoreForTest() {
