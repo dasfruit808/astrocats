@@ -1449,6 +1449,8 @@ const leaderboardState = {
     global: { changeToken: 0, lastFetchToken: -1, lastFetchTime: 0 },
     event: { changeToken: 0, lastFetchToken: -1, lastFetchTime: 0 }
 };
+const LEADERBOARD_FETCH_COOLDOWN_MS = 5000;
+const leaderboardLoadPromises = { global: null, event: null };
 
 const LEVEL_BASELINE_STATS = { strength: 3, speed: 2, vitality: 3, focus: 1 };
 const LEVEL_STAT_TIERS = [
@@ -4485,9 +4487,6 @@ function writeLeaderboardSafely(entries, channel = 'global') {
         return false;
     }
 }
-
-const LEADERBOARD_FETCH_COOLDOWN_MS = 5000;
-const leaderboardLoadPromises = { global: null, event: null };
 
 function enqueueProfileSync(snapshot) {
     if (!REMOTE_PROFILE_ENDPOINT || !snapshot) return;
